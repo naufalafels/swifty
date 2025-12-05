@@ -250,11 +250,11 @@ export const carDetailStyles = {
 // ... existing styles ...
 
 export const testimonialStyles = {
-  container: "relative bg-black py-16 px-4 sm:px-6 lg:px-8 overflow-hidden",
+  container: "relative bg-yellow py-16 px-4 sm:px-6 lg:px-8 overflow-hidden",
   innerContainer: "max-w-7xl mx-auto relative z-10",
   headerContainer: "text-center mb-16",
-  badge: "inline-flex items-center px-5 py-2 rounded-full bg-gray-800/50 backdrop-blur-sm border border-gray-700 mb-5",
-  badgeText: "text-sm font-medium text-orange-400",
+  badge: "inline-flex items-center px-5 py-2 rounded-full bg-gray-900/50 backdrop-blur-sm border border-orange-500 mb-5",
+  badgeText: "text-sm font-medium text-white",
   title: "text-4xl sm:text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-orange-600 mb-4 font-[pacifico]",
   accentText: "text-orange-400",
   dividerContainer: "flex justify-center items-center mb-5",
@@ -263,7 +263,7 @@ export const testimonialStyles = {
   grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8",
   card: "relative rounded-2xl overflow-hidden transform transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-t-4 border-orange-400",
   cardContent: "p-6 sm:p-8 relative z-10",
-  quoteIcon: "text-orange-400",
+  quoteIcon: "text-white",
   ratingContainer: "flex",
   star: "mr-1",
   comment: "text-gray-300 italic text-lg mb-8",
@@ -283,10 +283,10 @@ export const testimonialStyles = {
   statValue: (color) => `text-4xl sm:text-5xl font-bold ${color} mb-2`,
   statLabel: (color) => `text-sm ${color} font-medium`,
   ctaContainer: "mt-20 text-center",
-  ctaTitle: "text-3xl font-bold text-white font-[pacifico] mb-4",
-  ctaText: "text-gray-400 max-w-2xl mx-auto font-[pacifico] mb-8",
+  ctaTitle: "text-3xl font-bold text-gray-700 font-[pacifico] mb-4",
+  ctaText: "text-gray-500 max-w-2xl mx-auto font-[pacifico] mb-8",
   ctaButton: "bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white font-bold py-3 font-[pacifico] px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg shadow-orange-500/20",
-  bottomGradient: "absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-gray-900 to-transparent z-0",
+  bottomGradient: "absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-gray-400 to-transparent z-0",
   cardShapes: [
     "clip-path: polygon(0% 10%, 10% 0%, 100% 0%, 100% 90%, 90% 100%, 0% 100%);",
     "clip-path: polygon(0% 0%, 90% 0%, 100% 10%, 100% 100%, 10% 100%, 0% 90%);",

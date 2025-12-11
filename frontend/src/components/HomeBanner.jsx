@@ -52,7 +52,7 @@ export default function HeroSleek() {
         className={styles.container}
         style={{ ["--mx"]: 0.5, ["--my"]: 0.5 }}
       >
-        {/* Background */}
+        {/* BACKGROUND */}
         <div
           ref={bgRef}
           className={styles.background}
@@ -63,11 +63,13 @@ export default function HeroSleek() {
             transition: "transform 220ms cubic-bezier(.2,.9,.25,1)",
           }}
         >
-          <img
+
+          { /* PROMOTION */ }
+          {/*<img
             src={img1}
             alt="Futuristic car"
             className="w-full object-center opacity-95"
-          />
+          />*/}
 
           <div className={styles.gradientOverlay} />
         </div>

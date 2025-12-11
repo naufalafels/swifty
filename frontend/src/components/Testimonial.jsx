@@ -99,7 +99,7 @@ const Testimonial = () => {
                 <div className={styles.statsGrid}>
                     <div className={styles.statItem}>
                         <div className={styles.statValue(styles.statColors.value[0])}>
-                            500+
+                            200+
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[0])}>
                             Happy Customers
@@ -108,25 +108,25 @@ const Testimonial = () => {
 
                     <div className={styles.statItem}>
                         <div className={styles.statValue(styles.statColors.value[1])}>
-                            15+
+                            50+
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[1])}>
-                            Eco-Friendly Vehicles
+                            Fuel-Friendly Vehicles
                         </div>
                     </div>
 
                     <div className={styles.statItem}>
                         <div className={styles.statValue(styles.statColors.value[2])}>
-                            24/7
+                            2021
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[2])}>
-                            Support
+                            Since Established
                         </div>
                     </div>
 
                     <div className={styles.statItem}>
                         <div className={styles.statValue(styles.statColors.value[3])}>
-                            50+
+                            20+
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[3])}>
                             Locations

@@ -131,7 +131,7 @@ const Footer = () => {
 
             {/* BOTTOM COPYRIGHT */}
             <div className={styles.copyright}>
-                <p>&copy; Swifty 2021. All Rights Reserved.</p>
+                <p>&copy; {new Date().getFullYear()} Swifty. All Rights Reserved.</p>
                 <p className=' mt-3 md:mt-0'>
                     Designed by{" "}
                     <a 

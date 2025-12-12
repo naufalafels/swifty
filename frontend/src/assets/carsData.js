@@ -15,7 +15,9 @@ const carsData = [
     seats: 5,
     fuel: "Gasoline",
     transmission: "Automatic",
-    year: "2007 >"
+    year: "2007 >",
+    milage: "150k+",
+    perks: "Compact"
   },
   {
     id: 6,
@@ -27,7 +29,9 @@ const carsData = [
     seats: 5,
     fuel: "Gasoline",
     transmission: "Automatic",
-    year: "2024 >"
+    year: "2024 >",
+    milage: "30k+",
+    perks: "Hybrid"
   },
   {
     id: 7,
@@ -39,7 +43,9 @@ const carsData = [
     seats: 7,
     fuel: "Gasoline",
     transmission: "Automatic",
-    year: "2022 >"
+    year: "2022 >",
+    milage: "50k+",
+    perks: "Family"
   },
   {
     id: 8,
@@ -51,7 +57,9 @@ const carsData = [
     seats: 2,
     fuel: "Diesel",
     transmission: "Automatic",
-    year: "2021 >"
+    year: "2021 >",
+    milage: "70k+",
+    perks: "Cargo"
   },
 ];
 

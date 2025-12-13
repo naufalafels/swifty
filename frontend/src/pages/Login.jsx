@@ -38,7 +38,7 @@ const Login = () => {
       draggable: true,
       theme: 'colored',
       onClose: () => {
-        const redirectPath = location.state?.from || '/';
+        const redirectPath = '/';
         navigate(redirectPath, { replace: true });
       }
     });

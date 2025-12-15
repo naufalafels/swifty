@@ -104,6 +104,12 @@ bookingSchema.post('save', async function (doc, next) {
                 { $pull: { bookings: bookingEntry } },
                 { new: true }
             ).exec();
+
+            await Car.findByIdAndUpdate(
+                carId,
+                { $push: { bookings: bookingEntry } },
+                { new: true }
+            ).exec();
         }
 
         else {
@@ -136,8 +142,8 @@ bookingSchema.post('remove', async function (doc, next) {
         next();
     } 
     
-    catch (error) {
-        
+    catch (err) {
+        next(err);
     }
 });
 

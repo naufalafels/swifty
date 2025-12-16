@@ -7,8 +7,8 @@ import ContactPage from './pages/ContactPage';
 import CarsPage from './pages/CarsPage';
 import CarDetailPage from './pages/CarDetailPage';
 import { FaArrowUp } from 'react-icons/fa';
-import MyBookings from './components/MyBookings';
 import VerifyPaymentPage from './pages/VerifyPaymentPage';
+import MyBookingsPage from './pages/MyBookingsPage';
 
 // PROTECTED ROUTE
 const ProtectedRoute = ({ children }) => {
@@ -69,7 +69,7 @@ const App = () => {
           path='/bookings'
           element={
             <ProtectedRoute>
-              <MyBookings />
+              <MyBookingsPage />
             </ProtectedRoute>
           }
         />

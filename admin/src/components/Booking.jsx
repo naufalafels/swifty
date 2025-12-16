@@ -620,6 +620,10 @@ const Booking = () => {
                             onStatusChange={(e) => setNewStatus(e.target.value)}
                             onSaveStatus={(e) => {
                                 e.stopPropagation();
+                                updateStatus(booking.id);
+                            }}
+                            onCancelEdit={(e) => {
+                                e.stopPropagation();
                                 handleCancelEdit();
                             }}
                         />

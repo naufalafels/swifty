@@ -6,7 +6,7 @@ import HC4 from "../assets/HC4.png";
 
 const carsData = [
   {
-    id: 5,
+    id: 1,
     name: "Toyota Yaris",
     type: "Compact Auto",
     price: 30,
@@ -20,7 +20,7 @@ const carsData = [
     perks: "Compact"
   },
   {
-    id: 6,
+    id: 2,
     name: "Toyota Camry",
     type: "Eco-Friendly Sedan",
     price: 50,
@@ -34,7 +34,7 @@ const carsData = [
     perks: "Hybrid"
   },
   {
-    id: 7,
+    id: 3,
     name: "Toyota Kluger",
     type: "Intermediate SUV",
     price: 75,
@@ -48,7 +48,7 @@ const carsData = [
     perks: "Family"
   },
   {
-    id: 8,
+    id: 4,
     name: "Van",
     type: "Cargo Van",
     price: 70,

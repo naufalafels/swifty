@@ -166,33 +166,35 @@ const AddCar = () => {
     };
 
     const renderInputField = (field) => {
-        <div key={field.name}>
-            <label
-                className={
-                    field.icon ? AddCarPageStyles.labelWithIcon : AddCarPageStyles.label
-                }
-            >
-                {field.icon}
-                {field.name}
-            </label>
+        return (
+            <div key={field.name}>
+                <label
+                    className={
+                        field.icon ? AddCarPageStyles.labelWithIcon : AddCarPageStyles.label
+                    }
+                >
+                    {field.icon}
+                    {field.label}
+                </label>
 
-            <input
-                required={field.required}
-                name={field.name}
-                value={data[field.name]}
-                onChange={handleChange}
-                type={field.type || "text"}
-                className={
-                    field.prefix
-                        ? AddCarPageStyles.inputWithPrefix
-                        : AddCarPageStyles.input
-                }
-                placeholder={field.placeholder}
-                min={field.min}
-                max={field.max}
-                {...field.props}
-            />
-        </div>
+                <input
+                    required={field.required}
+                    name={field.name}
+                    value={data[field.name]}
+                    onChange={handleChange}
+                    type={field.type || "text"}
+                    className={
+                        field.prefix
+                            ? AddCarPageStyles.inputWithPrefix
+                            : AddCarPageStyles.input
+                    }
+                    placeholder={field.placeholder}
+                    min={field.min}
+                    max={field.max}
+                    {...field.props}
+                />
+            </div>
+        );
     };
 
     const renderSelectField = (field) => (
@@ -485,7 +487,7 @@ const AddCar = () => {
                     </div>
 
                     <div className=' mt-12 flex justify-center'>
-                        <button type='' className={AddCarPageStyles.submitButton}>
+                        <button type="submit" className={AddCarPageStyles.submitButton}>
                             <span className={AddCarPageStyles.buttonText}>List Your Car</span>
                             <svg
                                 className={AddCarPageStyles.iconInline}

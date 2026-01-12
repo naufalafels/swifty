@@ -46,6 +46,9 @@ app.use(
 app.use('/api/auth', userRouter);
 app.use('/api/cars', carRouter);
 app.use('/api/bookings', bookingRouter);
+
+// for webhook route only: need raw body parsing
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/payments', paymentRouter);
 
 app.get('api/ping', (req, res) => res.json({

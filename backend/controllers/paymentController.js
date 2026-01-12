@@ -8,7 +8,7 @@ dotenv.config();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim() || 'http://localhost:5173';
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2022-11-15";
-const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'aud').toLowerCase();
+const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toLowerCase();
 const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
 
 const getStripe = () => {

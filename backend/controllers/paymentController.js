@@ -1,26 +1,51 @@
 import Booking from '../models/bookingModel.js';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 
 dotenv.config();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim() || 'http://localhost:5173';
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2022-11-15";
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'aud').toLowerCase();
+const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
 
-// Get Stripe client safely
 const getStripe = () => {
   const key = (process.env.STRIPE_SECRET_KEY || '').trim();
   if (!key) throw new Error('Stripe secret key is not defined in environment variables');
   return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
 };
 
+const getUserIdFromRequest = (req) => {
+  try {
+    const auth = req.headers?.authorization || req.headers?.Authorization;
+    if (!auth) return null;
+    const parts = String(auth).split(' ');
+    if (parts.length !== 2) return null;
+    const token = parts[1];
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (payload && (payload.id || payload._id)) return String(payload.id ?? payload._id);
+      return null;
+    } catch {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+};
+
 export const createCheckoutSession = async (req, res) => {
   try {
     if (!req.body) return res.status(400).json({ success: false, message: 'Request body is missing' });
 
+    // Attempt to derive userId from server-side (JWT) if not provided by client
+    let providedUserId = req.body.userId;
+    const tokenUserId = getUserIdFromRequest(req);
+    const userId = tokenUserId || providedUserId || null;
+
     const {
-      userId,
       customer,
       email,
       phone,
@@ -50,11 +75,21 @@ export const createCheckoutSession = async (req, res) => {
       try { carField = JSON.parse(car); } catch { carField = { name: car }; }
     }
 
+    // Ensure we have a valid userId for booking model (booking.userId is required)
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized: missing user authentication' });
+    }
+
+    let finalUserId = userId;
+    if (!mongoose.Types.ObjectId.isValid(finalUserId)) {
+      return res.status(400).json({ success: false, message: 'Invalid userId format' });
+    }
+
     // Create booking (pending)
     let booking;
     try {
       booking = await Booking.create({
-        userId: userId || null,
+        userId: finalUserId,
         customer: String(customer ?? ""),
         email: String(email ?? ""),
         phone: String(phone ?? ""),
@@ -70,20 +105,17 @@ export const createCheckoutSession = async (req, res) => {
         currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
       });
     } catch (err) {
-      // return schema/db error back to client for debugging
-      console.error('Failed to create booking:', err);
+      console.error('Booking.create failed:', err && err.stack ? err.stack : err);
       return res.status(500).json({ success: false, message: 'Failed to create booking', error: String(err.message || err) });
     }
 
     let stripe;
     try { stripe = getStripe(); } catch (err) {
-      // rollback booking if stripe not configured
       await Booking.findByIdAndDelete(booking._id).catch(() => {});
-      console.error('Stripe config error:', err);
-      return res.status(500).json({ success: false, message: 'Payment configuration error', error: err.message });
+      console.error('Stripe config error:', err && err.stack ? err.stack : err);
+      return res.status(500).json({ success: false, message: 'Payment configuration error', error: String(err.message || err) });
     }
 
-    // Create checkout session
     let session;
     try {
       session = await stripe.checkout.sessions.create({
@@ -107,24 +139,22 @@ export const createCheckoutSession = async (req, res) => {
         cancel_url: `${FRONTEND_URL}/cancel?payment_status=cancelled`,
         metadata: {
           bookingId: booking._id.toString(),
-          userId: String(userId ?? ""),
+          userId: String(finalUserId ?? ""),
           carId: String((carField && (carField.id || carField._id)) || ""),
           pickupDate: String(pickupDate || ""),
           returnDate: String(returnDate || ""),
         },
       });
     } catch (stripeErr) {
-      console.error('Stripe session creation failed:', stripeErr);
+      console.error('Stripe session creation failed:', stripeErr && stripeErr.stack ? stripeErr.stack : stripeErr);
       await Booking.findByIdAndDelete(booking._id).catch(() => {});
       return res.status(500).json({ success: false, message: 'Failed to create Stripe checkout session', error: String(stripeErr.message || stripeErr) });
     }
 
-    // Save session data into booking
     booking.sessionId = session.id;
     booking.stripeSession = { id: session.id, url: session.url || null };
     await booking.save().catch((err) => console.warn('Failed to save stripeSession on booking', err));
 
-    // Return session info; frontend will redirect using session.url
     return res.json({
       success: true,
       id: session.id,
@@ -133,13 +163,13 @@ export const createCheckoutSession = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Checkout Session Error', error);
+    console.error('Checkout Session Error', error && error.stack ? error.stack : error);
     return res.status(500).json({ success: false, message: error.message || 'Internal server error' });
   }
 };
 
-// GET confirm-payment (existing behavior kept)
-export const confirmPayment = async (req, res) => {
+// Confirm payment endpoint (must be exported as named export)
+export const confirmPayment = async (req, res) => { 
   try {
     const { session_id } = req.query;
     if (!session_id) return res.status(400).json({ success: false, message: 'Session ID is required' });

@@ -5,9 +5,12 @@ import { stripeWebhookHandler } from '../controllers/webhookController.js';
 const paymentRouter = express.Router();
 
 paymentRouter.post('/create-checkout-session', createCheckoutSession);
+
+// keep both endpoints as aliases so old clients still work
+paymentRouter.get('/confirm', confirmPayment);
 paymentRouter.get('/confirm-payment', confirmPayment);
 
-// For webhooks, stripe requires raw body. When mounting in server.js, ensure to use express.raw for this endpoint.
+// webhook endpoint (Stripe will POST here)
 paymentRouter.post('/webhook', stripeWebhookHandler);
 
 export default paymentRouter;

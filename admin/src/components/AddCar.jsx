@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useRef, useState, useCallback } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 
-const baseURL = 'http://localhost:7889/';
+const baseURL = 'http://localhost:7889';
 const api = axios.create({ baseURL });
 
 

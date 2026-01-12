@@ -382,7 +382,7 @@ const HomeCars = () => {
 
                 <div className={styles.priceBadge}>
                   <span className={styles.priceText}>
-                    ₹{car.dailyRate ?? car.price ?? 0}/day
+                    RM{car.dailyRate ?? car.price ?? 0}/day
                   </span>
                 </div>
 

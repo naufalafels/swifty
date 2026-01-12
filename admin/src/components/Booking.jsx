@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useEffect, useCallback } from 'react';
 import { useMemo } from 'react';
 
-const baseURL = 'http://localhost:7889/';
+const baseURL = 'http://localhost:7889';
 const api = axios.create({ baseURL, headers: { Accept: 'application/json' } });
 
 // Utility functions

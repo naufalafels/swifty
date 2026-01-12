@@ -253,6 +253,7 @@ const SignUp = () => {
                                     checked={acceptedTerms}
                                     onChange={() => setAcceptedTerms(!acceptedTerms)}
                                     className={signupStyles.form.checkbox}
+                                    required
                                     style={{ boxShadow: "none" }}
                                 />
                             </div>

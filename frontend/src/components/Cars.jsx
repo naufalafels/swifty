@@ -388,7 +388,7 @@ const Cars = () => {
                     </div>
 
                     <div className={carPageStyles.priceBadge}>
-                      ₹{car.dailyRate ?? car.price ?? car.pricePerDay ?? "—"}
+                      RM{car.dailyRate ?? car.price ?? car.pricePerDay ?? "—"}
                       /day
                     </div>
                   </div>

@@ -6,7 +6,6 @@ import React, {
   useRef,
 } from "react";
 import { Link } from "react-router-dom";
-import axios from "axios";
 import {
   FaCar,
   FaCalendarAlt,
@@ -22,8 +21,8 @@ import {
   FaArrowRight,
 } from "react-icons/fa";
 import { myBookingsStyles as s } from "../assets/dummyStyles.js";
+import { fetchMyBookings, cancelBooking as serviceCancelBooking } from "../services/bookingService.js";
 
-const API_BASE = "http://localhost:7889";
 const TIMEOUT = 15000;
 
 // ---------- Helpers ----------
@@ -224,7 +223,7 @@ const BookingCard = ({ booking, onViewDetails }) => {
           <div>
             <h3 className={s.carTitle}>{booking.car.make}</h3>
             <p className={s.carSubtitle}>
-              {booking.car.category} â€¢ {booking.car.year}
+              {booking.car.category} • {booking.car.year}
             </p>
           </div>
           <div className="text-right">
@@ -414,13 +413,13 @@ const BookingModal = ({ booking, onClose, onCancel }) => {
                 <div className="mb-3">
                   <p className={s.infoLabel}>Payment Method:</p>
                   <p className={s.infoValue}>
-                    {booking.paymentMethod || "â€”"}
+                    {booking.paymentMethod || "—"}
                   </p>
                 </div>
                 <div>
                   <p className={s.infoLabel}>Transaction ID:</p>
                   <p className={s.infoValue}>
-                    {booking.paymentId || booking.raw?.sessionId || "â€”"}
+                    {booking.paymentId || booking.raw?.sessionId || "—"}
                   </p>
                 </div>
               </div>
@@ -481,23 +480,14 @@ const MyBookings = () => {
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
 
     try {
-      const token = localStorage.getItem("token");
-      const headers = {
-        "Content-Type": "application/json",
-        ...(token && { Authorization: `Bearer ${token}` }),
-      };
+      const responseData = await fetchMyBookings({ signal: controller.signal });
 
-      const response = await axios.get(`${API_BASE}/api/bookings/mybooking`, {
-        headers,
-        signal: controller.signal,
-      });
-
-      const rawData = Array.isArray(response.data)
-        ? response.data
-        : response.data?.data ||
-          response.data?.bookings ||
-          response.data?.rows ||
-          response.data ||
+      const rawData = Array.isArray(responseData)
+        ? responseData
+        : responseData?.data ||
+          responseData?.bookings ||
+          responseData?.rows ||
+          responseData ||
           [];
 
       const normalized = (Array.isArray(rawData) ? rawData : []).map(
@@ -534,20 +524,10 @@ const MyBookings = () => {
       if (!window.confirm("Are you sure you want to cancel this booking?"))
         return;
       try {
-        const token = localStorage.getItem("token");
-        const headers = {
-          "Content-Type": "application/json",
-          ...(token && { Authorization: `Bearer ${token}` }),
-        };
-        const response = await axios.patch(
-          `${API_BASE}/api/bookings/${bookingId}/status`,
-          { status: "cancelled" },
-          { headers }
-        );
-
+        const responseData = await serviceCancelBooking(bookingId);
         const updated = normalizeBooking(
-          response.data ||
-            response.data?.data || { _id: bookingId, status: "cancelled" }
+          responseData ||
+            responseData?.data || { _id: bookingId, status: "cancelled" }
         );
         setBookings((prev) =>
           prev.map((b) => (b.id === bookingId ? updated : b))

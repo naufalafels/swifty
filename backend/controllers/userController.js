@@ -3,10 +3,13 @@ import User from '../models/userModel.js';
 import validator from "validator";
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
 
-// TOKEN
-const TOKEN_EXPIRES_IN = '24h';
-const JWT_SECRET = 'your_jwt_secret_here';
+dotenv.config();
+
+// TOKEN SETTINGS
+const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || '24h';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 
 const createToken = (userId) => {
     const secret = JWT_SECRET;
@@ -118,7 +121,8 @@ export async function login(req, res) {
             message: 'Invalid password!'
         });
 
-        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '24h' });
+        // Sign token using the same JWT_SECRET that auth middleware will use
+        const token = createToken(user._id.toString());
         return res.status(200).json({
             success: true,
             message: 'Login Successfully!',

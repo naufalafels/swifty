@@ -13,8 +13,28 @@ const tryParseJSON = (v) => {
     try { return JSON.parse(v); } catch { return v; }
 }
 
+/**
+ * Build a compact car summary to store inside booking.car.
+ * We now include company/companyId/companyName so admin views can
+ * segregate bookings/cars per company.
+ */
 const buildCarSummary = (src = {}) => {
-    const id = src.id?.toString?.() || src.id || null;
+    const id = src.id?.toString?.() || src._id?.toString?.() || src.id || null;
+
+    // Try to extract company id/name from a variety of possible shapes:
+    // car.company may be an ObjectId, a string id, or an object with { _id, name }
+    let companyId = null;
+    let companyName = null;
+    if (src.company) {
+        if (typeof src.company === 'string') companyId = src.company;
+        else if (src.company._id || src.company.id) companyId = (src.company._id || src.company.id).toString?.() || (src.company._id || src.company.id) || null;
+        else if (src.company.id) companyId = src.company.id?.toString?.() || src.company.id || null;
+
+        if (src.company.name) companyName = src.company.name;
+    }
+    // fallback attempts
+    if (!companyId) companyId = src.companyId || src.company_id || null;
+    if (!companyName) companyName = src.companyName || src.company_name || null;
 
     return {
         id,
@@ -27,7 +47,10 @@ const buildCarSummary = (src = {}) => {
         fuelType: src.fuelType,
         mileage: src.mileage ? Number(src.mileage) : 0,
         image: src.image || src.carImage || "",
-  };
+        // company info (new)
+        companyId: companyId ? companyId.toString?.() || companyId : null,
+        companyName: companyName || null,
+    };
 }
 
 const deleteLocalFileIfPresent = (filePath) => {
@@ -53,7 +76,7 @@ export const createBooking = async (req, res) => {
         const pickup = new Date(pickupDate);
         const ret = new Date(returnDate);
 
-        if (Number.isNan(pickup.getTime()) || Number.isNaN(ret.getTime()) || pickup > ret) {
+        if (Number.isNaN(pickup.getTime()) || Number.isNaN(ret.getTime()) || pickup > ret) {
             await session.abortTransaction(); session.endSession();
             return res.status(400).json({ success: false, message: 'Invalid pickup or return date' });
         }
@@ -63,12 +86,25 @@ export const createBooking = async (req, res) => {
             const carDoc = await Car.findById(car).session(session).lean();
             if (!carDoc) { await session.abortTransaction(); session.endSession(); return res.status(404).json({ success: false, message: "Car not found" }); }
             carSummary = buildCarSummary(carDoc);
+            // If the car doc has a direct company field we try to normalize it
+            if (!carSummary.companyId && (carDoc.company || carDoc.companyId)) {
+                const c = carDoc.company || carDoc.companyId;
+                carSummary.companyId = c._id?.toString?.() || c.toString?.() || c || null;
+                carSummary.companyName = carDoc.company?.name || carDoc.companyName || carSummary.companyName || null;
+            }
         } else {
             const parsed = tryParseJSON(car) || car;
             carSummary = buildCarSummary(parsed);
             if (!carSummary.id) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: "Invalid car payload" }); }
             const carExists = await Car.exists({ _id: carSummary.id }).session(session);
             if (!carExists) { await session.abortTransaction(); session.endSession(); return res.status(404).json({ success: false, message: "Car not found" }); }
+            // try to pull company from DB to ensure booking has company info
+            const carDoc = await Car.findById(carSummary.id).session(session).lean();
+            if (carDoc) {
+                const cs = buildCarSummary(carDoc);
+                carSummary.companyId = cs.companyId || carSummary.companyId;
+                carSummary.companyName = cs.companyName || carSummary.companyName;
+            }
         }
 
         const carId = carSummary.id;
@@ -139,6 +175,7 @@ export const getBookings = async (req, res, next) => {
         const carFilter = req.query.car?.trim() || "";
         const from = req.query.from ? new Date(req.query.from) : null;
         const to = req.query.to ? new Date(req.query.to) : null;
+        const companyFilter = req.query.company?.trim() || ""; // new: filter by company id or name
 
         const query = {};
         if (search) {
@@ -150,6 +187,15 @@ export const getBookings = async (req, res, next) => {
         if (carFilter) {
             if (/^[0-9a-fA-F]{24}$/.test(carFilter)) query["car.id"] = carFilter;
             else query.$or = [...(query.$or || []), { "car.make": { $regex: carFilter, $options: "i" } }, { "car.model": { $regex: carFilter, $options: "i" } }];
+        }
+
+        // companyFilter: accept company id (24hex) or company name substring
+        if (companyFilter) {
+            if (/^[0-9a-fA-F]{24}$/.test(companyFilter)) {
+                query["car.companyId"] = companyFilter;
+            } else {
+                query["car.companyName"] = { $regex: companyFilter, $options: "i" };
+            }
         }
 
         if (from || to) {
@@ -209,7 +255,7 @@ export const updateBooking = async (req, res, next) => {
             if (req.body.carImage && !String(req.body.carImage).startsWith("/uploads/") && booking.carImage && booking.carImage.startsWith("/uploads/")) {
                 deleteLocalFileIfPresent(booking.carImage);
             }
-        booking.carImage = req.body.carImage || booking.carImage;
+            booking.carImage = req.body.carImage || booking.carImage;
         }
 
         const updatable = ["customer", "email", "phone", "car", "pickupDate", "returnDate", "bookingDate", "status", "amount", "details", "address"];
@@ -223,6 +269,9 @@ export const updateBooking = async (req, res, next) => {
                 if (c) {
                     const summary = buildCarSummary(c);
                     if (!summary.id && booking.car?.id) summary.id = booking.car.id;
+                    // ensure company info preserved if present on c or from db
+                    if (!summary.companyId && booking.car?.companyId) summary.companyId = booking.car.companyId;
+                    if (!summary.companyName && booking.car?.companyName) summary.companyName = booking.car.companyName;
                     booking.car = summary;
                 }
             } else booking[f] = req.body[f];

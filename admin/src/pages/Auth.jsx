@@ -17,11 +17,19 @@ const AuthPage = ({ mode = 'login' }) => {
     street: '',
     city: '',
     state: '',
-    zipCode: ''
+    zipCode: '',
+    logoFile: null
   });
   const [error, setError] = useState('');
 
-  const onChange = (e) => setValues(v => ({ ...v, [e.target.name]: e.target.value }));
+  const onChange = (e) => {
+    const { name, value, files } = e.target;
+    if (files) {
+      setValues(v => ({ ...v, [name]: files[0] }));
+    } else {
+      setValues(v => ({ ...v, [name]: value }));
+    }
+  };
 
   const doSubmit = async (e) => {
     e.preventDefault();
@@ -29,21 +37,23 @@ const AuthPage = ({ mode = 'login' }) => {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        // call admin signup endpoint
-        const payload = {
-          name: values.name,
-          email: values.email,
-          password: values.password,
-          companyName: values.companyName,
-          address: {
-            street: values.street,
-            city: values.city,
-            state: values.state,
-            zipCode: values.zipCode
-          },
-          phone: values.phone
-        };
-        const res = await axios.post(`${API_BASE}/api/admin/signup`, payload);
+        // send multipart/form-data with optional logo file
+        const form = new FormData();
+        form.append('name', values.name);
+        form.append('email', values.email);
+        form.append('password', values.password);
+        form.append('companyName', values.companyName);
+        form.append('phone', values.phone || '');
+        form.append('address_street', values.street || '');
+        form.append('address_city', values.city || '');
+        form.append('address_state', values.state || '');
+        form.append('address_zipCode', values.zipCode || '');
+        if (values.logoFile) form.append('logo', values.logoFile);
+
+        const res = await axios.post(`${API_BASE}/api/admin/signup`, form, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
         if (res.data?.success) {
           saveAdminSession(res.data.token, res.data.user);
           navigate('/');
@@ -51,7 +61,7 @@ const AuthPage = ({ mode = 'login' }) => {
         }
         setError(res.data?.message || 'Signup failed');
       } else {
-        // login via existing auth endpoint
+        // login via existing auth endpoint (JSON)
         const res = await axios.post(`${API_BASE}/api/auth/login`, {
           email: values.email,
           password: values.password
@@ -88,6 +98,9 @@ const AuthPage = ({ mode = 'login' }) => {
 
             <label className="block mb-2">Phone</label>
             <input name="phone" value={values.phone} onChange={onChange} className="w-full mb-3 p-2 rounded bg-gray-700" />
+
+            <label className="block mb-2">Logo (optional)</label>
+            <input name="logoFile" type="file" accept="image/*" onChange={onChange} className="w-full mb-3 p-2 rounded bg-gray-700" />
 
             <label className="block mb-2">Address (street)</label>
             <input name="street" value={values.street} onChange={onChange} className="w-full mb-3 p-2 rounded bg-gray-700" />

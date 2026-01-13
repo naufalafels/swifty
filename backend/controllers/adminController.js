@@ -10,33 +10,59 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 const TOKEN_EXPIRES = process.env.TOKEN_EXPIRES || '24h';
+const SERVER_URL = process.env.SERVER_URL || process.env.FRONTEND_URL || 'http://localhost:7889';
 
-// Helper to sign token
 const signToken = (userId) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES });
 
-// Create company + company_admin user in one step
+// Helper: build logo URL from uploaded file info (req.file)
+const buildLogoUrl = (file) => {
+  if (!file) return '';
+  // uploads/company-logos/<filename>
+  return `${SERVER_URL.replace(/\/$/, '')}/uploads/company-logos/${file.filename}`;
+};
+
+// Helper: construct address/contact from form fields (multipart sends strings)
+const buildAddressFromBody = (body) => ({
+  street: body.address_street || body.street || (body.address && body.address.street) || '',
+  city: body.address_city || body.city || (body.address && body.address.city) || '',
+  state: body.address_state || body.state || (body.address && body.address.state) || '',
+  zipCode: body.address_zipCode || body.zipCode || (body.address && body.address.zipCode) || '',
+});
+
+// ---------------- Signup: create company + company_admin user (accepts multipart/logo file) ----------------
 export const signupCompany = async (req, res) => {
   try {
-    const { name, email, password, companyName, address = {}, location = null, phone } = req.body;
+    // multer may have placed file on req.file
+    const { name, email, password, companyName, phone } = req.body;
+    const address = buildAddressFromBody(req.body);
+
     if (!name || !email || !password || !companyName) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
-    // Check if email exists
+    // check user exists
     const exists = await User.findOne({ email }).lean();
     if (exists) return res.status(409).json({ success: false, message: 'User already exists' });
 
-    // Create Company
+    // create company
     const slug = companyName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-    const company = await Company.create({
+    const companyData = {
       name: companyName,
       slug,
       address,
-      location: location ? { type: 'Point', coordinates: location } : undefined,
       contact: { phone, email },
-    });
+    };
 
-    // Create User as company_admin
+    // if file uploaded, set logo
+    if (req.file) {
+      companyData.logo = buildLogoUrl(req.file);
+    } else if (req.body.logo) {
+      companyData.logo = req.body.logo;
+    }
+
+    const company = await Company.create(companyData);
+
+    // create user as company_admin
     const hashed = await bcrypt.hash(password, 10);
     const user = new User({
       name,
@@ -47,7 +73,7 @@ export const signupCompany = async (req, res) => {
     });
     await user.save();
 
-    // link company owner
+    // link owner
     company.ownerUserId = user._id;
     await company.save();
 
@@ -58,7 +84,7 @@ export const signupCompany = async (req, res) => {
       message: 'Company account created',
       token,
       user: { id: user._id, name: user.name, email: user.email, role: user.role, companyId: user.companyId },
-      company: { id: company._id, name: company.name, slug: company.slug }
+      company: { id: company._id, name: company.name, slug: company.slug, logo: company.logo }
     });
   } catch (err) {
     console.error('signupCompany error', err);
@@ -66,7 +92,7 @@ export const signupCompany = async (req, res) => {
   }
 };
 
-// Admin: get cars for this company
+// ---------------- Admin: get cars (company scoped) ----------------
 export const getAdminCars = async (req, res) => {
   try {
     const user = req.user;
@@ -81,7 +107,7 @@ export const getAdminCars = async (req, res) => {
   }
 };
 
-// Admin: create a car for this company
+// ---------------- Admin: create car (company scoped) ----------------
 export const createAdminCar = async (req, res) => {
   try {
     const user = req.user;
@@ -89,7 +115,6 @@ export const createAdminCar = async (req, res) => {
     if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
 
     const body = req.body || {};
-    // minimal validation
     const required = ['make','model','year','dailyRate'];
     for (const f of required) if (!body[f]) return res.status(400).json({ success: false, message: `${f} is required` });
 
@@ -117,7 +142,56 @@ export const createAdminCar = async (req, res) => {
   }
 };
 
-// Admin: get bookings for this company
+// ---------------- Admin: update car (company scoped) ----------------
+export const updateAdminCar = async (req, res) => {
+  try {
+    const user = req.user;
+    const companyId = user.companyId || null;
+    const carId = req.params.id;
+    const body = req.body || {};
+
+    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    const car = await Car.findById(carId);
+    if (!car) return res.status(404).json({ success: false, message: 'Car not found' });
+    if (!car.companyId || car.companyId.toString() !== companyId.toString()) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','image','status','location'];
+    allowed.forEach(k => { if (body[k] !== undefined) car[k] = body[k]; });
+
+    await car.save();
+    return res.json({ success: true, car });
+  } catch (err) {
+    console.error('updateAdminCar', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ---------------- Admin: delete car (company scoped) ----------------
+export const deleteAdminCar = async (req, res) => {
+  try {
+    const user = req.user;
+    const companyId = user.companyId || null;
+    const carId = req.params.id;
+    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    const car = await Car.findById(carId);
+    if (!car) return res.status(404).json({ success: false, message: 'Car not found' });
+    if (!car.companyId || car.companyId.toString() !== companyId.toString()) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    await car.remove();
+    return res.json({ success: true, message: 'Car deleted' });
+  } catch (err) {
+    console.error('deleteAdminCar', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ---------------- Admin: bookings (company scoped) ----------------
 export const getAdminBookings = async (req, res) => {
   try {
     const user = req.user;
@@ -132,7 +206,6 @@ export const getAdminBookings = async (req, res) => {
   }
 };
 
-// Admin: update booking status (company can change own bookings)
 export const updateAdminBookingStatus = async (req, res) => {
   try {
     const user = req.user;
@@ -157,9 +230,7 @@ export const updateAdminBookingStatus = async (req, res) => {
   }
 };
 
-// ------------------- New: Company profile endpoints -------------------
-
-// GET company profile for the admin's company
+// ---------------- Company profile endpoints ----------------
 export const getCompanyProfile = async (req, res) => {
   try {
     const user = req.user;
@@ -176,18 +247,41 @@ export const getCompanyProfile = async (req, res) => {
   }
 };
 
-// PUT update company profile (only fields allowed)
 export const updateCompanyProfile = async (req, res) => {
   try {
     const user = req.user;
     const companyId = user.companyId || user.company || null;
     if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
 
+    // Build payload from body fields (multipart/form-data possible)
     const payload = {};
-    // Allowed fields to update:
-    const allowed = ['name', 'address', 'contact', 'location', 'isVerified'];
-    for (const k of allowed) {
-      if (req.body[k] !== undefined) payload[k] = req.body[k];
+    const allowed = ['name', 'isVerified'];
+    allowed.forEach(k => { if (req.body[k] !== undefined) payload[k] = req.body[k]; });
+
+    // address fields
+    const address = buildAddressFromBody(req.body);
+    payload.address = address;
+
+    // contact
+    payload.contact = {
+      phone: req.body.contact_phone || req.body.phone || (req.body.contact && req.body.contact.phone) || '',
+      email: req.body.contact_email || req.body.email || (req.body.contact && req.body.contact.email) || ''
+    };
+
+    // location - accept lat/lng fields if provided
+    if (req.body.location_lat && req.body.location_lng) {
+      const lat = parseFloat(req.body.location_lat);
+      const lng = parseFloat(req.body.location_lng);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        payload.location = { type: 'Point', coordinates: [lng, lat] };
+      }
+    }
+
+    // handle uploaded logo file (multer places it on req.file)
+    if (req.file) {
+      payload.logo = buildLogoUrl(req.file);
+    } else if (req.body.logo) {
+      payload.logo = req.body.logo;
     }
 
     const updated = await Company.findByIdAndUpdate(companyId, payload, { new: true }).lean();

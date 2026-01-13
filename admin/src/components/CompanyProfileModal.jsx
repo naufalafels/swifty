@@ -6,9 +6,10 @@ import { X } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
-const CompanyProfileModal = ({ onClose = () => {} }) => {
+const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState(null);
   const token = getAdminToken();
 
   useEffect(() => {
@@ -35,22 +36,40 @@ const CompanyProfileModal = ({ onClose = () => {} }) => {
   const updateAddress = (k, v) => setCompany(c => ({ ...c, address: { ...(c?.address || {}), [k]: v } }));
   const updateContact = (k, v) => setCompany(c => ({ ...c, contact: { ...(c?.contact || {}), [k]: v } }));
 
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0] || null;
+    setLogoFile(f);
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
-      const payload = {
-        name: company.name,
-        address: company.address,
-        contact: company.contact,
-        location: company.location,
-        logo: company.logo || '' // persist logo URL
-      };
-      const res = await axios.put(`${API_BASE}/api/admin/company`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
+      const form = new FormData();
+      form.append('name', company.name || '');
+      form.append('contact_email', company.contact?.email || '');
+      form.append('contact_phone', company.contact?.phone || '');
+      form.append('address_street', company.address?.street || '');
+      form.append('address_city', company.address?.city || '');
+      form.append('address_state', company.address?.state || '');
+      form.append('address_zipCode', company.address?.zipCode || '');
+      if (logoFile) form.append('logo', logoFile);
+      // if company.location fields exist, append as lat/lng
+      if (company.location?.coordinates) {
+        form.append('location_lat', company.location.coordinates[1]);
+        form.append('location_lng', company.location.coordinates[0]);
+      }
+
+      const res = await axios.put(`${API_BASE}/api/admin/company`, form, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
+
       if (res.data?.success) {
         setCompany(res.data.company);
         toast.success('Company updated');
+        if (typeof onSaved === 'function') onSaved(res.data.company);
         onClose();
       } else {
         toast.error(res.data?.message || 'Update failed');
@@ -86,13 +105,10 @@ const CompanyProfileModal = ({ onClose = () => {} }) => {
               </div>
 
               <div>
-                <label className="block mb-1 text-sm text-gray-300">Logo URL (image)</label>
-                <input className="w-full p-2 rounded bg-gray-800" value={company.logo || ''} onChange={e => updateField('logo', e.target.value)} placeholder="https://..." />
-                {company.logo && (
-                  <div className="mt-2">
-                    <img src={company.logo} alt="logo preview" className="h-16 object-contain" />
-                  </div>
-                )}
+                <label className="block mb-1 text-sm text-gray-300">Logo (upload)</label>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="w-full mb-2 p-2 rounded bg-gray-800" />
+                {company.logo && !logoFile && <div className="mt-2"><img src={company.logo} alt="logo preview" className="h-16 object-contain" /></div>}
+                {logoFile && <div className="mt-2"><img src={URL.createObjectURL(logoFile)} alt="preview" className="h-16 object-contain" /></div>}
               </div>
 
               <div>

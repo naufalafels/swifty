@@ -5,6 +5,7 @@ import AddCar from './components/AddCar.jsx'
 import ManageCar from './components/ManageCar.jsx';
 import Booking from './components/Booking.jsx';
 import AuthPage from './pages/Auth.jsx';
+import CompanyProfile from './pages/CompanyProfile.jsx';
 import { getAdminToken } from './utils/auth.js';
 
 const ProtectedRoute = ({ children }) => {
@@ -25,6 +26,8 @@ const App = () => {
         <Route path='/' element={<ProtectedRoute><AddCar /></ProtectedRoute>} />
         <Route path='/manage-cars' element={<ProtectedRoute><ManageCar /></ProtectedRoute>} />
         <Route path='/bookings' element={<ProtectedRoute><Booking /></ProtectedRoute>} />
+
+        <Route path='/company' element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} />
 
         <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>

@@ -156,3 +156,46 @@ export const updateAdminBookingStatus = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ------------------- New: Company profile endpoints -------------------
+
+// GET company profile for the admin's company
+export const getCompanyProfile = async (req, res) => {
+  try {
+    const user = req.user;
+    const companyId = user.companyId || user.company || null;
+    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    const company = await Company.findById(companyId).lean();
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+    return res.json({ success: true, company });
+  } catch (err) {
+    console.error('getCompanyProfile error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// PUT update company profile (only fields allowed)
+export const updateCompanyProfile = async (req, res) => {
+  try {
+    const user = req.user;
+    const companyId = user.companyId || user.company || null;
+    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    const payload = {};
+    // Allowed fields to update:
+    const allowed = ['name', 'address', 'contact', 'location', 'isVerified'];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) payload[k] = req.body[k];
+    }
+
+    const updated = await Company.findByIdAndUpdate(companyId, payload, { new: true }).lean();
+    if (!updated) return res.status(404).json({ success: false, message: 'Company not found' });
+
+    return res.json({ success: true, company: updated });
+  } catch (err) {
+    console.error('updateCompanyProfile error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

@@ -1,11 +1,12 @@
 import React from 'react';
 import { navbarStyles as styles } from '../assets/dummyStyles.js';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
-import { CalendarCheck, Car, Menu, PlusCircle, X } from 'lucide-react';
+import { CalendarCheck, Car, Menu, PlusCircle, X, LogOut, User } from 'lucide-react';
 import { useRef } from 'react';
 import { useEffect } from 'react';
+import { getAdminToken, getAdminUser, clearAdminSession } from '../utils/auth.js';
 
 const navLinks = [
     { path: "/", icon: PlusCircle, label: "Add Car" },
@@ -13,13 +14,17 @@ const navLinks = [
     { path: "/bookings", icon: CalendarCheck, label: "Bookings" },
 ];
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
 const Navbar = () => {
-
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const menuRef = useRef(null);
     const buttonRef = useRef(null);
+
+    // admin user info (optional display)
+    const adminUser = getAdminUser();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 10);
@@ -42,6 +47,33 @@ const Navbar = () => {
         document.addEventListener("mousedown", onDocClick);
         return () => document.removeEventListener("mousedown", onDocClick);
     }, [isOpen]);
+
+    const handleLogout = async () => {
+      try {
+        const token = getAdminToken();
+        // call backend logout if available (optional)
+        if (token) {
+          try {
+            await fetch(`${API_BASE}/api/auth/logout`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              credentials: 'include'
+            });
+          } catch (e) {
+            // ignore backend logout failure, proceed to clear client session
+            console.warn('Backend logout call failed', e);
+          }
+        }
+      } catch (err) {
+        console.warn('Logout fetch error', err);
+      } finally {
+        clearAdminSession();
+        navigate('/login');
+      }
+    };
 
     return (
         <div className={styles.navbar(scrolled)}>
@@ -80,6 +112,19 @@ const Navbar = () => {
                                             </React.Fragment>
                                         );
                                     })}
+                                </div>
+
+                                {/* Right side actions: Company profile and Logout */}
+                                <div className="flex items-center gap-3 ml-4">
+                                  <Link to="/company" className="flex items-center gap-2 text-sm text-gray-200 hover:text-white">
+                                    <User className="w-4 h-4" />
+                                    <span>Company</span>
+                                  </Link>
+
+                                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-1 bg-gray-700 rounded text-sm hover:bg-gray-600">
+                                    <LogOut className="w-4 h-4" />
+                                    <span>Logout</span>
+                                  </button>
                                 </div>
                             </div>
 
@@ -121,6 +166,28 @@ const Navbar = () => {
                                 </Link>
                             );
                         })}
+
+                        {/* Divider */}
+                        <div className="border-t border-gray-700 my-2" />
+
+                        {/* Company link */}
+                        <Link
+                          to="/company"
+                          className={styles.mobileNavLink}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <User className=' w-5 h-5' />
+                          <span>Company</span>
+                        </Link>
+
+                        {/* Logout entry in mobile menu */}
+                        <button
+                          onClick={() => { setIsOpen(false); handleLogout(); }}
+                          className={styles.mobileNavLink}
+                        >
+                          <LogOut className=' w-5 h-5' />
+                          <span>Logout</span>
+                        </button>
                     </div>
                 </div>
             )}

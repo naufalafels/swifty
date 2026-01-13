@@ -12,6 +12,7 @@ import userRouter from './routes/userRoutes.js';
 import carRouter from './routes/carRoutes.js';
 import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
+import adminRouter from './routes/adminRoutes.js';
 
 
 const app = express();
@@ -43,9 +44,13 @@ app.use(
 
 
 // ROUTES
-app.use('/api/auth', userRouter);
+app.use('/api/auth', userRouter); // auth routes
 app.use('/api/cars', carRouter);
 app.use('/api/bookings', bookingRouter);
+app.use('/api/payments', paymentRouter);
+
+// Add this line to mount admin API:
+app.use('/api/admin', adminRouter);
 
 // for webhook route only: need raw body parsing
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));

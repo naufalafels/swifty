@@ -4,10 +4,8 @@ import { FaCar, FaCog, FaEdit, FaFilter, FaGasPump, FaTachometerAlt, FaTrash, Fa
 
 import axios from 'axios';
 import { toast, ToastContainer } from 'react-toastify';
-import { useState } from 'react';
-import { useCallback } from 'react';
-import { useEffect } from 'react';
-import { useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { getAdminToken } from '../utils/auth.js';
 
 const BASE = 'http://localhost:7889';
 const api = axios.create({
@@ -84,12 +82,12 @@ const StatCard = ({ title, value, icon: Icon, className = "" }) => (
 
 const CarCard = ({ car, onEdit, onDelete }) => {
     const getStatusStyle = (status) => {
-        const styles = {
+        const stylesMap = {
             available: "bg-green-900/30 text-green-400",
             rented: "bg-yellow-900/30 text-yellow-400",
             maintenance: "bg-red-900/30 text-red-400",
         };
-        return styles[status] || "bg-gray-700 text-gray-200";
+        return stylesMap[status] || "bg-gray-700 text-gray-200";
     };
 
     return (
@@ -119,7 +117,7 @@ const CarCard = ({ car, onEdit, onDelete }) => {
                     </div>
 
                     <div className=' text-2xl font-bold text-orange-500'>
-                        ${car.dailyRate}
+                        RM{car.dailyRate}
                         <span className=' text-sm text-gray-400 font-normal'>/day</span>
                     </div>
                 </div>
@@ -133,7 +131,7 @@ const CarCard = ({ car, onEdit, onDelete }) => {
                     <div className=' flex items-center text-sm'>
                         <FaTachometerAlt className={`${styles.textOrange} mr-2`} />
                         <span className={styles.textGray300}>
-                            {(car.milage || 0).toLocaleString()} km
+                            {(car.mileage || 0).toLocaleString()} km
                         </span>
                     </div>
 
@@ -237,7 +235,6 @@ const EditModal = ({ car, onClose, onSubmit, onChange }) => {
         </div>
     );
 
-    // MAP INPUT FIELD TO EDIT AND SEND UPDATED VERSION ON BACKEND
     return (
         <div className={styles.modalOverlay}>
             <div
@@ -277,7 +274,7 @@ const EditModal = ({ car, onClose, onSubmit, onChange }) => {
                                 required: true,
                                 items: ["available", "rented", "maintenance"],
                             })}
-                            {inputField("Daily Rate ($)", "dailyRate", "number", {
+                            {inputField("Daily Rate (RM)", "dailyRate", "number", {
                                 required: true,
                                 min: 1,
                                 step: 0.01,
@@ -381,7 +378,6 @@ const FilterSelect = ({ value, onChange, categories }) => (
 );
 
 const ManageCar = () => {
-
     const [cars, setCars] = useState([]);
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [editingCar, setEditingCar] = useState(null);
@@ -389,8 +385,14 @@ const ManageCar = () => {
 
     const fetchCars = useCallback(async () => {
         try {
-            const res = await api.get("/api/cars?limit=100");
-            const raw = Array.isArray(res.data) ? res.data : res.data.data || [];
+            const token = getAdminToken();
+            if (!token) throw new Error('Not authenticated');
+
+            const res = await api.get("/api/admin/cars", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const raw = Array.isArray(res.data?.cars) ? res.data.cars : [];
             setCars(
                 raw.map((c, i) => ({
                     ...buildSafeCar(c, i),
@@ -433,7 +435,12 @@ const ManageCar = () => {
                 toast.success("Car removed locally.");
                 return;
             }
-            await api.delete(`/api/cars/${car._id}`);
+            const token = getAdminToken();
+            if (!token) throw new Error('Not authenticated');
+
+            await api.delete(`/api/admin/cars/${car._id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             toast.success("Car deleted");
             fetchCars();
         }
@@ -455,11 +462,20 @@ const ManageCar = () => {
 
     const handleEditSubmit = async (payload) => {
         try {
+            const token = getAdminToken();
+            if (!token) throw new Error('Not authenticated');
+
             if (!editingCar._id) {
-                await api.post("/api/cars", payload);
+                // add new car (admin)
+                await api.post("/api/admin/cars", payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 toast.success("Car added");
             } else {
-                await api.put(`/api/cars${editingCar._id}`, payload);
+                // update existing car (admin)
+                await api.put(`/api/admin/cars/${editingCar._id}`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 toast.success("Car updated");
             }
             setShowEditModal(false);

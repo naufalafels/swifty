@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
 import {
   signupCompany,
   getAdminCars,
@@ -18,7 +18,7 @@ import requireCompanyAdmin from '../middlewares/requireCompanyAdmin.js';
 
 const router = express.Router();
 
-// Configure multer storage for company logos
+// multer storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(process.cwd(), 'uploads', 'company-logos');
@@ -31,26 +31,26 @@ const storage = multer.diskStorage({
     cb(null, name);
   }
 });
-const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 } }); // 2MB limit
+const upload = multer({ storage, limits: { fileSize: 2 * 1024 * 1024 } }); // 2MB
 
-// Public: create company + admin (accepts multipart/form-data with optional logo field)
+// Public signup (accepts logo file)
 router.post('/signup', upload.single('logo'), signupCompany);
 
-// Protected admin routes
+// Admin routes (protected)
 router.use(authMiddleware);
 router.use(requireCompanyAdmin);
 
-// cars
+// Cars
 router.get('/cars', getAdminCars);
 router.post('/cars', createAdminCar);
 router.put('/cars/:id', updateAdminCar);
 router.delete('/cars/:id', deleteAdminCar);
 
-// bookings
+// Bookings
 router.get('/bookings', getAdminBookings);
 router.patch('/bookings/:id/status', updateAdminBookingStatus);
 
-// company profile (allow multipart upload for logo)
+// Company profile
 router.get('/company', getCompanyProfile);
 router.put('/company', upload.single('logo'), updateCompanyProfile);
 

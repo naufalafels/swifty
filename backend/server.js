@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 import path from 'path';
 import helmet from 'helmet';
@@ -14,59 +15,62 @@ import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 
+dotenv.config();
 
 const app = express();
-const PORT = 7889;
-dotenv.config();
+const PORT = process.env.PORT || 7889;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 connectDB();
 
-// MIDDLEWARES
-app.use(cors());
+// Middleware we need BEFORE body parsers for special routes (Stripe webhook requires raw body)
+app.use(cookieParser());
+
+// Serve uploads static files (allow cross origin)
 app.use(
-    helmet({
-        crossOriginResourcePolicy: { policy: 'cross-origin' },
-    })
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  },
+  express.static(path.join(process.cwd(), 'uploads'))
+);
+
+// IMPORTANT: mount raw body parser for Stripe webhook BEFORE express.json()
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+
+// General middlewares
+app.use(cors({ origin: true, credentials: true }));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use(
-    '/uploads', (req, res, next) => {
-        res.setHeader('Access-Control-Allow-Origin', "*");
-        next();
-    },
-    express.static(path.join(process.cwd(), 'uploads'))
-)
-
 
 // ROUTES
 app.use('/api/auth', userRouter); // auth routes
 app.use('/api/cars', carRouter);
 app.use('/api/bookings', bookingRouter);
+
+// Mount payment router (webhook path already handled above by raw parser)
 app.use('/api/payments', paymentRouter);
 
-// Add this line to mount admin API:
+// Admin routes (protected by auth middleware inside the routes)
 app.use('/api/admin', adminRouter);
 
-// for webhook route only: need raw body parsing
-app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
-app.use('/api/payments', paymentRouter);
+// health / ping route
+app.get('/api/ping', (req, res) => res.json({ ok: true, time: Date.now() }));
 
-app.get('api/ping', (req, res) => res.json({
-    ok: true,
-    time: Date.now()
-}))
-
-
-// LISTEN
+// root
 app.get('/', (req, res) => {
-    res.send('API WORKING')
+  res.send('API WORKING');
 });
 
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server Started on http://localhost:${PORT}`)
+  console.log(`Server started on http://localhost:${PORT}`);
 });

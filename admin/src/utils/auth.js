@@ -1,4 +1,3 @@
-// small client-side helper for admin app
 export const saveAdminSession = (token, user) => {
   try {
     localStorage.setItem('admin_token', token);

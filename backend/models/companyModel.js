@@ -4,7 +4,7 @@ const { Schema } = mongoose;
 const companySchema = new Schema({
   name: { type: String, required: true, trim: true },
   slug: { type: String, trim: true, lowercase: true, index: true, unique: true, sparse: true },
-  logo: { type: String, default: '' }, // <-- image URL for company logo
+  logo: { type: String, default: '' }, // image URL for company logo
   address: {
     street: String,
     city: String,
@@ -21,7 +21,7 @@ const companySchema = new Schema({
   },
   ownerUserId: { type: Schema.Types.ObjectId, ref: 'User' },
   isVerified: { type: Boolean, default: false },
-  stripeAccountId: { type: String, default: '' }, // future use
+  stripeAccountId: { type: String, default: '' },
 }, { timestamps: true });
 
 companySchema.index({ location: '2dsphere' });

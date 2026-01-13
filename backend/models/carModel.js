@@ -1,136 +1,40 @@
-import mongoose, { mongo } from "mongoose";
+import mongoose from "mongoose";
 const { Schema } = mongoose;
 
-const carBookingSubSchema = new Schema(
-    {
-        bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
-        pickupDate: { type: Date, required: true },
-        returnDate: { type: Date, required: true },
-
-        status: {
-            type: String,
-            enum: ['pending', 'active', 'completed', 'cancelled', 'upcoming'],
-            default: 'pending',
-        },
-    },
-    { _id: false }
-);
+const bookingSubSchema = new Schema({
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  pickupDate: Date,
+  returnDate: Date,
+  status: { type: String, enum: ['pending','active','completed','cancelled','upcoming'], default: 'pending' }
+}, { _id: false });
 
 const carSchema = new Schema({
-  make: { type: String, required: true, trim: true },
-  model: { type: String, required: true, trim: true },
-  year: { type: Number, required: true },
-  color: { type: String, default: '' },
-  category: { type: String, default: 'Sedan' },
-  seats: { type: Number, default: 4 },
-  transmission: { type: String, default: 'Automatic' },
-  fuelType: { type: String, default: 'Gasoline' },
-  mileage: { type: Number, default: 0 },
+  make: { type: String, required: true },
+  model: { type: String, required: true },
+  year: Number,
+  color: String,
+  category: String,
+  seats: Number,
+  transmission: String,
+  fuelType: String,
+  mileage: Number,
   dailyRate: { type: Number, required: true },
   status: { type: String, enum: ['available','rented','maintenance'], default: 'available' },
-  image: { type: String, default: '' },
-  createdAt: { type: Date, default: Date.now },
+  image: String,
 
-  // New: company ownership
+  // Multi-tenant: which company owns this car
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 
-  // New: geo location for pickup point (optional)
+  // optional pickup location
   location: {
     type: { type: String, enum: ['Point'], default: 'Point' },
-    coordinates: { type: [Number], default: [0, 0] } // [lng, lat]
+    coordinates: { type: [Number], default: [0, 0] }
   },
 
-  bookings: { type: [carBookingSubSchema], default: [] }, // show the id that booked which cars
-});
+  bookings: { type: [bookingSubSchema], default: [] }
+}, { timestamps: true });
 
 carSchema.index({ location: '2dsphere' });
-
-function rangesOverlap(aStart, aEnd, bStart, bEnd) {
-    return aStart <= bEnd && bStart <= aEnd;
-}
-
-
-// CARS AVAILABILITY, & PICKUP AND RETURN DATES
-carSchema.methods.isAvailableForRange = function (
-    requestedPickup, requestedReturn,  blockingStatuses = ['pending','active','upcoming']
-) {
-    if (!requestedPickup || !requestedReturn) return false;
-
-    const start = new Date(requestedPickup);
-    const end = new Date(requestedReturn);
-
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
-        return false;
-    if (start > end) return false;
-
-    for (const b of this.bookings || []) {
-        if (!blockingStatuses.includes(b.status)) continue;
-        const bStart = new Date(b.pickupDate);
-        const bEnd = new Date(b.returnDate);
-
-        if (rangesOverlap(start, end, bStart, bEnd)) return false;
-    }
-
-    return true;
-}
-
-carSchema.methods.getAvailabilitySummary = function (nowDate = new Date()) {
-  const now = new Date(nowDate);
-
-  // Filtering booking blocked availability...
-  const blockable = (this.bookings || [])
-    .filter(b => ['pending','active','upcoming'].includes(b.status))
-    .map(b => ({ ...b, pickupDate: new Date(b.pickupDate), returnDate: new Date(b.returnDate) }))
-    .sort((x, y) => x.pickupDate - y.pickupDate);
-
-    // Vehicle looked as it is booked.
-  const active = blockable.find(b => b.pickupDate <= now && now <= b.returnDate);
-  if (active) {
-    const msLeft = active.returnDate - now;
-    const daysRemaining = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
-    return { state: 'booked', daysRemaining: Math.max(daysRemaining, 0), until: active.returnDate, bookingId: active.bookingId };
-  }
-
-  // Finding the next availabel booking dates.
-  const next = blockable.find(b => b.pickupDate > now);
-  if (next) {
-    const msAvailable = next.pickupDate - now;
-    const daysAvailable = Math.floor(msAvailable / (1000 * 60 * 60 * 24));
-    return { state: 'available_until_reservation', daysAvailable: Math.max(daysAvailable, 0), nextBookingStarts: next.pickupDate, bookingId: next.bookingId };
-  }
-
-  return { state: 'fully_available' };
-};
-
-carSchema.statics.computeAvailabilityForCars = function (cars, nowDate = new Date()) {
-  const now = new Date(nowDate);
-  return cars.map(car => {
-    const bookings = (car.bookings || [])
-      .filter(b => ['pending','active','upcoming'].includes(b.status))
-      .map(b => ({ ...b, pickupDate: new Date(b.pickupDate), returnDate: new Date(b.returnDate) }))
-      .sort((x, y) => x.pickupDate - y.pickupDate);
-
-    const active = bookings.find(b => b.pickupDate <= now && now <= b.returnDate);
-    if (active) {
-      const msLeft = active.returnDate - now;
-      const daysRemaining = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
-      car.availability = { state: 'booked', daysRemaining: Math.max(daysRemaining, 0), until: active.returnDate, bookingId: active.bookingId };
-      return car;
-    }
-
-    const next = bookings.find(b => b.pickupDate > now);
-    if (next) {
-      const msAvailable = next.pickupDate - now;
-      const daysAvailable = Math.floor(msAvailable / (1000 * 60 * 60 * 24));
-      car.availability = { state: 'available_until_reservation', daysAvailable: Math.max(daysAvailable, 0), nextBookingStarts: next.pickupDate, bookingId: next.bookingId };
-      return car;
-    }
-
-    car.availability = { state: 'fully_available' };
-    return car;
-  });
-};
-
-carSchema.index({ 'bookings.bookingId': 1 });
+carSchema.index({ companyId: 1 });
 
 export default mongoose.models.Car || mongoose.model('Car', carSchema);

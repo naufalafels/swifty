@@ -3,521 +3,277 @@ import { AddCarPageStyles, toastStyles } from '../assets/dummyStyles.js';
 import axios from 'axios';
 import { useRef, useState, useCallback } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
+import { getAdminToken } from '../utils/auth.js';
 
 const baseURL = 'http://localhost:7889';
 const api = axios.create({ baseURL });
 
-
 const AddCar = () => {
+  const initialFormData = {
+    carName: "",
+    dailyPrice: "",
+    seats: "",
+    fuelType: "Petrol",
+    mileage: "",
+    transmission: "Automatic",
+    year: "",
+    model: "",
+    description: "",
+    category: "Sedan",
+    image: null,
+    imagePreview: null,
+  };
 
-    const initialFormData = {
-        carName: "",
-        dailyPrice: "",
-        seats: "",
-        fuelType: "Petrol",
-        mileage: "",
-        transmission: "Automatic",
-        year: "",
-        model: "",
-        description: "",
-        category: "Sedan",
-        image: null,
-        imagePreview: null,
+  const [data, setData] = useState(initialFormData);
+  const fileRef = useRef(null);
+
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setData((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  // FOR IMAGE HANDLING
+  const handleImageChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) =>
+      setData((prev) => ({ ...prev, image: file, imagePreview: evt.target.result }));
+    reader.readAsDataURL(file);
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setData(initialFormData);
+    if (fileRef.current) fileRef.current.value = '';
+  }, [initialFormData]);
+
+  const showToast = useCallback((type, title, message, icon) => {
+    const toastConfig = {
+      position: "top-right",
+      className: toastStyles[type].container,
+      bodyClassName: toastStyles[type].body,
     };
+    toastConfig.autoClose = type === "success" ? 3000 : 4000;
 
-    const [data, setData] = useState(initialFormData);
-    const fileRef = useRef(null);
+    toast[type](
+      <div className="flex items-center">
+        {icon}
+        <div>
+          <p className={type === "success" ? "font-bold text-lg" : "font-semibold"}>{title}</p>
+          <p>{message}</p>
+        </div>
+      </div>,
+      toastConfig
+    );
+  }, []);
 
-    const handleChange = useCallback((e) => {
-        const { name, value } = e.target;
+  // Basic client-side validation
+  const validate = () => {
+    const required = [
+      { key: 'carName', label: 'Car Name' },
+      { key: 'dailyPrice', label: 'Daily Price' },
+      { key: 'seats', label: 'Seats' },
+      { key: 'year', label: 'Year' },
+      { key: 'model', label: 'Model' },
+    ];
+    for (const r of required) {
+      const val = data[r.key];
+      if (val === '' || val === null || val === undefined) {
+        showToast('error', 'Validation', `${r.label} is required`);
+        return false;
+      }
+    }
+    // numeric checks
+    if (isNaN(Number(data.dailyPrice)) || Number(data.dailyPrice) <= 0) {
+      showToast('error', 'Validation', 'Daily Price must be a positive number');
+      return false;
+    }
+    if (isNaN(Number(data.seats)) || Number(data.seats) <= 0) {
+      showToast('error', 'Validation', 'Seats must be a positive number');
+      return false;
+    }
+    if (isNaN(Number(data.year)) || Number(data.year) < 1900) {
+      showToast('error', 'Validation', 'Year is invalid');
+      return false;
+    }
+    return true;
+  };
 
-        setData((prev) => ({
-            ...prev,
-            [name]: value
-        }));
-    }, []);
+  // HANDLE SUBMIT
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    // FOR IMAGE HANDLING
-    const handleImageChange = useCallback((e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    if (!validate()) return;
 
-        const reader = new FileReader();
-        reader.onload = (evt) =>
-            setData((prev) => ({
-                ...prev,
-                image: file,
-                imagePreview: evt.target.result,
-            }));
-        reader.readAsDataURL(file);
-    }, []);
+    try {
+      const formData = new FormData();
 
-    const resetForm = useCallback(() => {
-        setData(initialFormData);
-        if (fileRef.current) fileRef.current.value = '';
-    }, [initialFormData]);
+      // Map your UI fields to backend expected field names
+      formData.append("make", data.carName);
+      formData.append("dailyRate", Number(data.dailyPrice));
+      formData.append("seats", Number(data.seats));
+      formData.append("fuelType", data.fuelType);
+      formData.append("mileage", data.mileage ? Number(data.mileage) : 0);
+      formData.append("transmission", data.transmission);
+      formData.append("year", Number(data.year));
+      formData.append("model", data.model);
+      formData.append("description", data.description || "");
+      formData.append("color", "");
+      formData.append("category", data.category || "Sedan");
 
-    const showToast = useCallback((type, title, message, icon) => {
-        const toastConfig = {
-            position: "top-right",
-            className: toastStyles[type].container,
-            bodyClassName: toastStyles[type].body,
-        };
+      if (data.image) formData.append("image", data.image);
 
-        if (type === "success") {
-            toastConfig.autoClose = 3000;
-        } else {
-            toastConfig.autoClose = 4000;
-        }
+      const token = getAdminToken();
+      if (!token) {
+        showToast('error', 'Not authenticated', 'Please login as company admin first.');
+        return;
+      }
 
-        toast[type](
-            <div className="flex items-center">
-                {icon}
-                <div>
-                    <p
-                        className={
-                            type === "success" ? "font-bold text-lg" : "font-semibold"
-                        }
-                    >
-                        {title}
-                    </p>
-                    <p>{message}</p>
-                </div>
-            </div>,
-            toastConfig
+      // IMPORTANT: Do NOT set Content-Type header here. Let axios/browser set it with boundary.
+      const res = await api.post("/api/admin/cars", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+      });
+
+      if (res.data?.success) {
+        showToast(
+          "success",
+          "Congratulations!",
+          `Your ${data.carName || 'car'} has been listed successfully`,
+          <svg
+            className={AddCarPageStyles.iconLarge}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
         );
-    }, []);
+        resetForm();
+      } else {
+        const msg = res.data?.message || 'Unexpected server response';
+        showToast('error', 'Error', msg, <svg className={AddCarPageStyles.iconMedium} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>);
+      }
+    } catch (err) {
+      console.error("Failed to submit car:", err);
+      const msg = err.response?.data?.message || err.message || "Failed to list car";
+      showToast('error', 'Error', msg, <svg className={AddCarPageStyles.iconMedium} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>);
+    }
+  };
 
-    // HANDLE SUBMIT
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const carNameForToast = data.carName || "";
+  return (
+    <div className={AddCarPageStyles.pageContainer}>
+      <div className={AddCarPageStyles.fixedBackground}>
+        <div className={AddCarPageStyles.gradientBlob1}></div>
+        <div className={AddCarPageStyles.gradientBlob2}></div>
+        <div className={AddCarPageStyles.gradientBlob3}></div>
+      </div>
 
-        try {
-            const formData = new FormData();
-            const fieldMappings = {
-                make: data.carName,
-                dailyRate: data.dailyPrice,
-                seats: data.seats,
-                fuelType: data.fuelType,
-                mileage: data.mileage,
-                transmission: data.transmission,
-                year: data.year,
-                model: data.model,
-                description: data.description || "",
-                color: "",
-                category: data.category,
-            };
+      <div className={AddCarPageStyles.headerContainer}>
+        <div className={AddCarPageStyles.headerDivider}>
+          <div className={AddCarPageStyles.headerDividerLine}></div>
+        </div>
 
-            Object.entries(fieldMappings).forEach(([key, value]) => {
-                formData.append(key, value);
-            });
+        <h1 className={AddCarPageStyles.title}>
+          <span className={AddCarPageStyles.titleGradient}>Add Cars Here</span>
+        </h1>
+        <p className={AddCarPageStyles.subtitle}>
+          Share your vehicle and start earning today!
+        </p>
+      </div>
 
-            if (data.image) formData.append("image", data.image);
+      <div className={AddCarPageStyles.formContainer}>
+        <form onSubmit={handleSubmit} className={AddCarPageStyles.form}>
+          <div className={AddCarPageStyles.formGrid}>
+            <div className={AddCarPageStyles.formColumn}>
+              <label className={AddCarPageStyles.label}>Car Name</label>
+              <input required name="carName" value={data.carName} onChange={handleChange} className={AddCarPageStyles.input} placeholder="e.g., Toyota Camry" />
 
-            await api.post("/api/cars", formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-            });
+              <label className={AddCarPageStyles.label}>Daily Price (RM)</label>
+              <input required name="dailyPrice" value={data.dailyPrice} onChange={handleChange} type="number" min="1" className={AddCarPageStyles.input} placeholder="150" />
 
-            showToast(
-                "success",
-                "Congratulations!",
-                `Your ${carNameForToast} has been listed successfully`,
-                <svg
-                    className={AddCarPageStyles.iconLarge}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M5 13l4 4L19 7"
-                    ></path>
-                </svg>
-            );
+              <label className={AddCarPageStyles.label}>Seats</label>
+              <select required name="seats" value={data.seats} onChange={handleChange} className={AddCarPageStyles.select}>
+                <option value="">Select seats</option>
+                {[2,4,5,6,7,8].map(s => <option key={s} value={s}>{s} seats</option>)}
+              </select>
 
-            resetForm();
-        } catch (err) {
-            console.error("Failed to submit car:", err);
-            const msg =
-                err.response?.data?.message || err.message || "Failed to list car";
+              <label className={AddCarPageStyles.label}>Fuel Type</label>
+              <select required name="fuelType" value={data.fuelType} onChange={handleChange} className={AddCarPageStyles.select}>
+                {["Petrol","Diesel","Electric","Hybrid","CNG"].map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
 
-            showToast(
-                "error",
-                "Error",
-                msg,
-                <svg
-                    className={AddCarPageStyles.iconMedium}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M6 18L18 6M6 6l12 12"
-                    ></path>
-                </svg>
-            );
-        }
-    };
+              <label className={AddCarPageStyles.label}>Mileage (km)</label>
+              <input required name="mileage" value={data.mileage} onChange={handleChange} type="number" min="0" className={AddCarPageStyles.input} placeholder="28000" />
 
-    const renderInputField = (field) => {
-        return (
-            <div key={field.name}>
-                <label
-                    className={
-                        field.icon ? AddCarPageStyles.labelWithIcon : AddCarPageStyles.label
-                    }
-                >
-                    {field.icon}
-                    {field.label}
+              <label className={AddCarPageStyles.label}>Category</label>
+              <select required name="category" value={data.category} onChange={handleChange} className={AddCarPageStyles.select}>
+                {["Sedan","SUV","Sports","Coupe","Hatchback","Luxury"].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+
+              <div style={{ marginTop: 12 }}>
+                <label className={AddCarPageStyles.label}>Transmission</label>
+                <div className={AddCarPageStyles.radioContainer}>
+                  {['Automatic','Manual'].map(t => (
+                    <label key={t} className={AddCarPageStyles.radioLabel(data.transmission === t)}>
+                      <input type="radio" name="transmission" value={t} checked={data.transmission === t} onChange={handleChange} className={AddCarPageStyles.radioInput} />
+                      <span className={AddCarPageStyles.radioText}>{t}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={AddCarPageStyles.formColumn}>
+              <label className={AddCarPageStyles.label}>Year</label>
+              <input required name="year" value={data.year} onChange={handleChange} type="number" min="1990" max={new Date().getFullYear()} className={AddCarPageStyles.input} placeholder="2020" />
+
+              <label className={AddCarPageStyles.label}>Model</label>
+              <input required name="model" value={data.model} onChange={handleChange} className={AddCarPageStyles.input} placeholder="e.g., XLE" />
+
+              <label className={AddCarPageStyles.label}>Car Image</label>
+              <div className={AddCarPageStyles.imageUploadContainer}>
+                <label className={AddCarPageStyles.imageUploadLabel}>
+                  {data.imagePreview ? (
+                    <div className='w-full h-full rounded-xl overflow-hidden'>
+                      <img src={data.imagePreview} alt='preview' className='w-full h-full object-cover' />
+                    </div>
+                  ) : (
+                    <div className={AddCarPageStyles.imageUploadPlaceholder}>
+                      <svg className={AddCarPageStyles.iconUpload} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                      <p className={AddCarPageStyles.imageUploadText}>
+                        <span className={AddCarPageStyles.imageUploadTextSemibold}>Click to upload</span><br/>or drag and drop
+                      </p>
+                      <p className={AddCarPageStyles.imageUploadSubText}>PNG, JPG, up to 5Mb</p>
+                    </div>
+                  )}
+                  <input type='file' ref={fileRef} name="image" onChange={handleImageChange} className='hidden' accept='image/*' />
                 </label>
+              </div>
 
-                <input
-                    required={field.required}
-                    name={field.name}
-                    value={data[field.name]}
-                    onChange={handleChange}
-                    type={field.type || "text"}
-                    className={
-                        field.prefix
-                            ? AddCarPageStyles.inputWithPrefix
-                            : AddCarPageStyles.input
-                    }
-                    placeholder={field.placeholder}
-                    min={field.min}
-                    max={field.max}
-                    {...field.props}
-                />
+              <label className={AddCarPageStyles.label}>Description</label>
+              <textarea required name='description' value={data.description} onChange={handleChange} rows='4' className={AddCarPageStyles.textarea} placeholder='Describe features, condition, special details...' />
+
             </div>
-        );
-    };
+          </div>
 
-    const renderSelectField = (field) => (
-        <div key={field.name}>
-            <label className={AddCarPageStyles.label}>{field.label}</label>
-            <select
-                required={field.required}
-                name={field.name}
-                value={data[field.name]}
-                onChange={handleChange}
-                className={AddCarPageStyles.select}
-            >
-                {field.options.map((option) =>
-                    typeof option === 'object' ? (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ) : (
-                        <option key={option} value={option}>
-                            {option}
-                        </option>
-                    )
-                )}
-            </select>
-        </div>
-    );
+          <div className='mt-12 flex justify-center'>
+            <button type="submit" className={AddCarPageStyles.submitButton}>
+              <span className={AddCarPageStyles.buttonText}>List Your Car</span>
+              <svg className={AddCarPageStyles.iconInline} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
 
-    const leftColumnFields = [
-        {
-            type: "input",
-            config: {
-                name: "carName",
-                label: "Car Name",
-                required: true,
-                placeholder: "e.g., Toyota Camry",
-                icon: (
-                    <svg
-                        className={AddCarPageStyles.iconSmall}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M5 13l4 4L19 7"
-                        ></path>
-                    </svg>
-                ),
-            },
-        },
-        {
-            type: "input",
-            config: {
-                name: "dailyPrice",
-                label: "Daily Price ($)",
-                type: "number",
-                required: true,
-                min: "1",
-                placeholder: "45",
-                props: { className: "pl-8" },
-                prefix: <span className="absolute left-3 top-3 text-gray-400">$</span>,
-            },
-        },
-        {
-            type: "select",
-            config: {
-                name: "seats",
-                label: "Seats",
-                required: true,
-                options: [2, 4, 5, 6, 7, 8].map((n) => ({
-                    value: n,
-                    label: `${n} seats`,
-                })),
-            },
-        },
-        {
-            type: "select",
-            config: {
-                name: "fuelType",
-                label: "Fuel Type",
-                required: true,
-                options: ["Petrol", "Diesel", "Electric", "Hybrid", "CNG"],
-            },
-        },
-        {
-            type: "input",
-            config: {
-                name: "mileage",
-                label: "Mileage (MPG)",
-                type: "number",
-                required: true,
-                min: "1",
-                placeholder: "28",
-            },
-        },
-        {
-            type: "select",
-            config: {
-                name: "category",
-                label: "Category",
-                required: true,
-                options: ["Sedan", "SUV", "Sports", "Coupe", "Hatchback", "Luxury"],
-            },
-        },
-    ];
-
-    const rightColumnFields = [
-        {
-            type: "input",
-            config: {
-                name: "year",
-                label: "Year",
-                type: "number",
-                required: true,
-                min: "1990",
-                max: new Date().getFullYear(),
-                placeholder: "2020",
-            },
-        },
-        {
-            type: "input",
-            config: {
-                name: "model",
-                label: "Model",
-                required: true,
-                placeholder: "e.g., XLE",
-            },
-        },
-    ];
-
-    return (
-        <div className={AddCarPageStyles.pageContainer}>
-            <div className={AddCarPageStyles.fixedBackground}>
-                <div className={AddCarPageStyles.gradientBlob1}></div>
-                <div className={AddCarPageStyles.gradientBlob2}></div>
-                <div className={AddCarPageStyles.gradientBlob3}></div>
-            </div>
-
-            <div className={AddCarPageStyles.headerContainer}>
-                <div className={AddCarPageStyles.headerDivider}>
-                    <div className={AddCarPageStyles.headerDividerLine}></div>
-                </div>
-
-                <h1 className={AddCarPageStyles.title}>
-                    <span className={AddCarPageStyles.titleGradient}>Add Cars Here</span>
-                </h1>
-                <p className={AddCarPageStyles.subtitle}>
-                    Share your vehicle and start earning today!
-                </p>
-            </div>
-
-            <div className={AddCarPageStyles.formContainer}>
-                <form onSubmit={handleSubmit} className={AddCarPageStyles.form}>
-                    <div className={AddCarPageStyles.formGrid}>
-                        <div className={AddCarPageStyles.formColumn}>
-                            {leftColumnFields.map((field) => {
-                                if (field.type === "input") {
-                                    return (
-                                        <div key={field.config.name}>
-                                            <label className={AddCarPageStyles.label}>
-                                                {field.config.label}
-                                            </label>
-                                            <div className=' relative'>
-                                                {field.config.prefix}
-
-                                                <input
-                                                    required={field.config.required}
-                                                    name={field.config.name}
-                                                    value={data[field.config.name]}
-                                                    onChange={handleChange}
-                                                    type={field.config.type || "text"}
-                                                    className={`${AddCarPageStyles.input} ${field.config.props?.className || ""
-                                                        }`}
-                                                    placeholder={field.config.placeholder}
-                                                    min={field.config.min}
-                                                    max={field.config.max}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                } else if (field.type === "select") {
-                                    return renderSelectField(field.config);
-                                }
-                                return null;
-                            })}
-
-                            <div>
-                                <label className={AddCarPageStyles.label}>Transmission</label>
-                                <div className={AddCarPageStyles.radioContainer}>
-                                    {['Automatic', 'Manual'].map((t) => (
-                                        <label
-                                            key={t}
-                                            className={AddCarPageStyles.radioLabel(
-                                                data.transmission === t
-                                            )}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="transmission"
-                                                value={t}
-                                                checked={data.transmission === t}
-                                                onChange={handleChange}
-                                                className={AddCarPageStyles.radioInput}
-                                            />
-                                            <span className={AddCarPageStyles.radioText}>{t}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className={AddCarPageStyles.formColumn}>
-                            <div className={AddCarPageStyles.formGridInner}>
-                                {rightColumnFields.map((field) => {
-                                    if (field.type === "input") {
-                                        return renderInputField(field.config);
-                                    }
-                                    return null;
-                                })}
-                            </div>
-
-                            <div>
-                                <label className={AddCarPageStyles.label}>Car Image</label>
-                                <div className={AddCarPageStyles.imageUploadContainer}>
-                                    <label className={AddCarPageStyles.imageUploadLabel}>
-                                        {data.imagePreview ? (
-                                            <div className=' w-full h-full rounded-xl overflow-hidden'>
-                                                <img
-                                                    src={data.imagePreview}
-                                                    alt='preview'
-                                                    className=' w-full h-full object-cover'
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div className={AddCarPageStyles.imageUploadPlaceholder}>
-                                                <svg
-                                                    className={AddCarPageStyles.iconUpload}
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth="2"
-                                                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                                    ></path>
-                                                </svg>
-                                                <p className={AddCarPageStyles.imageUploadText}>
-                                                    <span className={AddCarPageStyles.imageUploadTextSemibold}>
-                                                        Click to upload
-                                                    </span>
-                                                    <br />
-                                                    or drag and drop
-                                                </p>
-
-                                                <p className={AddCarPageStyles.imageUploadSubText}>
-                                                    PNG, JPG, up to 5Mb
-                                                </p>
-                                            </div>
-                                        )}
-                                        <input
-                                            type='file'
-                                            ref={fileRef}
-                                            name="image"
-                                            onChange={handleImageChange}
-                                            className=' hidden'
-                                            accept='image/*'
-                                        />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className={AddCarPageStyles.label}>Description</label>
-                                <textarea
-                                    required
-                                    name='description'
-                                    value={data.description}
-                                    onChange={handleChange}
-                                    rows='4'
-                                    className={AddCarPageStyles.textarea}
-                                    placeholder='Describe features, condition, special details...'
-
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className=' mt-12 flex justify-center'>
-                        <button type="submit" className={AddCarPageStyles.submitButton}>
-                            <span className={AddCarPageStyles.buttonText}>List Your Car</span>
-                            <svg
-                                className={AddCarPageStyles.iconInline}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                ></path>
-                            </svg>
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                hideProgressBar={false}
-                closeOnClick
-                pauseOnHover
-                draggable
-                pauseOnFocusLoss
-                theme="dark"
-            />
-        </div>
-    );
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover draggable pauseOnFocusLoss theme="dark" />
+    </div>
+  );
 };
 
-export default AddCar
+export default AddCar;

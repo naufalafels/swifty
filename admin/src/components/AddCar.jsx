@@ -32,13 +32,11 @@ const AddCar = () => {
     setData((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  // FOR IMAGE HANDLING
   const handleImageChange = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (evt) =>
-      setData((prev) => ({ ...prev, image: file, imagePreview: evt.target.result }));
+    reader.onload = (evt) => setData((prev) => ({ ...prev, image: file, imagePreview: evt.target.result }));
     reader.readAsDataURL(file);
   }, []);
 
@@ -48,13 +46,8 @@ const AddCar = () => {
   }, [initialFormData]);
 
   const showToast = useCallback((type, title, message, icon) => {
-    const toastConfig = {
-      position: "top-right",
-      className: toastStyles[type].container,
-      bodyClassName: toastStyles[type].body,
-    };
+    const toastConfig = { position: "top-right", className: toastStyles[type].container, bodyClassName: toastStyles[type].body };
     toastConfig.autoClose = type === "success" ? 3000 : 4000;
-
     toast[type](
       <div className="flex items-center">
         {icon}
@@ -62,12 +55,10 @@ const AddCar = () => {
           <p className={type === "success" ? "font-bold text-lg" : "font-semibold"}>{title}</p>
           <p>{message}</p>
         </div>
-      </div>,
-      toastConfig
+      </div>, toastConfig
     );
   }, []);
 
-  // Basic client-side validation
   const validate = () => {
     const required = [
       { key: 'carName', label: 'Car Name' },
@@ -83,32 +74,24 @@ const AddCar = () => {
         return false;
       }
     }
-    // numeric checks
     if (isNaN(Number(data.dailyPrice)) || Number(data.dailyPrice) <= 0) {
-      showToast('error', 'Validation', 'Daily Price must be a positive number');
-      return false;
+      showToast('error', 'Validation', 'Daily Price must be a positive number'); return false;
     }
     if (isNaN(Number(data.seats)) || Number(data.seats) <= 0) {
-      showToast('error', 'Validation', 'Seats must be a positive number');
-      return false;
+      showToast('error', 'Validation', 'Seats must be a positive number'); return false;
     }
     if (isNaN(Number(data.year)) || Number(data.year) < 1900) {
-      showToast('error', 'Validation', 'Year is invalid');
-      return false;
+      showToast('error', 'Validation', 'Year is invalid'); return false;
     }
     return true;
   };
 
-  // HANDLE SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validate()) return;
 
     try {
       const formData = new FormData();
-
-      // Map your UI fields to backend expected field names
       formData.append("make", data.carName);
       formData.append("dailyRate", Number(data.dailyPrice));
       formData.append("seats", Number(data.seats));
@@ -120,40 +103,20 @@ const AddCar = () => {
       formData.append("description", data.description || "");
       formData.append("color", "");
       formData.append("category", data.category || "Sedan");
-
       if (data.image) formData.append("image", data.image);
 
       const token = getAdminToken();
-      if (!token) {
-        showToast('error', 'Not authenticated', 'Please login as company admin first.');
-        return;
-      }
+      if (!token) { showToast('error', 'Auth', 'Please login as admin'); return; }
 
-      // IMPORTANT: Do NOT set Content-Type header here. Let axios/browser set it with boundary.
       const res = await api.post("/api/admin/cars", formData, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
+        headers: { Authorization: `Bearer ${token}` } // do not set Content-Type manually
       });
 
       if (res.data?.success) {
-        showToast(
-          "success",
-          "Congratulations!",
-          `Your ${data.carName || 'car'} has been listed successfully`,
-          <svg
-            className={AddCarPageStyles.iconLarge}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
-        );
+        showToast('success', 'Congratulations!', `Your ${data.carName || 'car'} has been listed`, <svg className={AddCarPageStyles.iconLarge} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>);
         resetForm();
       } else {
-        const msg = res.data?.message || 'Unexpected server response';
-        showToast('error', 'Error', msg, <svg className={AddCarPageStyles.iconMedium} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>);
+        throw new Error(res.data?.message || 'Unexpected response');
       }
     } catch (err) {
       console.error("Failed to submit car:", err);
@@ -171,16 +134,9 @@ const AddCar = () => {
       </div>
 
       <div className={AddCarPageStyles.headerContainer}>
-        <div className={AddCarPageStyles.headerDivider}>
-          <div className={AddCarPageStyles.headerDividerLine}></div>
-        </div>
-
-        <h1 className={AddCarPageStyles.title}>
-          <span className={AddCarPageStyles.titleGradient}>Add Cars Here</span>
-        </h1>
-        <p className={AddCarPageStyles.subtitle}>
-          Share your vehicle and start earning today!
-        </p>
+        <div className={AddCarPageStyles.headerDivider}><div className={AddCarPageStyles.headerDividerLine}></div></div>
+        <h1 className={AddCarPageStyles.title}><span className={AddCarPageStyles.titleGradient}>Add Cars Here</span></h1>
+        <p className={AddCarPageStyles.subtitle}>Share your vehicle and start earning today!</p>
       </div>
 
       <div className={AddCarPageStyles.formContainer}>
@@ -244,9 +200,7 @@ const AddCar = () => {
                       <svg className={AddCarPageStyles.iconUpload} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                       </svg>
-                      <p className={AddCarPageStyles.imageUploadText}>
-                        <span className={AddCarPageStyles.imageUploadTextSemibold}>Click to upload</span><br/>or drag and drop
-                      </p>
+                      <p className={AddCarPageStyles.imageUploadText}><span className={AddCarPageStyles.imageUploadTextSemibold}>Click to upload</span><br/>or drag and drop</p>
                       <p className={AddCarPageStyles.imageUploadSubText}>PNG, JPG, up to 5Mb</p>
                     </div>
                   )}
@@ -256,7 +210,6 @@ const AddCar = () => {
 
               <label className={AddCarPageStyles.label}>Description</label>
               <textarea required name='description' value={data.description} onChange={handleChange} rows='4' className={AddCarPageStyles.textarea} placeholder='Describe features, condition, special details...' />
-
             </div>
           </div>
 

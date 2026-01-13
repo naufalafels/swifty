@@ -14,10 +14,13 @@ const SERVER_URL = process.env.SERVER_URL || 'http://localhost:7889';
 
 const signToken = (userId) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES });
 
-// Helpers
 const buildLogoUrl = (file) => {
   if (!file) return '';
   return `${SERVER_URL.replace(/\/$/, '')}/uploads/company-logos/${file.filename}`;
+};
+const buildCarImageUrl = (file) => {
+  if (!file) return '';
+  return `${SERVER_URL.replace(/\/$/, '')}/uploads/car-images/${file.filename}`;
 };
 const buildAddressFromBody = (body) => ({
   street: body.address_street || body.street || (body.address && body.address.street) || '',
@@ -26,7 +29,7 @@ const buildAddressFromBody = (body) => ({
   zipCode: body.address_zipCode || body.zipCode || (body.address && body.address.zipCode) || '',
 });
 
-// Signup: create company + admin user (multipart accepted)
+// signup company (company logo optional)
 export const signupCompany = async (req, res) => {
   try {
     const { name, email, password, companyName, phone } = req.body;
@@ -67,7 +70,7 @@ export const signupCompany = async (req, res) => {
   }
 };
 
-// Cars: get/create/update/delete (company scoped)
+// get cars for admin's company
 export const getAdminCars = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -77,6 +80,7 @@ export const getAdminCars = async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
 };
 
+// create car for company (accepts image on req.file)
 export const createAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -86,18 +90,33 @@ export const createAdminCar = async (req, res) => {
     const required = ['make','model','year','dailyRate'];
     for (const f of required) if (!body[f]) return res.status(400).json({ success: false, message: `${f} is required` });
 
+    const imageUrl = req.file ? buildCarImageUrl(req.file) : (body.image || "");
+
     const car = await Car.create({
-      make: body.make, model: body.model, year: body.year,
-      color: body.color, category: body.category || 'Sedan', seats: body.seats || 4,
-      transmission: body.transmission || 'Automatic', fuelType: body.fuelType || 'Gasoline',
-      mileage: body.mileage || 0, dailyRate: Number(body.dailyRate || 0), image: body.image || '',
-      status: body.status || 'available', companyId,
+      make: body.make,
+      model: body.model,
+      year: Number(body.year),
+      color: body.color || '',
+      category: body.category || 'Sedan',
+      seats: Number(body.seats) || 4,
+      transmission: body.transmission || 'Automatic',
+      fuelType: body.fuelType || 'Gasoline',
+      mileage: Number(body.mileage) || 0,
+      dailyRate: Number(body.dailyRate || 0),
+      image: imageUrl,
+      status: body.status || 'available',
+      companyId,
       location: body.location ? { type: 'Point', coordinates: body.location } : undefined
     });
+
     return res.status(201).json({ success: true, car });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+  } catch (err) {
+    console.error('createAdminCar error', err);
+    return res.status(500).json({ success:false, message:'Server error' });
+  }
 };
 
+// update car for company (accepts image on req.file)
 export const updateAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -109,12 +128,21 @@ export const updateAdminCar = async (req, res) => {
     if (!car.companyId || car.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
 
     const body = req.body || {};
-    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','image','status','location'];
+    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','status','location'];
     allowed.forEach(k => { if (body[k] !== undefined) car[k] = body[k]; });
+
+    if (req.file) {
+      car.image = buildCarImageUrl(req.file);
+    } else if (body.image) {
+      car.image = body.image;
+    }
 
     await car.save();
     return res.json({ success: true, car });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+  } catch (err) {
+    console.error('updateAdminCar', err);
+    return res.status(500).json({ success:false, message:'Server error' });
+  }
 };
 
 export const deleteAdminCar = async (req, res) => {
@@ -129,10 +157,13 @@ export const deleteAdminCar = async (req, res) => {
 
     await car.remove();
     return res.json({ success: true, message: 'Car deleted' });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+  } catch (err) {
+    console.error('deleteAdminCar', err);
+    return res.status(500).json({ success:false, message:'Server error' });
+  }
 };
 
-// Bookings (company scoped)
+// bookings
 export const getAdminBookings = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -160,7 +191,7 @@ export const updateAdminBookingStatus = async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
 };
 
-// Company profile endpoints
+// company profile
 export const getCompanyProfile = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -183,13 +214,11 @@ export const updateCompanyProfile = async (req, res) => {
       phone: req.body.contact_phone || req.body.phone || (req.body.contact && req.body.contact.phone) || '',
       email: req.body.contact_email || req.body.email || (req.body.contact && req.body.contact.email) || ''
     };
-
     if (req.body.location_lat && req.body.location_lng) {
       const lat = parseFloat(req.body.location_lat);
       const lng = parseFloat(req.body.location_lng);
       if (!Number.isNaN(lat) && !Number.isNaN(lng)) payload.location = { type: 'Point', coordinates: [lng, lat] };
     }
-
     if (req.file) payload.logo = buildLogoUrl(req.file);
     else if (req.body.logo) payload.logo = req.body.logo;
 

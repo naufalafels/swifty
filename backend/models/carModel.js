@@ -31,8 +31,19 @@ const carSchema = new Schema({
   image: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
 
+  // New: company ownership
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
+
+  // New: geo location for pickup point (optional)
+  location: {
+    type: { type: String, enum: ['Point'], default: 'Point' },
+    coordinates: { type: [Number], default: [0, 0] } // [lng, lat]
+  },
+
   bookings: { type: [carBookingSubSchema], default: [] }, // show the id that booked which cars
 });
+
+carSchema.index({ location: '2dsphere' });
 
 function rangesOverlap(aStart, aEnd, bStart, bEnd) {
     return aStart <= bEnd && bStart <= aEnd;
@@ -122,5 +133,4 @@ carSchema.statics.computeAvailabilityForCars = function (cars, nowDate = new Dat
 
 carSchema.index({ 'bookings.bookingId': 1 });
 
-const Car = mongoose.models.Car || mongoose.model('Car', carSchema);
-export default Car;
+export default mongoose.models.Car || mongoose.model('Car', carSchema);

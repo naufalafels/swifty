@@ -15,6 +15,18 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true
+    },
+
+    // New multi-tenant fields:
+    role: {
+      type: String,
+      enum: ['user', 'company_admin', 'superadmin'],
+      default: 'user'
+    },
+    companyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+      default: null
     }
 }, {
     timestamps: true

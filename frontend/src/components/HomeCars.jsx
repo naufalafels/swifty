@@ -1,4 +1,4 @@
-// src/components/HomeCars.jsx
+// src/components/Home.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Users, Fuel, Gauge, CheckCircle, Zap } from "lucide-react";
@@ -43,26 +43,6 @@ const HomeCars = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const normalizeCarsResponse = (resData) => {
-    // Accept many server shapes:
-    // - Array (res.data = [])
-    // - { data: [...] }
-    // - { cars: [...] }
-    // - { success: true, data: [...] } etc.
-    if (!resData) return [];
-    if (Array.isArray(resData)) return resData;
-    if (Array.isArray(resData.data)) return resData.data;
-    if (Array.isArray(resData.cars)) return resData.cars;
-    if (resData.success && Array.isArray(resData.data)) return resData.data;
-    if (resData.success && Array.isArray(resData.cars)) return resData.cars;
-    // fallback: if object with numeric keys, convert to array
-    if (typeof resData === "object") {
-      const maybeArray = Object.values(resData).filter((v) => Array.isArray(v))[0];
-      if (Array.isArray(maybeArray)) return maybeArray;
-    }
-    return [];
-  };
-
   const fetchCars = async () => {
     setLoading(true);
     setError("");
@@ -76,36 +56,17 @@ const HomeCars = () => {
         params: { limit },
         signal: ctrl.signal,
       });
-
-      const normalized = normalizeCarsResponse(res.data);
-      setCars(normalized);
+      setCars(res.data?.data || []);
     } catch (err) {
       const isCanceled =
         err?.code === "ERR_CANCELED" ||
         err?.name === "CanceledError" ||
         err?.message === "canceled";
       if (!isCanceled) {
-        // Show a detailed error message useful for debugging and user feedback
         console.error("Error fetching cars:", err);
-        // Try to extract server message/body
-        let serverMsg = "";
-        try {
-          if (err?.response) {
-            // axios response available
-            console.error("Server response status:", err.response.status);
-            console.error("Server response body:", err.response.data);
-            serverMsg =
-              err.response?.data?.message ||
-              (typeof err.response?.data === "string"
-                ? err.response.data
-                : JSON.stringify(err.response?.data));
-          } else {
-            serverMsg = err.message || "Unknown error";
-          }
-        } catch (e) {
-          serverMsg = err.message || "Unknown error";
-        }
-        setError(serverMsg || "Failed to load cars");
+        setError(
+          err?.response?.data?.message || err.message || "Failed to load cars"
+        );
       }
     } finally {
       setLoading(false);
@@ -372,26 +333,13 @@ const HomeCars = () => {
           ))}
 
         {!loading && error && (
-          <div className="col-span-full text-center text-red-600">
-            <div className="mb-2">Error loading cars:</div>
-            <pre className="text-xs text-red-400 whitespace-pre-wrap break-words max-w-3xl mx-auto">{String(error)}</pre>
-            <div className="mt-4">
-              <button className="px-4 py-2 bg-orange-600 rounded text-white" onClick={() => {
-                setError("");
-                fetchCars();
-              }}>
-                Retry
-              </button>
-            </div>
-          </div>
+          <div className="col-span-full text-center text-red-600">{error}</div>
         )}
-
         {!loading && !error && cars.length === 0 && (
           <div className="col-span-full text-center">No cars found.</div>
         )}
 
         {!loading &&
-          !error &&
           cars.map((car, idx) => {
             const carName =
               `${car.make || ""} ${car.model || ""}`.trim() ||

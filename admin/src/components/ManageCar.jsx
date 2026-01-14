@@ -383,6 +383,7 @@ const ManageCar = () => {
     const [editingCar, setEditingCar] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
+    // inside ManageCar component, replace fetchCars definition with:
     const fetchCars = useCallback(async () => {
         try {
             const token = getAdminToken();
@@ -392,7 +393,7 @@ const ManageCar = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            const raw = Array.isArray(res.data?.cars) ? res.data.cars : [];
+            const raw = Array.isArray(res.data?.cars) ? res.data.cars : res.data?.data || res.data?.cars || [];
             setCars(
                 raw.map((c, i) => ({
                     ...buildSafeCar(c, i),

@@ -1,10 +1,11 @@
 import React from 'react'
 import { BookingPageStyles, statusConfig } from '../assets/dummyStyles.js'
 import axios from 'axios'
-import { FaCalendarAlt, FaCar, FaCheckCircle, FaChevronDown, FaCity, FaCreditCard, FaEdit, FaEnvelope, FaGasPump, FaGlobeAsia, FaMapMarkerAlt, FaMapPin, FaPhone, FaSearch, FaSync, FaTachometerAlt, FaUser, FaUserFriends, FaFilter } from 'react-icons/fa';
+import { FaCalendarAlt, FaCar, FaCheckCircle, FaChevronDown, FaCity, FaCreditCard, FaEdit, FaEnvelope, FaGasPump, FaGlobeAsia, FaMapMarkerAlt, FaMapPin, FaPhone, FaSearch, FaSync, FaTachometerAlt, FaUserFriends } from 'react-icons/fa'
 import { useState } from 'react';
 import { useEffect, useCallback } from 'react';
 import { useMemo } from 'react';
+import { getAdminToken } from '../utils/auth.js';
 
 const baseURL = 'http://localhost:7889';
 const api = axios.create({ baseURL, headers: { Accept: 'application/json' } });
@@ -216,9 +217,9 @@ const BookingCardDetails = ({ booking }) => (
         <div className={BookingPageStyles.bookingDetailsGrid}>
             <Panel
                 title="Customer Details"
-                icon={<FaUser className={BookingPageStyles.panelIcon} />}
+                icon={<FaUserFriends className={BookingPageStyles.panelIcon} />}
             >
-                <Detail icon={<FaUser />} label="Full Name" value={booking.customer} />
+                <Detail icon={<FaUserFriends />} label="Full Name" value={booking.customer} />
                 <Detail icon={<FaEnvelope />} label="Email" value={booking.email} />
                 <Detail icon={<FaPhone />} label="Phone" value={booking.phone} />
             </Panel>
@@ -256,18 +257,18 @@ const BookingCardDetails = ({ booking }) => (
                 <Detail
                     icon={<FaMapMarkerAlt />}
                     label="Street"
-                    value={booking.address.street}
+                    value={booking.address?.street}
                 />
-                <Detail icon={<FaCity />} label="City" value={booking.address.city} />
+                <Detail icon={<FaCity />} label="City" value={booking.address?.city} />
                 <Detail
                     icon={<FaGlobeAsia />}
                     label="State"
-                    value={booking.address.state}
+                    value={booking.address?.state}
                 />
                 <Detail
                     icon={<FaMapPin />}
                     label="ZIP Code"
-                    value={booking.address.zipCode}
+                    value={booking.address?.zipCode}
                 />
             </Panel>
 
@@ -293,22 +294,22 @@ const BookingCardDetails = ({ booking }) => (
                     <Spec
                         icon={<FaUserFriends />}
                         label="Seats"
-                        value={booking.details.seats}
+                        value={booking.details?.seats}
                     />
                     <Spec
                         icon={<FaGasPump />}
                         label="Fuel"
-                        value={booking.details.fuel}
+                        value={booking.details?.fuel}
                     />
                     <Spec
                         icon={<FaTachometerAlt />}
                         label="Mileage"
-                        value={booking.details.mileage}
+                        value={booking.details?.mileage}
                     />
                     <Spec
                         icon={<FaCheckCircle />}
                         label="Transmission"
-                        value={booking.details.transmission}
+                        value={booking.details?.transmission}
                     />
                 </div>
             </Panel>
@@ -401,7 +402,7 @@ const SearchFilterBar = ({
                             ))}
                     </select>
                     <div className={BookingPageStyles.filterIconContainer}>
-                        <FaFilter />
+                        <FaSearch />
                     </div>
                 </div>
             </div>
@@ -474,13 +475,18 @@ const Booking = () => {
     const [editingStatus, setEditingStatus] = useState(null);
     const [newStatus, setNewStatus] = useState("");
 
-    // FETCH BOOKINGS FROM SERVER SIDE
+    // FETCH BOOKINGS FROM SERVER SIDE (use admin endpoint so company-segregation applies)
     const fetchBookings = useCallback(async () => {
         try {
-            const res = await api.get("/api/bookings?limit=200");
+            const token = getAdminToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const res = await api.get("/api/admin/bookings?limit=200", {
+                headers
+            });
+            // admin endpoint returns { success: true, bookings: [...] }
             const raw = Array.isArray(res.data)
                 ? res.data
-                : res.data.data || res.data.bookings || [];
+                : res.data.bookings || res.data.data || [];
             const mapped = raw.map((b, i) => {
                 const id = b._id || b.id || `local-${i + 1}`;
                 const carInfo = extractCarInfo(b);
@@ -492,7 +498,7 @@ const Booking = () => {
                     email: b.email || "",
                     phone: b.phone || "",
                     car: carInfo.title || "",
-                    carImage: carInfo.image || "",
+                    carImage: carInfo.image || b.carImage || "",
                     pickupDate: b.pickupDate || b.pickup || b.startDate || "",
                     returnDate: b.returnDate || b.return || b.endDate || "",
                     bookingDate: b.bookingDate || b.createdAt || "",
@@ -523,7 +529,7 @@ const Booking = () => {
     const filteredBookings = useMemo(() => {
         const q = (searchTerm || '').toLowerCase().trim();
         const stringForSearch = (v) =>
-            v === null || v === undefined ? '' : String(v).toLowerCase;
+            v === null || v === undefined ? '' : String(v).toLowerCase();
 
         return bookings.filter((b) => {
             const matchesSearch =
@@ -550,9 +556,13 @@ const Booking = () => {
                 window.alert('Please select a status before saving.');
                 return;
             }
-            await api.patch(`/api/bookings/${booking._id}/status`, {
+
+            const token = getAdminToken();
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            await api.patch(`/api/admin/bookings/${booking._id}/status`, {
                 status: newStatus,
-            });
+            }, { headers });
 
             setBookings((prev) =>
                 prev.map((b) =>

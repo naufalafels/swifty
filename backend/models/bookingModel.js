@@ -5,9 +5,17 @@ const addressSchema = new Schema({
   street: String, city: String, state: String, zipCode: String
 }, { _id: false, default: {} });
 
+// Denormalized car snapshot schema includes company fields so Mongoose won't strip them
 const carSummarySchema = new Schema({
   id: { type: Schema.Types.ObjectId, ref: 'Car', required: true },
-  make: String, model: String, year: Number, dailyRate: Number, image: String
+  make: String,
+  model: String,
+  year: Number,
+  dailyRate: Number,
+  image: String,
+
+  // Multi-tenant: which company owns this car
+  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 }, { _id: false });
 
 const bookingSchema = new Schema({
@@ -27,7 +35,7 @@ const bookingSchema = new Schema({
   paymentIntentId: String,
   address: { type: addressSchema, default: () => ({}) },
 
-  // Denormalized: which company the booking belongs to
+  // Denormalized: which company the booking belongs to (used by admin filters)
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 
   stripeSession: { type: Schema.Types.Mixed, default: {} }

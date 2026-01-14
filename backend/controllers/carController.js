@@ -87,7 +87,8 @@ export const getCars = async (req, res, next) => {
     let carsWithAvailability = cars;
     if (Array.isArray(cars) && cars.length && typeof Car.computeAvailabilityForCars === "function") {
       try {
-        carsWithAvailability = Car.computeAvailabilityForCars(cars);
+        // computeAvailabilityForCars is async and queries bookings, await it
+        carsWithAvailability = await Car.computeAvailabilityForCars(cars);
       } catch (err) {
         console.warn("computeAvailabilityForCars failed:", err);
         // fallback to raw cars
@@ -122,7 +123,7 @@ export const getCarById = async (req, res, next) => {
     let carWithAvailability = car;
     if (typeof Car.computeAvailabilityForCars === "function") {
       try {
-        const arr = Car.computeAvailabilityForCars([car]);
+        const arr = await Car.computeAvailabilityForCars([car]);
         carWithAvailability = arr && arr[0] ? arr[0] : car;
       } catch (err) {
         console.warn("computeAvailabilityForCars failed for single car:", err);

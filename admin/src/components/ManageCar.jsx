@@ -117,7 +117,7 @@ const CarCard = ({ car, onEdit, onDelete }) => {
                     </div>
 
                     <div className=' text-2xl font-bold text-orange-500'>
-                        RM{car.dailyRate}
+                        MYR&nbsp;{car.dailyRate}
                         <span className=' text-sm text-gray-400 font-normal'>/day</span>
                     </div>
                 </div>
@@ -274,7 +274,7 @@ const EditModal = ({ car, onClose, onSubmit, onChange }) => {
                                 required: true,
                                 items: ["available", "rented", "maintenance"],
                             })}
-                            {inputField("Daily Rate (RM)", "dailyRate", "number", {
+                            {inputField("Daily Rate (MYR)", "dailyRate", "number", {
                                 required: true,
                                 min: 1,
                                 step: 0.01,

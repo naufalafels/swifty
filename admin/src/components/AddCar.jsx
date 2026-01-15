@@ -146,7 +146,7 @@ const AddCar = () => {
               <label className={AddCarPageStyles.label}>Car Name</label>
               <input required name="carName" value={data.carName} onChange={handleChange} className={AddCarPageStyles.input} placeholder="e.g., Toyota Camry" />
 
-              <label className={AddCarPageStyles.label}>Daily Price (RM)</label>
+              <label className={AddCarPageStyles.label}>Daily Price (MYR)</label>
               <input required name="dailyPrice" value={data.dailyPrice} onChange={handleChange} type="number" min="1" className={AddCarPageStyles.input} placeholder="150" />
 
               <label className={AddCarPageStyles.label}>Seats</label>

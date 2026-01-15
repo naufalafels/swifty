@@ -1,4 +1,5 @@
 import Booking from '../models/bookingModel.js';
+import Car from '../models/carModel.js';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
@@ -85,25 +86,49 @@ export const createCheckoutSession = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid userId format' });
     }
 
-    // Create booking (pending)
+    // --- NEW: if carField contains an id, fetch canonical Car and copy its companyId into carField and bookingCompanyId ---
+    let bookingCompanyId = null;
+    try {
+      const carRef = carField && (carField.id || carField._id);
+      const carIdStr = carRef ? String(carRef) : null;
+      if (carIdStr && mongoose.Types.ObjectId.isValid(carIdStr)) {
+        const canonicalCar = await Car.findById(carIdStr).lean();
+        if (canonicalCar) {
+          const canonicalCompany = canonicalCar.company || canonicalCar.companyId || null;
+          if (canonicalCompany) {
+            // ensure carField has company info for snapshot
+            carField = { ...(carField || {}), companyId: canonicalCompany, companyName: canonicalCar.companyName || (canonicalCar.company && canonicalCar.company.name) || "" };
+            bookingCompanyId = canonicalCompany;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('createCheckoutSession: failed to fetch canonical Car for companyId:', e && e.message ? e.message : e);
+    }
+    // --- end new section ---
+
+    // Create booking (pending) — include companyId top-level if we found it
+    let bookingInput = {
+      userId: finalUserId,
+      customer: String(customer ?? ""),
+      email: String(email ?? ""),
+      phone: String(phone ?? ""),
+      car: carField ?? {},
+      carImage: String(carImage ?? ""),
+      pickupDate: pd,
+      returnDate: rd,
+      amount: total,
+      paymentStatus: "pending",
+      details: typeof details === "string" ? JSON.parse(details) : (details || {}),
+      address: typeof address === "string" ? JSON.parse(address) : (address || {}),
+      status: "pending",
+      currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+    };
+    if (bookingCompanyId) bookingInput.companyId = bookingCompanyId;
+
     let booking;
     try {
-      booking = await Booking.create({
-        userId: finalUserId,
-        customer: String(customer ?? ""),
-        email: String(email ?? ""),
-        phone: String(phone ?? ""),
-        car: carField ?? {},
-        carImage: String(carImage ?? ""),
-        pickupDate: pd,
-        returnDate: rd,
-        amount: total,
-        paymentStatus: "pending",
-        details: typeof details === "string" ? JSON.parse(details) : (details || {}),
-        address: typeof address === "string" ? JSON.parse(address) : (address || {}),
-        status: "pending",
-        currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
-      });
+      booking = await Booking.create(bookingInput);
     } catch (err) {
       console.error('Booking.create failed:', err && err.stack ? err.stack : err);
       return res.status(500).json({ success: false, message: 'Failed to create booking', error: String(err.message || err) });

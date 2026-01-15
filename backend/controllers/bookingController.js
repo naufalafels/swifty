@@ -83,6 +83,7 @@ function buildCarSummary(src) {
     image: src.image || src.carImage || "",
     // keep companyId as string here; we'll convert to ObjectId when saving top-level or nested fields where appropriate
     companyId: companyId ? String(companyId) : null,
+    companyName: companyName || "",
   };
 }
 
@@ -163,6 +164,21 @@ export const createBooking = async (req, res) => {
     }
 
     const carId = carSummary.id;
+
+    // Defensive: ensure company info comes from canonical Car record when available
+    if (carSummary.id) {
+      try {
+        const canonicalCar = await Car.findById(carSummary.id).session(session).lean();
+        if (canonicalCar && (canonicalCar.companyId || canonicalCar.company)) {
+          const c = canonicalCar.company || canonicalCar.companyId;
+          carSummary.companyId = idToString(c);
+          carSummary.companyName = canonicalCar.companyName || (canonicalCar.company && canonicalCar.company.name) || carSummary.companyName || "";
+        }
+      } catch (e) {
+        // non-fatal: proceed with whatever company info we have
+        console.warn("createBooking: failed to fetch canonical car for companyId:", e);
+      }
+    }
 
     // Compose bookingData. Embed car snapshot with company info if available.
     const bookingData = {
@@ -366,11 +382,38 @@ export const updateBooking = async (req, res, next) => {
             companyId: summary.companyId && mongoose.Types.ObjectId.isValid(summary.companyId) ? mongoose.Types.ObjectId(summary.companyId) : (summary.companyId || null),
             companyName: summary.companyName || "",
           };
-          // keep top-level companyId in sync
-          if (summary.companyId) {
-            booking.companyId = toObjectIdIfValid(summary.companyId) || null;
+
+          // Defensive: if we have a car id, ensure companyId comes from canonical Car record when available
+          if (summary.id) {
+            try {
+              const canonicalCar = await Car.findById(summary.id).session(session).lean();
+              if (canonicalCar && (canonicalCar.companyId || canonicalCar.company)) {
+                const cval = canonicalCar.company || canonicalCar.companyId;
+                booking.car.companyId = (cval && mongoose.Types.ObjectId.isValid(cval)) ? mongoose.Types.ObjectId(cval) : (cval || booking.car.companyId);
+                booking.companyId = toObjectIdIfValid(cval) || booking.companyId || null;
+              } else {
+                // keep top-level companyId in sync with snapshot if present
+                if (summary.companyId) {
+                  booking.companyId = toObjectIdIfValid(summary.companyId) || null;
+                } else {
+                  booking.companyId = null;
+                }
+              }
+            } catch (e) {
+              console.warn("updateBooking: failed to fetch canonical car for companyId:", e);
+              if (summary.companyId) {
+                booking.companyId = toObjectIdIfValid(summary.companyId) || null;
+              } else {
+                booking.companyId = null;
+              }
+            }
           } else {
-            booking.companyId = null;
+            // keep top-level companyId in sync
+            if (summary.companyId) {
+              booking.companyId = toObjectIdIfValid(summary.companyId) || null;
+            } else {
+              booking.companyId = null;
+            }
           }
         }
       } else {

@@ -51,7 +51,7 @@ const formatPrice = (price) => {
   const num = typeof price === "number" ? price : Number(price) || 0;
   return num.toLocaleString("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "MYR",
     maximumFractionDigits: 0,
   });
 };

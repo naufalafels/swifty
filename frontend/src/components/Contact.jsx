@@ -102,7 +102,7 @@ const Contact = () => {
                         <div className={styles.infoItemContainer}>
                             {[
                                 { icon: FaWhatsapp, label: 'WhatsApp', value: '+61 481 152 728', color: 'bg-green-900/30' },
-                                { icon: FaEnvelope, label: 'Email', value: 'Admin@imanglobal.com.au', color: 'bg-orange-900/30' },
+                                { icon: FaEnvelope, label: 'Email', value: 'admin@swifty.com', color: 'bg-orange-900/30' },
                                 { icon: FaClock, label: 'Hours', value: 'Mon-Sat: 8AM-8PM', color: 'bg-orange-900/30' },
                             ].map((info, i) => (
                                 <div key={i} className={styles.infoItem}>
@@ -139,7 +139,7 @@ const Contact = () => {
                                 </span>
                             </div>
                             <p className={styles.offerText}>
-                                Book for 7+ days and enjoy a 15% discount
+                                Book for 7+ days and enjoy a 10% discount
                             </p>
                         </div>
                     </div>

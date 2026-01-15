@@ -289,7 +289,7 @@ const HomeCars = () => {
         </div>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 w-full">
           <div className="w-full text-center">
-            <h1 className={styles.title}>Luxury Car Collection</h1>
+            <h1 className={styles.title}>Premium Car Collection</h1>
             <p className={styles.subtitle}>
               Discover premium vehicles with exceptional performance and comfort
               for your next journey
@@ -382,7 +382,7 @@ const HomeCars = () => {
 
                 <div className={styles.priceBadge}>
                   <span className={styles.priceText}>
-                    RM{car.dailyRate ?? car.price ?? 0}/day
+                    MYR&nbsp;{car.dailyRate ?? car.price ?? 0}/day
                   </span>
                 </div>
 

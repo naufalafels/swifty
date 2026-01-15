@@ -80,7 +80,7 @@ const Footer = () => {
                     <ul className={styles.contactList}>
                         <li className={styles.contactList}>
                             <FaMapMarkedAlt className={styles.contactIcon} />
-                            <span>Clarence Street, Merrylands, NSW 2160</span>
+                            <span>Bayan Baru, 11950, Pulau Pinang, Malaysia </span>
                         </li>
                     
                         <li className={styles.contactItem}>
@@ -90,7 +90,7 @@ const Footer = () => {
 
                         <li className={styles.contactItem}>
                             <FaEnvelope className={styles.contactIcon} />
-                            <span>Admin@imanglobal.com.au</span>
+                            <span>admin@swifty.com</span>
                         </li>
                     </ul>
                 

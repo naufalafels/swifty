@@ -111,7 +111,7 @@ const Testimonial = () => {
                             50+
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[1])}>
-                            Fuel-Friendly Vehicles
+                            Rental Companies
                         </div>
                     </div>
 
@@ -126,7 +126,7 @@ const Testimonial = () => {
 
                     <div className={styles.statItem}>
                         <div className={styles.statValue(styles.statColors.value[3])}>
-                            20+
+                            150+
                         </div>
                         <div className={styles.statLabel(styles.statColors.label[3])}>
                             Locations

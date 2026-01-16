@@ -68,16 +68,111 @@ const daysBetween = (start, end) => {
   }
 };
 
+/**
+ * Build a readable address string from various address shapes.
+ */
 const buildCompanyAddress = (company) => {
   if (!company) return "";
-  const addr = company.address || {};
-  const parts = [];
-  if (addr.street) parts.push(addr.street);
-  if (addr.city) parts.push(addr.city);
-  if (addr.state) parts.push(addr.state);
-  if (addr.zipCode) parts.push(addr.zipCode);
-  if (addr.country) parts.push(addr.country);
-  return parts.filter(Boolean).join(", ");
+  const addr = company.address || company || {};
+  // Try multiple possible field names
+  const street = addr.street || addr.address_street || addr.addressLine1 || "";
+  const city = addr.city || addr.address_city || addr.town || "";
+  const state = addr.state || addr.address_state || addr.region || "";
+  const zip = addr.zipCode || addr.postal_code || addr.address_zipCode || "";
+  const country = addr.country || addr.address_country || "";
+  return [street, city, state, zip, country].filter(Boolean).join(", ");
+};
+
+/**
+ * Resolve a company object from many possible locations/shapes within a booking payload.
+ * Returns { id, name, address, logo } or null.
+ *
+ * This function now also attempts to recover a usable name/address from snapshot fields
+ * (booking.car.companyName, booking.raw.*) so the UI doesn't show raw ObjectId strings.
+ */
+const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
+  if (!booking && !carSnapshot) return null;
+
+  const normalize = (c) => {
+    if (!c) return null;
+    if (typeof c === "string") {
+      // If it looks like an ObjectId, treat as id; otherwise treat as name
+      const isId = /^[0-9a-fA-F]{8,}$/.test(c);
+      if (isId) return { id: c };
+      return { name: c };
+    }
+    // object shape
+    const name =
+      c.name ||
+      c.companyName ||
+      c.company_name ||
+      c.title ||
+      c.displayName ||
+      "";
+    const logo = c.logo || c.logoUrl || c.logo_url || c.image || c.avatar || "";
+    const address = buildCompanyAddress(c);
+    const id = c._id || c.id || c.companyId || c.company_id || null;
+    return { id, name, address, logo };
+  };
+
+  // 1) booking.company
+  const bCompany = safeAccess(() => booking.company, null);
+  const n1 = normalize(bCompany);
+  if (n1 && (n1.name || n1.address || n1.logo || n1.id)) return n1;
+
+  // 2) booking.companyName or booking.company_name
+  const bCompanyName =
+    safeAccess(() => booking.companyName, null) ||
+    safeAccess(() => booking.company_name, null);
+  if (bCompanyName) return normalize(bCompanyName);
+
+  // 3) booking.raw?.company or booking.raw?.companyName
+  const rawCompany = safeAccess(() => booking.raw?.company, null);
+  const n3 = normalize(rawCompany);
+  if (n3 && (n3.name || n3.address || n3.logo || n3.id)) return n3;
+
+  const rawCompanyName = safeAccess(() => booking.raw?.companyName, null);
+  if (rawCompanyName) return normalize(rawCompanyName);
+
+  // 4) carSnapshot.company or booking.car.company or booking.raw?.car?.company
+  const carCompany =
+    safeAccess(() => carSnapshot.company, null) ||
+    safeAccess(() => booking.car?.company, null) ||
+    safeAccess(() => booking.raw?.car?.company, null) ||
+    null;
+  const n4 = normalize(carCompany);
+  if (n4 && (n4.name || n4.address || n4.logo || n4.id)) return n4;
+
+  // 5) fallback: sometimes the canonical company name is stored on the car snapshot as companyName
+  const snapshotCompanyName =
+    safeAccess(() => carSnapshot.companyName, null) ||
+    safeAccess(() => booking.car?.companyName, null) ||
+    safeAccess(() => booking.raw?.car?.companyName, null) ||
+    safeAccess(() => booking.raw?.companyName, null);
+  if (snapshotCompanyName) return normalize(snapshotCompanyName);
+
+  // 6) company id fields (no metadata)
+  const companyId =
+    safeAccess(() => booking.companyId, null) ||
+    safeAccess(() => booking.company_id, null) ||
+    safeAccess(() => booking.raw?.companyId, null) ||
+    safeAccess(() => booking.car?.companyId, null) ||
+    safeAccess(() => carSnapshot.companyId, null) ||
+    null;
+  if (companyId) {
+    // try to get a friendly name from other fields before exposing id
+    const fallbackName =
+      safeAccess(() => booking.car?.companyName, null) ||
+      safeAccess(() => booking.raw?.car?.companyName, null) ||
+      safeAccess(() => booking.raw?.company?.name, null) ||
+      null;
+    if (fallbackName) return { id: companyId, name: fallbackName };
+    // we will return id but caller will hide raw id if no name available
+    return { id: companyId };
+  }
+
+  // no company found
+  return null;
 };
 
 const normalizeBooking = (booking) => {
@@ -92,6 +187,10 @@ const normalizeBooking = (booking) => {
         return { ...snapshot, ...populated };
       }
       return snapshot;
+    }
+    // fallback to raw.car
+    if (booking.raw?.car && typeof booking.raw.car === "object") {
+      return { ...booking.raw.car };
     }
     return {};
   };
@@ -117,17 +216,39 @@ const normalizeBooking = (booking) => {
     booking.return ||
     null;
 
-  // Company resolution: booking.company -> booking.raw.company -> car snapshot company -> booking.car.company
-  const companyObj =
-    safeAccess(() => booking.company, null) ||
-    safeAccess(() => booking.raw?.company, null) ||
-    safeAccess(() => carObj.company, null) ||
-    safeAccess(() => booking.car?.company, null) ||
-    null;
+  // Resolve company using robust helper; pass car snapshot for additional info
+  const companyObj = resolveCompanyFromBooking(booking, carObj);
 
-  const companyName = companyObj?.name || companyObj?.companyName || "";
-  const companyLogo = companyObj?.logo || companyObj?.logoUrl || "";
-  const companyAddress = buildCompanyAddress(companyObj);
+  // If companyObj exists but only contains id, try a few more fallbacks for name/address
+  let resolvedCompany = { name: "", address: "", logo: "", id: "" };
+  if (companyObj) {
+    resolvedCompany.id = companyObj.id || "";
+    resolvedCompany.name = companyObj.name || "";
+    resolvedCompany.address = companyObj.address || "";
+    resolvedCompany.logo = companyObj.logo || "";
+  }
+
+  // Additional fallback: car snapshot companyName or company address fields
+  if (!resolvedCompany.name) {
+    resolvedCompany.name =
+      safeAccess(() => carObj.companyName, "") ||
+      safeAccess(() => booking.raw?.car?.companyName, "") ||
+      safeAccess(() => booking.raw?.companyName, "") ||
+      "";
+  }
+  if (!resolvedCompany.address) {
+    // possible fields on carObj or booking.raw
+    resolvedCompany.address =
+      safeAccess(() => carObj.companyAddress, "") ||
+      safeAccess(() => booking.raw?.company?.address, "") ||
+      safeAccess(() => booking.raw?.companyAddress, "") ||
+      "";
+  }
+
+  // If still no name and only id present, hide raw id and show unavailable label
+  if (!resolvedCompany.name && resolvedCompany.id) {
+    resolvedCompany.name = ""; // keep empty so UI displays friendly fallback
+  }
 
   const normalized = {
     id: booking._id || booking.id || String(Math.random()).slice(2, 8),
@@ -178,9 +299,10 @@ const normalizeBooking = (booking) => {
     paymentId:
       booking.paymentIntentId || booking.paymentId || booking.sessionId || "",
     company: {
-      name: companyName,
-      address: companyAddress,
-      logo: companyLogo,
+      name: resolvedCompany.name || "",
+      address: resolvedCompany.address || "",
+      logo: resolvedCompany.logo || "",
+      id: resolvedCompany.id || "",
     },
     raw: booking,
   };
@@ -279,6 +401,11 @@ const BookingCard = ({ booking, onViewDetails }) => {
                     </div>
                   ) : null}
                 </div>
+              </div>
+            ) : booking.company?.id ? (
+              <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                <FaBuilding className="text-gray-400" />
+                <span>Company information unavailable</span>
               </div>
             ) : null}
           </div>
@@ -391,6 +518,8 @@ const BookingModal = ({ booking, onClose, onCancel }) => {
                   <h3 className="text-lg font-semibold">{booking.car.make}</h3>
                   {booking.company?.name ? (
                     <div className="text-sm text-gray-300">{booking.company.name}</div>
+                  ) : booking.company?.id ? (
+                    <div className="text-sm text-gray-400">Company information unavailable</div>
                   ) : null}
                 </div>
               </div>
@@ -485,11 +614,11 @@ const BookingModal = ({ booking, onClose, onCancel }) => {
               <div className={s.infoCard}>
                 <div className="mb-3">
                   <p className={s.infoLabel}>Company Name:</p>
-                  <p className={s.infoValue}>{booking.company?.name || "—"}</p>
+                  <p className={s.infoValue}>{booking.company?.name || (booking.company?.id ? "Company information unavailable" : "—")}</p>
                 </div>
                 <div>
                   <p className={s.infoLabel}>Company Address:</p>
-                  <p className={s.infoValue}>{booking.company?.address || "—"}</p>
+                  <p className={s.infoValue}>{booking.company?.address || (booking.company?.id ? "Company information unavailable" : "—")}</p>
                 </div>
               </div>
 

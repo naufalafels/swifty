@@ -1,20 +1,77 @@
-// Central auth service (in-memory access token + refresh via HttpOnly cookie)
-// - login() calls POST /api/auth/login with credentials (withCredentials:true).
-// - refresh() calls POST /api/auth/refresh (expects server to read HttpOnly cookie).
-// - logout() calls POST /api/auth/logout and clears in-memory tokens.
-// - getAccessToken()/getCurrentUser() provide in-memory values for other modules.
+// frontend/src/utils/authService.js
+// In-memory auth helper with scheduled refresh for the client app.
 
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
 
-// In-memory store (cleared on full page reload)
 let accessToken = null;
 let currentUser = null;
-let refreshing = null; // Promise to de-duplicate concurrent refreshes
+let refreshing = null;
+let refreshTimerId = null;
 
+/* Utility: parse JWT payload in browser */
+function parseJwt(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      Array.prototype.map
+        .call(atob(payload), (c) => {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/* Schedule a refresh based on token expiry (refresh 30s before exp) */
+function scheduleRefreshFromToken(token) {
+  try {
+    if (!token) return;
+    const payload = parseJwt(token);
+    if (!payload || !payload.exp) return;
+    const expMs = payload.exp * 1000;
+    const now = Date.now();
+    const msUntilExp = expMs - now;
+    const refreshBeforeMs = 30 * 1000; // refresh 30s before expiry
+    let timeout = Math.max(2000, msUntilExp - refreshBeforeMs);
+    if (msUntilExp <= 2000) timeout = 2000;
+
+    // clear any existing timer
+    if (refreshTimerId) {
+      clearTimeout(refreshTimerId);
+      refreshTimerId = null;
+    }
+
+    refreshTimerId = setTimeout(async () => {
+      try {
+        const r = await refresh();
+        if (!(r && r.ok)) {
+          // failed refresh -> clear session
+          accessToken = null;
+          currentUser = null;
+          if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
+        }
+      } catch {
+        accessToken = null;
+        currentUser = null;
+        if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
+      }
+    }, timeout);
+  } catch {
+    // ignore scheduling errors
+  }
+}
+
+/* Public helpers */
 export const setAccessToken = (t) => {
   accessToken = t || null;
+  if (accessToken) scheduleRefreshFromToken(accessToken);
 };
 
 export const getAccessToken = () => accessToken;
@@ -25,15 +82,28 @@ export const setCurrentUser = (u) => {
 
 export const getCurrentUser = () => currentUser;
 
+export const clearLocalSession = () => {
+  accessToken = null;
+  currentUser = null;
+  if (refreshTimerId) {
+    clearTimeout(refreshTimerId);
+    refreshTimerId = null;
+  }
+};
+
+/* Auth API calls */
+
 /**
  * login(credentials)
  * - POST /api/auth/login
- * - Server may set an HttpOnly refresh cookie.
- * - Server is expected to return { accessToken, user } or { token, user } or { user }.
+ * - Server sets HttpOnly refresh cookie and returns access token + user
  */
 export const login = async (credentials) => {
   const url = `${API_BASE}/api/auth/login`;
-  const res = await axios.post(url, credentials, { withCredentials: true, headers: { "Content-Type": "application/json" } });
+  const res = await axios.post(url, credentials, {
+    withCredentials: true,
+    headers: { "Content-Type": "application/json" },
+  });
   const data = res.data || {};
   const token = data.accessToken || data.token || null;
   const user = data.user || null;
@@ -43,12 +113,15 @@ export const login = async (credentials) => {
 };
 
 /**
- * register (optional)
- * - POST /api/auth/register
+ * register(payload)
+ * - POST /api/auth/register (if you use a different route adjust accordingly)
  */
-export const register = async (payload) => {
+export const register = async (payload, isFormData = false) => {
   const url = `${API_BASE}/api/auth/register`;
-  const res = await axios.post(url, payload, { withCredentials: true, headers: { "Content-Type": "application/json" } });
+  const res = await axios.post(url, payload, {
+    withCredentials: true,
+    headers: isFormData ? {} : { "Content-Type": "application/json" },
+  });
   const data = res.data || {};
   const token = data.accessToken || data.token || null;
   const user = data.user || null;
@@ -61,7 +134,7 @@ export const register = async (payload) => {
  * refresh()
  * - POST /api/auth/refresh
  * - Server should read refresh cookie and return new accessToken and optionally user
- * - This function is de-duplicated so multiple simultaneous calls share the same promise
+ * - De-duplicated so parallel calls share same promise
  */
 export const refresh = async () => {
   if (refreshing) return refreshing;
@@ -77,8 +150,7 @@ export const refresh = async () => {
       return { ok: true, data };
     } catch (err) {
       // clear local memory state on refresh failure
-      setAccessToken(null);
-      setCurrentUser(null);
+      clearLocalSession();
       return { ok: false, err };
     } finally {
       refreshing = null;
@@ -109,7 +181,6 @@ export const logout = async () => {
   } catch (err) {
     // ignore network errors
   } finally {
-    setAccessToken(null);
-    setCurrentUser(null);
+    clearLocalSession();
   }
 };

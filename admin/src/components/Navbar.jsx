@@ -1,25 +1,23 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { navbarStyles as styles } from '../assets/dummyStyles.js';
-import { Link, useNavigate } from 'react-router-dom';
-import logo from '../assets/logo.png';
-import { CalendarCheck, Car, Menu, PlusCircle, X, LogOut, User } from 'lucide-react';
+import React, { useEffect, useRef, useState } from "react";
+import { navbarStyles as styles } from "../assets/dummyStyles.js";
+import { Link, useNavigate } from "react-router-dom";
+import logo from "../assets/logo.png";
+import { CalendarCheck, Car, Menu, PlusCircle, X, LogOut, User } from "lucide-react";
 import {
   getAdminToken,
   getAdminUser,
   clearAdminSession,
   adminLogout,
-  ensureAuth
-} from '../utils/auth.js';
-import CompanyProfileModal from './CompanyProfileModal.jsx';
-import axios from 'axios';
+  ensureAuth,
+} from "../utils/auth.js";
+import CompanyProfileModal from "./CompanyProfileModal.jsx";
+import api from "../utils/api";
 
 const navLinks = [
   { path: "/", icon: PlusCircle, label: "Add Car" },
   { path: "/manage-cars", icon: Car, label: "Manage Cars" },
   { path: "/bookings", icon: CalendarCheck, label: "Bookings" },
 ];
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -34,8 +32,8 @@ const Navbar = () => {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll);
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -54,49 +52,44 @@ const Navbar = () => {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [isOpen]);
 
-  // fetch company info (logo, name) once (so avatar can show logo)
+  // fetch company info after ensuring auth
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // ensure auth (attempt refresh if needed)
-        await ensureAuth();
-        const token = getAdminToken();
-        if (!token) return;
-        const res = await axios.get(`${API_BASE}/api/admin/company`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const ok = await ensureAuth();
+        if (!ok) return;
+        // api will attach Authorization header automatically from in-memory token
+        const res = await api.get("/api/admin/company");
         if (mounted && res?.data?.company) setCompany(res.data.company);
-        // update adminUser in case ensureAuth refreshed it
+        // refresh local user state
         setAdminUser(getAdminUser());
       } catch (err) {
-        console.warn('Failed to fetch company for navbar', err?.response?.data || err.message);
+        console.warn("Failed to fetch company for navbar", err?.response?.data || err.message);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleLogout = async () => {
     try {
-      await adminLogout(); // calls server logout and clears client token
+      await adminLogout(); // server logout + clears in-memory
     } catch (e) {
-      console.warn('logout error', e);
+      console.warn("logout error", e);
     } finally {
       clearAdminSession();
-      navigate('/login');
+      navigate("/login", { replace: true });
     }
   };
 
   const renderAvatar = () => {
-    // prefer company.logo if exists
     if (company && company.logo) {
-      return (
-        <img src={company.logo} alt="company logo" className="w-8 h-8 rounded-full object-cover" />
-      );
+      return <img src={company.logo} alt="company logo" className="w-8 h-8 rounded-full object-cover" />;
     }
-    // otherwise use initials
-    const name = adminUser?.name || adminUser?.email || '';
-    const initials = name ? name.split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase() : '';
+    const name = adminUser?.name || adminUser?.email || "";
+    const initials = name ? name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() : "";
     return (
       <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-sm font-semibold text-white">
         {initials || <User className="w-4 h-4" />}
@@ -105,7 +98,7 @@ const Navbar = () => {
   };
 
   return (
-    <div className={styles.navbar(scrolled)}>
+    <nav className={styles.navbar(scrolled)}>
       <div className={styles.navbarInner}>
         <div className={styles.navbarCenter}>
           <div className={styles.navbarBackground(scrolled)}>
@@ -123,7 +116,7 @@ const Navbar = () => {
                     return (
                       <React.Fragment key={link.path}>
                         <Link to={link.path} className={styles.navLink}>
-                          <Icon className=' w-4 h-4' />
+                          <Icon className="w-4 h-4" />
                           <span>{link.label}</span>
                         </Link>
                         {i < navLinks.length - 1 && <div className={styles.navDivider} />}
@@ -136,8 +129,8 @@ const Navbar = () => {
                   <div className="flex items-center gap-2 text-sm text-gray-200">
                     {renderAvatar()}
                     <div className="flex flex-col leading-none">
-                      <span className="font-medium text-sm text-gray-100">{adminUser?.name || adminUser?.email || 'Admin'}</span>
-                      <span className="text-xs text-gray-400">{adminUser?.email || ''}</span>
+                      <span className="font-medium text-sm text-gray-100">{adminUser?.name || adminUser?.email || "Admin"}</span>
+                      <span className="text-xs text-gray-400">{adminUser?.email || ""}</span>
                     </div>
                   </div>
 
@@ -170,7 +163,7 @@ const Navbar = () => {
               const Icon = link.icon;
               return (
                 <Link key={link.path} to={link.path} className={styles.mobileNavLink} onClick={() => setIsOpen(false)}>
-                  <Icon className=' w-5 h-5' />
+                  <Icon className="w-5 h-5" />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -179,12 +172,12 @@ const Navbar = () => {
             <div className="border-t border-gray-700 my-2" />
 
             <button onClick={() => { setIsOpen(false); setShowCompanyModal(true); }} className={styles.mobileNavLink}>
-              <User className=' w-5 h-5' />
+              <User className="w-5 h-5" />
               <span>Company</span>
             </button>
 
             <button onClick={() => { setIsOpen(false); handleLogout(); }} className={styles.mobileNavLink}>
-              <LogOut className=' w-5 h-5' />
+              <LogOut className="w-5 h-5" />
               <span>Logout</span>
             </button>
           </div>
@@ -192,7 +185,7 @@ const Navbar = () => {
       )}
 
       {showCompanyModal && <CompanyProfileModal onClose={() => setShowCompanyModal(false)} />}
-    </div>
+    </nav>
   );
 };
 

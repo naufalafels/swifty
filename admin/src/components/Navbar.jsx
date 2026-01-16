@@ -3,7 +3,13 @@ import { navbarStyles as styles } from '../assets/dummyStyles.js';
 import { Link, useNavigate } from 'react-router-dom';
 import logo from '../assets/logo.png';
 import { CalendarCheck, Car, Menu, PlusCircle, X, LogOut, User } from 'lucide-react';
-import { getAdminToken, getAdminUser, clearAdminSession } from '../utils/auth.js';
+import {
+  getAdminToken,
+  getAdminUser,
+  clearAdminSession,
+  adminLogout,
+  ensureAuth
+} from '../utils/auth.js';
 import CompanyProfileModal from './CompanyProfileModal.jsx';
 import axios from 'axios';
 
@@ -24,7 +30,7 @@ const Navbar = () => {
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
 
-  const adminUser = getAdminUser();
+  const [adminUser, setAdminUser] = useState(() => getAdminUser());
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -50,39 +56,31 @@ const Navbar = () => {
 
   // fetch company info (logo, name) once (so avatar can show logo)
   useEffect(() => {
-    const loadCompany = async () => {
-      const token = getAdminToken();
-      if (!token) return;
+    let mounted = true;
+    (async () => {
       try {
+        // ensure auth (attempt refresh if needed)
+        await ensureAuth();
+        const token = getAdminToken();
+        if (!token) return;
         const res = await axios.get(`${API_BASE}/api/admin/company`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res?.data?.company) setCompany(res.data.company);
+        if (mounted && res?.data?.company) setCompany(res.data.company);
+        // update adminUser in case ensureAuth refreshed it
+        setAdminUser(getAdminUser());
       } catch (err) {
         console.warn('Failed to fetch company for navbar', err?.response?.data || err.message);
       }
-    };
-    loadCompany();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const handleLogout = async () => {
     try {
-      const token = getAdminToken();
-      if (token) {
-        try {
-          await fetch(`${API_BASE}/api/auth/logout`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            credentials: 'include'
-          });
-        } catch (e) {
-          console.warn('Backend logout failed', e);
-        }
-      }
+      await adminLogout(); // calls server logout and clears client token
+    } catch (e) {
+      console.warn('logout error', e);
     } finally {
       clearAdminSession();
       navigate('/login');
@@ -98,7 +96,7 @@ const Navbar = () => {
     }
     // otherwise use initials
     const name = adminUser?.name || adminUser?.email || '';
-    const initials = name.split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase();
+    const initials = name ? name.split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase() : '';
     return (
       <div className="w-8 h-8 rounded-full bg-orange-600 flex items-center justify-center text-sm font-semibold text-white">
         {initials || <User className="w-4 h-4" />}
@@ -157,7 +155,7 @@ const Navbar = () => {
 
               <div className={styles.mobileMenuButton}>
                 <button ref={buttonRef} onClick={() => setIsOpen((v) => !v)} className={styles.menuButton} aria-label="Toggle Menu" aria-expanded={isOpen}>
-                  {isOpen ? <X className=' h-5 w-5' /> : <Menu className=' h-5 w-5' />}
+                  {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                 </button>
               </div>
             </div>

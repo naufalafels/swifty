@@ -6,11 +6,28 @@ import ManageCar from './components/ManageCar.jsx';
 import Booking from './components/Booking.jsx';
 import AuthPage from './pages/Auth.jsx';
 import CompanyProfile from './pages/CompanyProfile.jsx';
-import { getAdminToken } from './utils/auth.js';
+import { useState, useEffect } from 'react';
+import { ensureAuth, getAdminToken } from './utils/auth.js';
 
 const ProtectedRoute = ({ children }) => {
-  const token = getAdminToken();
-  if (!token) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  const [checking, setChecking] = useState(true);
+  const [ok, setOk] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const authed = await ensureAuth();
+      if (mounted) {
+        setOk(!!authed);
+        setChecking(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  if (checking) return <div className="min-h-screen flex items-center justify-center text-white">Checking authentication...</div>;
+  if (!ok) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return children;
 };
 

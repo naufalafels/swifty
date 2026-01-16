@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { saveAdminSession } from '../utils/auth.js';
 import { useNavigate } from 'react-router-dom';
+import {
+  adminLogin,
+  adminRegister,
+  saveAdminSession
+} from '../utils/auth.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
@@ -45,9 +49,7 @@ const AuthPage = ({ mode = 'login' }) => {
     const loadCountries = async () => {
       setLoadingCountries(true);
       try {
-        // restcountries provides an easy list
         const res = await axios.get('https://restcountries.com/v3.1/all?fields=name,cca2');
-        // res.data is an array
         const sorted = (res.data || [])
           .map((c) => ({ name: c?.name?.common || c?.name?.official || '', code: c?.cca2 || '' }))
           .filter(c => c.name)
@@ -172,7 +174,6 @@ const AuthPage = ({ mode = 'login' }) => {
         addressdetails: '1'
       });
       const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`;
-      // Nominatim requires a user-agent; browsers block setting User-Agent header, but requests generally still work.
       const resp = await axios.get(url, { timeout: 10000 });
       const hits = resp?.data || [];
       if (Array.isArray(hits) && hits.length > 0) {
@@ -211,34 +212,27 @@ const AuthPage = ({ mode = 'login' }) => {
         if (values.location_lng) form.append('location_lng', values.location_lng);
         if (values.logoFile) form.append('logo', values.logoFile);
 
-        const res = await axios.post(`${API_BASE}/api/admin/signup`, form, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        if (res.data?.success) {
-          saveAdminSession(res.data.token, res.data.user);
-          navigate('/');
-          return;
-        }
-        setError(res.data?.message || 'Signup failed');
+        // Use adminRegister helper which sends form to /api/admin/signup and expects cookie + token
+        const data = await adminRegister(form);
+        // adminRegister should return { accessToken | token, user } or success object per backend
+        const token = data?.accessToken || data?.token || null;
+        const user = data?.user || null;
+        saveAdminSession(token, user);
+        navigate('/');
+        return;
       } else {
-        const res = await axios.post(`${API_BASE}/api/auth/login`, {
-          email: values.email,
-          password: values.password
-        }, {
-          headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (res.data?.token) {
-          saveAdminSession(res.data.token, res.data.user);
-          navigate('/');
-          return;
-        }
-        setError(res.data?.message || 'Login failed');
+        // login via adminLogin which calls /api/auth/login (withCredentials) and returns accessToken,user
+        const data = await adminLogin({ email: values.email, password: values.password });
+        const token = data?.accessToken || data?.token || null;
+        const user = data?.user || null;
+        saveAdminSession(token, user);
+        navigate('/');
+        return;
       }
     } catch (err) {
       console.error('Auth error', err);
-      setError(err?.response?.data?.message || err.message || 'Request failed');
+      const msg = err?.response?.data?.message || err.message || 'Request failed';
+      setError(msg);
     } finally {
       setLoading(false);
     }

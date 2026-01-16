@@ -10,6 +10,7 @@ const companySchema = new Schema({
     city: String,
     state: String,
     zipCode: String,
+    country: String, // added country to address
   },
   location: {
     type: { type: String, enum: ['Point'], default: 'Point' },

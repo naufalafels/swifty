@@ -27,6 +27,7 @@ const buildAddressFromBody = (body) => ({
   city: body.address_city || body.city || (body.address && body.address.city) || '',
   state: body.address_state || body.state || (body.address && body.address.state) || '',
   zipCode: body.address_zipCode || body.zipCode || (body.address && body.address.zipCode) || '',
+  country: body.address_country || body.country || (body.address && body.address.country) || ''
 });
 
 // signup company (company logo optional)
@@ -45,6 +46,17 @@ export const signupCompany = async (req, res) => {
     const companyData = { name: companyName, slug, address, contact: { phone, email } };
     if (req.file) companyData.logo = buildLogoUrl(req.file);
     else if (req.body.logo) companyData.logo = req.body.logo;
+
+    // Optional: accept location latitude/longitude and store as GeoJSON Point
+    const rawLat = req.body.location_lat ?? req.body.lat ?? req.body.latitude;
+    const rawLng = req.body.location_lng ?? req.body.lng ?? req.body.longitude;
+    if (rawLat !== undefined && rawLng !== undefined && rawLat !== '' && rawLng !== '') {
+      const lat = parseFloat(rawLat);
+      const lng = parseFloat(rawLng);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        companyData.location = { type: 'Point', coordinates: [lng, lat] };
+      }
+    }
 
     const company = await Company.create(companyData);
 

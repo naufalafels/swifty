@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import logo from "../assets/swifty-logo.png"
 import { ToastContainer, toast } from "react-toastify"
 import axios from 'axios'
+import * as authService from '../utils/authService';
 
 const SignUp = () => {
 
@@ -36,22 +37,27 @@ const SignUp = () => {
         e.preventDefault();
         if (!acceptedTerms) {
             toast.error('Please Accept Terms & Conditions', { theme: 'dark' })
+            return;
         }
         setLoading(true);
 
         try {
-            const base = 'http://localhost:7889';
+            // Use authService.register when available
+            const base = import.meta.env.VITE_API_URL || 'http://localhost:7889';
             const url = `${base}/api/auth/register`;
 
             const res = await axios.post(url, formData, {
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                withCredentials: true,
             });
 
             if (res.status >= 200 && res.status < 300) {
-                const { token, user } = res.data || {};
-
-                if (token) localStorage.setItem('token', token);
-                if (user) localStorage.setItem('user', JSON.stringify(user));
+                const data = res.data || {};
+                // if server returns an access token, set it in memory
+                const token = data?.accessToken || data?.token || null;
+                const user = data?.user || null;
+                if (token) authService.setAccessToken(token);
+                if (user) authService.setCurrentUser(user);
 
                 toast.success('Account created successfully! Comfortable Journey Ahead!', {
                     position: "top-right",

@@ -4,35 +4,22 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBars, FaTimes, FaUser, FaSignOutAlt } from "react-icons/fa";
 import logo from "../assets/swifty-logo.png";
 import { navbarStyles as styles } from "../assets/dummyStyles.js";
-import axios from "axios";
+import api from "../utils/api";
+import * as authService from "../utils/authService";
 
+const ME_ENDPOINT = "/api/auth/me";
 const LOGOUT_ENDPOINT = "/api/auth/logout";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => !!localStorage.getItem("token")
-  );
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem("user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
   const abortRef = useRef(null);
-
-  const base = "http://localhost:7889";
-  const api = axios.create({
-    baseURL: base,
-    headers: { Accept: "application/json" },
-  });
 
   const navLinks = [
     { to: "/", label: "Home" },
@@ -49,26 +36,23 @@ const Navbar = () => {
 
   const validateToken = useCallback(
     async (signal) => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setIsLoggedIn(false);
-        setUser(null);
-        return;
-      }
-
       try {
-        const res = await api.get(ME_ENDPOINT, {
-          signal,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        // Ensure we have an access token (or attempt refresh)
+        const ok = await authService.ensureAuth();
+        if (!ok) {
+          setIsLoggedIn(false);
+          setUser(null);
+          return;
+        }
+
+        // If access token present, fetch profile from server
+        const res = await api.get(ME_ENDPOINT, { signal });
         const profile = res?.data?.user ?? res?.data ?? null;
         if (profile) {
           setIsLoggedIn(true);
           setUser(profile);
           try {
-            localStorage.setItem("user", JSON.stringify(profile));
+            authService.setCurrentUser(profile);
           } catch {}
         } else {
           setIsLoggedIn(true);
@@ -76,12 +60,12 @@ const Navbar = () => {
         }
       } catch (err) {
         if (
-          axios.isAxiosError(err) &&
-          err.response &&
+          err?.response &&
           err.response.status === 401
         ) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          // clear in-memory session
+          authService.setAccessToken(null);
+          authService.setCurrentUser(null);
           setIsLoggedIn(false);
           setUser(null);
         } else {
@@ -89,7 +73,7 @@ const Navbar = () => {
         }
       }
     },
-    [api]
+    []
   );
 
   useEffect(() => {
@@ -111,52 +95,41 @@ const Navbar = () => {
   }, [validateToken]);
 
   useEffect(() => {
-    const handleStorageChange = (ev) => {
-      if (ev.key === "token" || ev.key === "user") {
+    // listen for visibility or storage changes in case server clears session
+    const handleVisibility = () => {
+      // try to validate again when tab becomes visible
+      if (document.visibilityState === "visible") {
         if (abortRef.current) {
-          try {
-            abortRef.current.abort();
-          } catch {}
+          try { abortRef.current.abort(); } catch {}
         }
         const controller = new AbortController();
         abortRef.current = controller;
         validateToken(controller.signal);
       }
     };
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [validateToken]);
 
   const handleLogout = useCallback(async () => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        await api.post(
-          LOGOUT_ENDPOINT,
-          {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 2000,
-          }
-        );
-      } catch {}
-    }
-
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    try {
+      // call server logout to clear HttpOnly refresh cookie
+      await api.post(LOGOUT_ENDPOINT, {}, { withCredentials: true, timeout: 2000 });
+    } catch {}
+    // clear in-memory session
+    await authService.logout();
     setIsLoggedIn(false);
     setUser(null);
     setIsOpen(false);
-
     navigate("/", { replace: true });
-  }, [api, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     setIsOpen(false);
-    setIsLoggedIn(!!localStorage.getItem("token"));
+    // derive initial UI state from in-memory user (may be null until validateToken completes)
+    setIsLoggedIn(!!authService.getAccessToken());
     try {
-      const raw = localStorage.getItem("user");
-      setUser(raw ? JSON.parse(raw) : null);
+      setUser(authService.getCurrentUser());
     } catch {
       setUser(null);
     }

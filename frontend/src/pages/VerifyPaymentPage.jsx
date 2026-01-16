@@ -1,5 +1,5 @@
 import React from 'react'
-import axios from 'axios'
+import api from '../utils/api'
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
@@ -19,7 +19,6 @@ const VerifyPaymentPage = () => {
       const rawSession = params.get('session_id');
       const session_id = rawSession ? rawSession.trim() : null;
       const payment_status = params.get('payment_status');
-      const token = localStorage.getItem('token');
 
       if (payment_status === 'cancel') {
         navigate('/checkout', {replace: true});
@@ -34,10 +33,8 @@ const VerifyPaymentPage = () => {
       try {
         setStatusMsg('Confirming payment with server...');
 
-        const API_BASE = 'http://localhost:7889';
-        const res = await axios.get(`${API_BASE}/api/payments/confirm`, {
+        const res = await api.get(`/api/payments/confirm`, {
           params: {session_id},
-          headers: token ? {Authorization: `Bearer ${token}`} : {},
           timeout: 15000,
         });
 
@@ -72,7 +69,7 @@ const VerifyPaymentPage = () => {
     verifyPayment();
 
     return () => {
-      cancelled: true;
+      cancelled = true;
     };
   }, [search, navigate]);
 

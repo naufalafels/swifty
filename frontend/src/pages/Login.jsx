@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { FaArrowLeft, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa'
 import logo from '../assets/swifty-logo.png'
 import { toast, ToastContainer } from 'react-toastify'
-import axios from 'axios'
+import * as authService from '../utils/authService'
 
 const Login = () => {
 
@@ -31,38 +31,23 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const base = 'http://localhost:7889';
-      const url = `${base}/api/auth/login`;
-
-      const res = await axios.post(url, credentials, {
-        headers: { 'Content-Type': 'application/json' }
+      // Use authService which keeps token in memory and attempts to use cookie-based refresh if backend sets refresh cookie
+      const data = await authService.login(credentials);
+      // login returns server payload; authService already stored access token (in memory) and user
+      const msg = data?.message || 'Login Successful! Welcome back';
+      toast.success(msg, {
+        position: 'top-right',
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        theme: 'colored',
+        onClose: () => {
+          const redirectPath = '/';
+          navigate(redirectPath, { replace: true });
+        },
+        autoClose: 1000,
       });
-
-      if (res.status >= 200 && res.status < 300) {
-        const { token, user, message } = res.data || {};
-
-        if (token) localStorage.setItem('token', token);
-        if (user) localStorage.setItem('user', JSON.stringify(user));
-
-        toast.success(message || 'Login Successful! Welcome back', {
-          position: 'top-right',
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-          onClose: () => {
-            const redirectPath = '/';
-            navigate(redirectPath, { replace: true });
-          },
-          autoClose: 1000,
-        });
-      }
-      else {
-        toast.error('Unexpected response from server', {
-          theme: 'colored'
-        })
-      }
     }
 
     catch (err) {

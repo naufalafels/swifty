@@ -9,23 +9,53 @@ import CarDetailPage from './pages/CarDetailPage';
 import { FaArrowUp } from 'react-icons/fa';
 import VerifyPaymentPage from './pages/VerifyPaymentPage';
 import MyBookingsPage from './pages/MyBookingsPage';
+import * as authService from './utils/authService';
 
-// PROTECTED ROUTE
+// PROTECTED ROUTE that supports async token refresh on page load
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
-  const authToken = localStorage.getItem("token");
+  const [checking, setChecking] = useState(true);
+  const [ok, setOk] = useState(false);
 
-  if (!authToken) {
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const authed = await authService.ensureAuth();
+      if (mounted) {
+        setOk(!!authed);
+        setChecking(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  if (checking) {
+    return <div className="min-h-screen flex items-center justify-center text-white">Checking authentication...</div>;
+  }
+  if (!ok) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   return children;
 };
 
 const RedirectIfAuthenticated = ({ children }) => {
-  const authToken = localStorage.getItem('token');
-  if (authToken) {
-    return <Navigate to='/' replace />;
-  }
+  const [checking, setChecking] = useState(true);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const ok = await authService.ensureAuth();
+      if (mounted) {
+        setAuthed(!!ok);
+        setChecking(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  if (checking) return null;
+  if (authed) return <Navigate to='/' replace />;
   return children;
 };
 

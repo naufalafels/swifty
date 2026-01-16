@@ -1,43 +1,62 @@
+// Admin auth helper - in-memory token + cookie-based refresh
+// Replaces previous localStorage-based helpers.
+
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
+
+let accessToken = null;
+let currentUser = null;
+let refreshing = null;
+
 export const saveAdminSession = (token, user) => {
-  try {
-    // Save token and user to both admin-specific keys and general keys so admin login
-    // works regardless of whether backend/frontend uses 'token' or 'admin_token'.
-    if (token) {
-      localStorage.setItem('admin_token', token);
-      localStorage.setItem('token', token);
-    }
-    if (user) {
-      localStorage.setItem('admin_user', JSON.stringify(user));
-      localStorage.setItem('user', JSON.stringify(user));
-    }
-  } catch (e) {}
+  accessToken = token || null;
+  currentUser = user || null;
 };
 
 export const clearAdminSession = () => {
-  try {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('admin_user');
-    localStorage.removeItem('user');
-  } catch (e) {}
+  accessToken = null;
+  currentUser = null;
 };
 
-export const getAdminToken = () => {
-  try {
-    // prefer admin_token but fall back to generic token if present
-    const t1 = localStorage.getItem('admin_token');
-    if (t1) return t1;
-    return localStorage.getItem('token');
-  } catch {
-    return null;
-  }
+export const getAdminToken = () => accessToken;
+export const getAdminUser = () => currentUser;
+
+/**
+ * adminLogin: call admin login endpoint. Server should set refresh cookie (HttpOnly).
+ */
+export const adminLogin = async (credentials) => {
+  const res = await axios.post(`${API_BASE}/api/admin/login`, credentials, { withCredentials: true });
+  const data = res.data || {};
+  accessToken = data?.accessToken || data?.token || null;
+  currentUser = data?.user || null;
+  return data;
 };
 
-export const getAdminUser = () => {
+export const adminRefresh = async () => {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/admin/refresh`, {}, { withCredentials: true });
+      const data = res.data || {};
+      accessToken = data?.accessToken || data?.token || null;
+      currentUser = data?.user || null;
+      return { ok: true, data };
+    } catch (err) {
+      accessToken = null;
+      currentUser = null;
+      return { ok: false, err };
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+};
+
+export const adminLogout = async () => {
   try {
-    const raw = localStorage.getItem('admin_user') || localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+    await axios.post(`${API_BASE}/api/admin/logout`, {}, { withCredentials: true });
+  } catch {}
+  accessToken = null;
+  currentUser = null;
 };

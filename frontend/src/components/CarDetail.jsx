@@ -15,6 +15,7 @@ import {
   FaCity,
   FaGlobeAsia,
   FaMapPin,
+  FaBuilding,
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -284,6 +285,19 @@ const CarDetail = () => {
     ? String(car.transmission).toLowerCase()
     : "standard";
 
+  // company info helpers
+  const companyName = car.company?.name || car.companyName || car.ownerName || "";
+  const companyAddress = (() => {
+    const addr = car.company?.address || {};
+    const parts = [];
+    if (addr.street) parts.push(addr.street);
+    if (addr.city) parts.push(addr.city);
+    if (addr.state) parts.push(addr.state);
+    if (addr.zipCode) parts.push(addr.zipCode);
+    if (addr.country) parts.push(addr.country);
+    return parts.filter(Boolean).join(", ");
+  })();
+
   return (
     <div className={carDetailStyles.pageContainer}>
       <div className={carDetailStyles.contentContainer}>
@@ -327,6 +341,24 @@ const CarDetail = () => {
               MYR&nbsp;{price}{" "}
               <span className={carDetailStyles.pricePerDay}>/ day</span>
             </p>
+
+            {/* Company brief */}
+            {companyName ? (
+              <div className="mt-3 mb-3 p-3 bg-gray-800 rounded-md border border-gray-700">
+                <div className="flex items-start gap-3">
+                  <FaBuilding className="text-orange-400 mt-1" />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-100">{companyName}</div>
+                    {companyAddress ? (
+                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                        <FaMapMarkerAlt className="text-gray-500" />
+                        <span>{companyAddress}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className={carDetailStyles.specsGrid}>
               {[

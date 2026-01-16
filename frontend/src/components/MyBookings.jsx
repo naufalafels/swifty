@@ -19,6 +19,7 @@ import {
   FaCreditCard,
   FaReceipt,
   FaArrowRight,
+  FaBuilding,
 } from "react-icons/fa";
 import { myBookingsStyles as s } from "../assets/dummyStyles.js";
 import { fetchMyBookings, cancelBooking as serviceCancelBooking } from "../services/bookingService.js";
@@ -67,6 +68,18 @@ const daysBetween = (start, end) => {
   }
 };
 
+const buildCompanyAddress = (company) => {
+  if (!company) return "";
+  const addr = company.address || {};
+  const parts = [];
+  if (addr.street) parts.push(addr.street);
+  if (addr.city) parts.push(addr.city);
+  if (addr.state) parts.push(addr.state);
+  if (addr.zipCode) parts.push(addr.zipCode);
+  if (addr.country) parts.push(addr.country);
+  return parts.filter(Boolean).join(", ");
+};
+
 const normalizeBooking = (booking) => {
   const getCarData = () => {
     if (!booking) return {};
@@ -103,6 +116,18 @@ const normalizeBooking = (booking) => {
     safeAccess(() => booking.dates?.return) ||
     booking.return ||
     null;
+
+  // Company resolution: booking.company -> booking.raw.company -> car snapshot company -> booking.car.company
+  const companyObj =
+    safeAccess(() => booking.company, null) ||
+    safeAccess(() => booking.raw?.company, null) ||
+    safeAccess(() => carObj.company, null) ||
+    safeAccess(() => booking.car?.company, null) ||
+    null;
+
+  const companyName = companyObj?.name || companyObj?.companyName || "";
+  const companyLogo = companyObj?.logo || companyObj?.logoUrl || "";
+  const companyAddress = buildCompanyAddress(companyObj);
 
   const normalized = {
     id: booking._id || booking.id || String(Math.random()).slice(2, 8),
@@ -152,6 +177,11 @@ const normalizeBooking = (booking) => {
     paymentMethod: booking.paymentMethod || booking.payment?.method || "",
     paymentId:
       booking.paymentIntentId || booking.paymentId || booking.sessionId || "",
+    company: {
+      name: companyName,
+      address: companyAddress,
+      logo: companyLogo,
+    },
     raw: booking,
   };
 
@@ -216,6 +246,15 @@ const BookingCard = ({ booking, onViewDetails }) => {
           alt={booking.car.make}
           className={s.cardImage}
         />
+        {/* optional company logo badge */}
+        {booking.company?.logo ? (
+          <img
+            src={booking.company.logo}
+            alt={booking.company.name || "Company"}
+            className="absolute left-3 top-3 w-10 h-10 rounded-full object-cover border border-gray-800"
+            style={{ background: "#fff" }}
+          />
+        ) : null}
       </div>
 
       <div className={s.cardContent}>
@@ -225,6 +264,23 @@ const BookingCard = ({ booking, onViewDetails }) => {
             <p className={s.carSubtitle}>
               {booking.car.category} • {booking.car.year}
             </p>
+
+            {/* Company line */}
+            {booking.company?.name ? (
+              <div className="flex items-center gap-2 mt-2 text-sm text-gray-300">
+                <FaBuilding className="text-gray-400" />
+                <div>
+                  <div className="font-medium text-sm text-gray-100">
+                    {booking.company.name}
+                  </div>
+                  {booking.company.address ? (
+                    <div className="text-xs text-gray-400">
+                      {booking.company.address}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className="text-right">
             <p className={s.priceText}>{formatPrice(booking.price)}</p>
@@ -321,7 +377,24 @@ const BookingModal = ({ booking, onClose, onCancel }) => {
             </div>
 
             <div>
-              <h3 className={s.carTitle}>{booking.car.make}</h3>
+              <div className="flex items-center gap-3">
+                {booking.company?.logo ? (
+                  <img
+                    src={booking.company.logo}
+                    alt={booking.company.name || "Company"}
+                    className="w-12 h-12 rounded-md object-cover"
+                  />
+                ) : (
+                  <FaBuilding className="text-orange-400 w-12 h-12" />
+                )}
+                <div>
+                  <h3 className="text-lg font-semibold">{booking.car.make}</h3>
+                  {booking.company?.name ? (
+                    <div className="text-sm text-gray-300">{booking.company.name}</div>
+                  ) : null}
+                </div>
+              </div>
+
               <div className={s.carTags}>
                 <span className={s.carTag}>{booking.car.category}</span>
                 <span className={s.carTag}>{booking.car.year}</span>
@@ -403,6 +476,20 @@ const BookingModal = ({ booking, onClose, onCancel }) => {
                 <div>
                   <p className={s.infoLabel}>Address:</p>
                   <p className={s.infoValue}>{booking.user.address}</p>
+                </div>
+              </div>
+
+              <h3 className="text-lg font-semibold flex items-center gap-2 mt-6">
+                <FaBuilding className="text-orange-400" /> Company
+              </h3>
+              <div className={s.infoCard}>
+                <div className="mb-3">
+                  <p className={s.infoLabel}>Company Name:</p>
+                  <p className={s.infoValue}>{booking.company?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className={s.infoLabel}>Company Address:</p>
+                  <p className={s.infoValue}>{booking.company?.address || "—"}</p>
                 </div>
               </div>
 

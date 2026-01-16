@@ -9,6 +9,7 @@ import {
   FaShieldAlt,
   FaMapMarkerAlt,
   FaSyncAlt,
+  FaBuilding,
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
@@ -19,6 +20,7 @@ const startOfDay = (d) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
+// ceil so partial days count as next day
 const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
@@ -57,6 +59,7 @@ const Cars = () => {
 
   useEffect(() => {
     fetchCars();
+    // pre-load Malaysia states
     fetchMalaysiaStates();
     return () => {
       if (abortControllerRef.current) {
@@ -104,6 +107,7 @@ const Cars = () => {
   };
 
   const fetchMalaysiaStates = async () => {
+    // countriesnow.space provides states list; using Malaysia fixed
     try {
       const resp = await axios.post(
         "https://countriesnow.space/api/v0.1/countries/states",
@@ -132,7 +136,8 @@ const Cars = () => {
         { country: "Malaysia", state: stateName },
         { timeout: 10000 }
       );
-      const ct = resp?.data?.data?.map((c) => ({ name: c })) || [];
+      const ct =
+        resp?.data?.data?.map((c) => ({ name: c })) || [];
       setCitiesForState(ct);
     } catch (err) {
       console.warn("Failed to load cities for state", err);
@@ -172,6 +177,21 @@ const Cars = () => {
     img.src = fallbackImage;
     img.alt = img.alt || "Image not available";
     img.style.objectFit = img.style.objectFit || "cover";
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const opts =
+        d.getFullYear() === now.getFullYear()
+          ? { day: "numeric", month: "short" }
+          : { day: "numeric", month: "short", year: "numeric" };
+      return new Intl.DateTimeFormat("en-IN", opts).format(d);
+    } catch {
+      return dateStr;
+    }
   };
 
   const plural = (n, singular, pluralForm) => {
@@ -305,7 +325,7 @@ const Cars = () => {
     return R * c;
   };
 
-  // state / city / area matching
+  // city / area matching
   const matchesState = (car, state) => {
     if (!state) return true;
     const q = state.trim().toLowerCase();
@@ -372,6 +392,7 @@ const Cars = () => {
     );
   }, []);
 
+  // toggle locate off if unchecked
   useEffect(() => {
     if (!useMyLocation) {
       setUserCoords(null);
@@ -384,7 +405,7 @@ const Cars = () => {
     [selectedTypes]
   );
 
-  // final filtered list (includes state + city)
+  // final filtered list
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
     const reqReturn = returnDate ? startOfDay(new Date(returnDate)) : null;
@@ -441,6 +462,7 @@ const Cars = () => {
     return list;
   }, [cars, activeTypes, stateSelected, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
 
+  // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
     try {
@@ -474,10 +496,10 @@ const Cars = () => {
           return (
             <div className="flex flex-col items-end">
               <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-                Booked — available on {new Date(meta.availableIso).toLocaleDateString()}
+                Booked — available on {formatDate(meta.availableIso)}
               </span>
               <small className="text-xs text-gray-400 mt-1">
-                until {new Date(effective.until).toLocaleDateString()}
+                until {formatDate(effective.until)}
               </small>
             </div>
           );
@@ -488,7 +510,7 @@ const Cars = () => {
               Booked
             </span>
             <small className="text-xs text-gray-400 mt-1">
-              until {new Date(effective.until).toLocaleDateString()}
+              until {formatDate(effective.until)}
             </small>
           </div>
         );
@@ -512,7 +534,7 @@ const Cars = () => {
             </span>
             {effective.nextBookingStarts && (
               <small className="text-xs text-gray-400 mt-1">
-                from {new Date(effective.nextBookingStarts).toLocaleDateString()}
+                from {formatDate(effective.nextBookingStarts)}
               </small>
             )}
           </div>
@@ -526,7 +548,7 @@ const Cars = () => {
             </span>
             {effective.nextBookingStarts && (
               <small className="text-xs text-gray-400 mt-1">
-                from {new Date(effective.nextBookingStarts).toLocaleDateString()}
+                from {formatDate(effective.nextBookingStarts)}
               </small>
             )}
           </div>
@@ -539,7 +561,7 @@ const Cars = () => {
           </span>
           {effective.nextBookingStarts && (
             <small className="text-xs text-gray-400 mt-1">
-              from {new Date(effective.nextBookingStarts).toLocaleDateString()}
+              from {formatDate(effective.nextBookingStarts)}
             </small>
           )}
         </div>
@@ -736,6 +758,11 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
+              // company display helpers
+              const companyName = car.company?.name || car.companyName || car.ownerName || "";
+              const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
+              const companyState = car.company?.address?.state || "";
+
               return (
                 <div key={id} className={carPageStyles.carCard}>
                   <div className={carPageStyles.glowEffect}></div>
@@ -749,6 +776,7 @@ const Cars = () => {
                       className={carPageStyles.carImage}
                     />
 
+                    {/* availability badge at top-right of card */}
                     <div className="absolute right-4 top-4 z-20">
                       {renderAvailabilityBadge(car.availability, car)}
                     </div>
@@ -766,6 +794,14 @@ const Cars = () => {
                         <p className={carPageStyles.carType}>
                           {car.category ?? car.type ?? "Sedan"}
                         </p>
+
+                        {/* Company name (small) */}
+                        {companyName ? (
+                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
+                            <FaBuilding className="text-gray-400" />
+                            <span className="truncate">{companyName}{companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ''}</span>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="text-right text-sm text-gray-300">
                         {car._distanceKm ? (
@@ -828,6 +864,7 @@ const Cars = () => {
             })}
         </div>
 
+        {/* Floating decorative elements */}
         <div className={carPageStyles.decor1}></div>
         <div className={carPageStyles.decor2}></div>
       </div>

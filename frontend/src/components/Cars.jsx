@@ -33,13 +33,21 @@ const Cars = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // --- filter state ---
-  const [locationQuery, setLocationQuery] = useState("");
+  // --- filters ---
   const [selectedTypes, setSelectedTypes] = useState(() =>
     DEFAULT_TYPES.reduce((acc, t) => ({ ...acc, [t]: false }), {})
   );
   const [pickupDate, setPickupDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
+
+  // Malaysia-first: state & city selectors, plus area text
+  const [malaysiaStates, setMalaysiaStates] = useState([]);
+  const [stateSelected, setStateSelected] = useState("");
+  const [citiesForState, setCitiesForState] = useState([]);
+  const [citySelected, setCitySelected] = useState("");
+  const [areaQuery, setAreaQuery] = useState("");
+
+  // geolocation
   const [useMyLocation, setUseMyLocation] = useState(false);
   const [userCoords, setUserCoords] = useState(null);
   const [geoError, setGeoError] = useState("");
@@ -51,12 +59,13 @@ const Cars = () => {
 
   useEffect(() => {
     fetchCars();
+    // pre-load Malaysia states
+    fetchMalaysiaStates();
     return () => {
       if (abortControllerRef.current) {
         try {
           abortControllerRef.current.abort();
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     };
   }, []);
@@ -97,6 +106,55 @@ const Cars = () => {
     }
   };
 
+  const fetchMalaysiaStates = async () => {
+    // countriesnow.space provides states list; using Malaysia fixed
+    try {
+      const resp = await axios.post(
+        "https://countriesnow.space/api/v0.1/countries/states",
+        { country: "Malaysia" },
+        { timeout: 10000 }
+      );
+      const st =
+        resp?.data?.data?.states?.map((s) =>
+          typeof s === "string" ? { name: s } : { name: s.name || s }
+        ) || [];
+      setMalaysiaStates(st);
+    } catch (err) {
+      console.warn("Failed to load Malaysia states", err);
+      setMalaysiaStates([]);
+    }
+  };
+
+  const fetchCitiesForState = async (stateName) => {
+    if (!stateName) {
+      setCitiesForState([]);
+      return;
+    }
+    try {
+      const resp = await axios.post(
+        "https://countriesnow.space/api/v0.1/countries/state/cities",
+        { country: "Malaysia", state: stateName },
+        { timeout: 10000 }
+      );
+      const ct =
+        resp?.data?.data?.map((c) => ({ name: c })) || [];
+      setCitiesForState(ct);
+    } catch (err) {
+      console.warn("Failed to load cities for state", err);
+      setCitiesForState([]);
+    }
+  };
+
+  useEffect(() => {
+    if (stateSelected) {
+      fetchCitiesForState(stateSelected);
+      setCitySelected("");
+    } else {
+      setCitiesForState([]);
+      setCitySelected("");
+    }
+  }, [stateSelected]);
+
   const buildImageSrc = (image) => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];
@@ -115,7 +173,6 @@ const Cars = () => {
   const handleImageError = (e) => {
     const img = e?.target;
     if (!img) return;
-    // prevent infinite loop if fallback also fails
     img.onerror = null;
     img.src = fallbackImage;
     img.alt = img.alt || "Image not available";
@@ -142,7 +199,7 @@ const Cars = () => {
     return `${n} ${pluralForm ?? singular + "s"}`;
   };
 
-  // Compute canonical availability (existing)
+  // availability helpers (same as before)
   const computeEffectiveAvailability = (car) => {
     const today = new Date();
 
@@ -184,7 +241,6 @@ const Cars = () => {
         car.availability.state === "available_until_reservation" &&
         Number(car.availability.daysAvailable ?? -1) === 0
       ) {
-        // reservation starts today -> treat as booked
         return {
           state: "booked",
           until: car.availability.until ?? null,
@@ -199,63 +255,52 @@ const Cars = () => {
     return { state: "fully_available", source: "none" };
   };
 
-  // Booking overlap check for a requested date range (inclusive)
+  // overlap utilities for date filter
   const doesBookingOverlapRange = (booking, reqPickup, reqReturn) => {
     const pickup = booking.pickupDate ?? booking.startDate ?? booking.start ?? booking.from;
     const ret = booking.returnDate ?? booking.endDate ?? booking.end ?? booking.to;
     if (!pickup || !ret) return false;
     const bStart = startOfDay(new Date(pickup));
     const bEnd = startOfDay(new Date(ret));
-    // overlap if booking.start <= reqReturn && booking.end >= reqPickup
     return bStart <= reqReturn && bEnd >= reqPickup;
   };
 
-  // Check if car is available for requested date range (both dates required)
   const isAvailableForRange = (car, reqPickupIso, reqReturnIso) => {
-    if (!reqPickupIso || !reqReturnIso) return true; // no restriction
+    if (!reqPickupIso || !reqReturnIso) return true;
     try {
       const reqPickup = startOfDay(new Date(reqPickupIso));
       const reqReturn = startOfDay(new Date(reqReturnIso));
       if (reqReturn < reqPickup) return false;
 
-      // 1) check explicit bookings
       if (Array.isArray(car.bookings) && car.bookings.length) {
         for (const b of car.bookings) {
           if (doesBookingOverlapRange(b, reqPickup, reqReturn)) return false;
         }
       }
 
-      // 2) check availability metadata from backend
       if (car.availability) {
-        // if availability says booked until a date that overlaps request -> not available
         if (car.availability.state === "booked" && car.availability.until) {
           const until = startOfDay(new Date(car.availability.until));
-          // if until >= reqPickup then there's an overlap (booked covering reqPickup)
           if (until >= reqPickup) return false;
         }
-        // if availability has nextBookingStarts and it starts before or on reqReturn, then it's reserved within requested window -> consider unavailable
         if (car.availability.nextBookingStarts) {
           const nextStart = startOfDay(new Date(car.availability.nextBookingStarts));
           if (nextStart <= reqReturn && nextStart >= reqPickup) return false;
         }
       }
 
-      // else assume available
       return true;
     } catch {
       return true;
     }
   };
 
-  // --- location helpers: attempt coordinates then textual matching ---
+  // location helpers: prefer company.location
   const getCarCoordinates = (car) => {
-    // common shapes: car.location.coordinates [lng, lat], car.company.location.coordinates
-    const loc = car.location ?? car.company?.location ?? null;
+    const loc = car.company?.location ?? car.location ?? null;
     if (loc && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
-      // return [lat, lng]
       return [Number(loc.coordinates[1]), Number(loc.coordinates[0])];
     }
-    // fallback: lat, lng fields
     if (car.lat !== undefined && car.lng !== undefined) {
       return [Number(car.lat), Number(car.lng)];
     }
@@ -266,7 +311,6 @@ const Cars = () => {
   };
 
   const haversineKm = (lat1, lon1, lat2, lon2) => {
-    // returns distance in km
     const toRad = (x) => (x * Math.PI) / 180;
     const R = 6371;
     const dLat = toRad(lat2 - lat1);
@@ -281,30 +325,40 @@ const Cars = () => {
     return R * c;
   };
 
-  const matchesLocationQuery = (car, query) => {
-    if (!query || !query.trim()) return true;
-    const q = query.trim().toLowerCase();
+  // city / area matching
+  const matchesCity = (car, city) => {
+    if (!city) return true;
+    const c = city.trim().toLowerCase();
     const candidates = [
-      car.locationName,
-      car.location,
-      car.address,
-      car.pickupLocation,
-      car.company?.name,
       car.company?.address?.city,
-      car.company?.address?.street,
-      car.company?.address?.state,
+      car.company?.address?.cityName,
+      car.company?.city,
       car.city,
-      car.cityName,
-      car.make,
-      car.model,
+      car.pickupLocation,
+      car.locationName,
     ]
       .filter(Boolean)
       .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
-
-    return candidates.some((text) => text.includes(q));
+    return candidates.some((t) => t.includes(c));
   };
 
-  // attempt to get user coords
+  const matchesArea = (car, area) => {
+    if (!area) return true;
+    const q = area.trim().toLowerCase();
+    const candidates = [
+      car.company?.address?.street,
+      car.company?.address?.city,
+      car.address,
+      car.pickupLocation,
+      car.description,
+      `${car.make} ${car.model}`,
+    ]
+      .filter(Boolean)
+      .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
+    return candidates.some((t) => t.includes(q));
+  };
+
+  // detect user location
   const obtainUserLocation = useCallback(() => {
     setGeoError("");
     if (!navigator.geolocation) {
@@ -314,6 +368,7 @@ const Cars = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserCoords([pos.coords.latitude, pos.coords.longitude]);
+        setUseMyLocation(true);
       },
       (err) => {
         setGeoError(err?.message || "Failed to obtain location");
@@ -322,30 +377,27 @@ const Cars = () => {
     );
   }, []);
 
-  // toggle "use my location"
+  // toggle locate off if unchecked
   useEffect(() => {
-    if (useMyLocation) {
-      obtainUserLocation();
-    } else {
+    if (!useMyLocation) {
       setUserCoords(null);
       setGeoError("");
     }
-  }, [useMyLocation, obtainUserLocation]);
+  }, [useMyLocation]);
 
-  // prepare a typed set for easier checks
   const activeTypes = useMemo(
     () => Object.keys(selectedTypes).filter((t) => selectedTypes[t]),
     [selectedTypes]
   );
 
-  // compute filtered list (client-side)
+  // final filtered list
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
     const reqReturn = returnDate ? startOfDay(new Date(returnDate)) : null;
 
     let list = Array.isArray(cars) ? cars.slice() : [];
 
-    // 1. filter by types if any selected
+    // type filter
     if (activeTypes.length > 0) {
       list = list.filter((car) => {
         const cat = (car.category ?? car.type ?? "").toString();
@@ -353,17 +405,22 @@ const Cars = () => {
       });
     }
 
-    // 2. filter by textual location query
-    if (locationQuery && locationQuery.trim()) {
-      list = list.filter((car) => matchesLocationQuery(car, locationQuery));
+    // city filter (Malaysia focused)
+    if (citySelected) {
+      list = list.filter((car) => matchesCity(car, citySelected));
     }
 
-    // 3. filter by availability for requested dates
+    // area filter optional
+    if (areaQuery && areaQuery.trim()) {
+      list = list.filter((car) => matchesArea(car, areaQuery));
+    }
+
+    // dates filter
     if (reqPickup && reqReturn) {
       list = list.filter((car) => isAvailableForRange(car, reqPickup.toISOString(), reqReturn.toISOString()));
     }
 
-    // 4. if user coords available, compute distance (and sort by it)
+    // if user coords available, compute distance and sort by it
     if (userCoords) {
       const [uLat, uLng] = userCoords;
       const withDist = list.map((car) => {
@@ -379,18 +436,13 @@ const Cars = () => {
         if (a._distKm === b._distKm) return 0;
         return a._distKm - b._distKm;
       });
-      return withDist.map((x) => {
-        // attach distance for UI, but return car objects with _distanceKm field
-        const out = { ...(x.car || {}), _distanceKm: Number.isFinite(x._distKm) && x._distKm !== Infinity ? Number(x._distKm.toFixed(2)) : null };
-        return out;
-      });
+      return withDist.map((x) => ({ ...(x.car || {}), _distanceKm: Number.isFinite(x._distKm) && x._distKm !== Infinity ? Number(x._distKm.toFixed(2)) : null }));
     }
 
     return list;
-  }, [cars, activeTypes, locationQuery, pickupDate, returnDate, userCoords]);
+  }, [cars, activeTypes, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
 
-  // --- existing availability rendering / helpers ---
-  // Given an 'until' ISO date, compute day-after available date + daysUntilAvailable
+  // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
     try {
@@ -406,7 +458,6 @@ const Cars = () => {
     }
   };
 
-  // Render availability badge — prefer showing concrete available date when booked
   const renderAvailabilityBadge = (rawAvailability, car) => {
     const effective = computeEffectiveAvailability(car);
 
@@ -444,7 +495,6 @@ const Cars = () => {
           </div>
         );
       }
-      // booked but no until info
       return (
         <div className="flex flex-col items-end">
           <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
@@ -498,7 +548,6 @@ const Cars = () => {
       );
     }
 
-    // fully_available or fallback
     return (
       <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
         Available
@@ -519,16 +568,17 @@ const Cars = () => {
     navigate(`/cars/${id}`, { state: { car } });
   };
 
-  // toggle type checkbox
   const toggleType = (type) => {
     setSelectedTypes((prev) => ({ ...prev, [type]: !prev[type] }));
   };
 
   const resetFilters = () => {
-    setLocationQuery("");
     setSelectedTypes(DEFAULT_TYPES.reduce((acc, t) => ({ ...acc, [t]: false }), {}));
     setPickupDate("");
     setReturnDate("");
+    setStateSelected("");
+    setCitySelected("");
+    setAreaQuery("");
     setUseMyLocation(false);
     setUserCoords(null);
     setGeoError("");
@@ -536,96 +586,111 @@ const Cars = () => {
 
   return (
     <div className={carPageStyles.pageContainer}>
-      {/* Main Content */}
       <div className={carPageStyles.contentContainer}>
         <div className={carPageStyles.headerContainer}>
           <div className={carPageStyles.headerDecoration}></div>
           <h1 className={carPageStyles.title}>Premium Car Collection</h1>
           <p className={carPageStyles.subtitle}>
-            Discover our exclusive fleet of vehicles. Use filters to find cars by location, type and availability.
+            Find cars by city in Malaysia — or use Locate to find the closest vehicles to you.
           </p>
         </div>
 
-        {/* --- Filters panel (simple and safe UI) --- */}
+        {/* Filters */}
         <div className="w-full max-w-7xl mx-auto mb-6">
-          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start">
+          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex flex-col lg:flex-row gap-4 items-start">
             <div className="flex-1 min-w-[220px]">
-              <label className="text-sm text-gray-300 block mb-2">Location</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={locationQuery}
-                  onChange={(e) => setLocationQuery(e.target.value)}
-                  placeholder="City or area (e.g. Kuala Lumpur)"
-                  className="w-full p-2 rounded bg-gray-800 border border-gray-700 text-white"
-                />
-                <button
-                  title="Use my current location"
-                  onClick={() => setUseMyLocation((v) => !v)}
-                  className={`p-2 rounded bg-gradient-to-r from-orange-600 to-orange-700 text-white flex items-center gap-2 ${useMyLocation ? "opacity-90" : "opacity-80"}`}
-                  aria-pressed={useMyLocation}
+              <label className="text-sm text-gray-300 block mb-2">State</label>
+              {malaysiaStates && malaysiaStates.length > 0 ? (
+                <select
+                  value={stateSelected}
+                  onChange={(e) => setStateSelected(e.target.value)}
+                  className="w-full p-2 rounded bg-gray-800 text-white"
                 >
-                  <FaLocationArrow />
+                  <option value="">Choose a state</option>
+                  {malaysiaStates.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={stateSelected}
+                  onChange={(e) => setStateSelected(e.target.value)}
+                  placeholder="State / Region"
+                  className="w-full p-2 rounded bg-gray-700 text-white"
+                />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-[220px]">
+              <label className="text-sm text-gray-300 block mb-2">City</label>
+              {citiesForState && citiesForState.length > 0 ? (
+                <select
+                  value={citySelected}
+                  onChange={(e) => setCitySelected(e.target.value)}
+                  className="w-full p-2 rounded bg-gray-800 text-white"
+                >
+                  <option value="">Choose a city</option>
+                  {citiesForState.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={citySelected}
+                  onChange={(e) => setCitySelected(e.target.value)}
+                  placeholder="City"
+                  className="w-full p-2 rounded bg-gray-700 text-white"
+                />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-[220px]">
+              <label className="text-sm text-gray-300 block mb-2">Area (optional)</label>
+              <input
+                value={areaQuery}
+                onChange={(e) => setAreaQuery(e.target.value)}
+                placeholder="Neighborhood / area name"
+                className="w-full p-2 rounded bg-gray-700 text-white"
+              />
+            </div>
+
+            <div className="min-w-[240px] flex flex-col items-end gap-2">
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => { setUseMyLocation((v) => !v); if (!useMyLocation) obtainUserLocation(); else { setUserCoords(null); setGeoError(''); } }}
+                  className={`px-3 py-2 rounded flex items-center gap-2 text-white ${useMyLocation ? 'bg-amber-600' : 'bg-orange-600'}`}
+                  title="Locate and sort by nearest cars"
+                >
+                  <FaMapMarkerAlt /> {useMyLocation ? 'Using my location' : 'Locate'}
                 </button>
-              </div>
-              {geoError && <small className="text-xs text-red-400 mt-1">{geoError}</small>}
-            </div>
-
-            <div className="flex-1 min-w-[220px]">
-              <label className="text-sm text-gray-300 block mb-2">Car Types</label>
-              <div className="flex flex-wrap gap-2">
-                {DEFAULT_TYPES.map((t) => (
-                  <label key={t} className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={!!selectedTypes[t]}
-                      onChange={() => toggleType(t)}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-200">{t}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="min-w-[220px]">
-              <label className="text-sm text-gray-300 block mb-2">Dates</label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={pickupDate}
-                  onChange={(e) => setPickupDate(e.target.value)}
-                  min={new Date().toISOString().split("T")[0]}
-                  className="p-2 rounded bg-gray-800 border border-gray-700 text-white"
-                />
-                <input
-                  type="date"
-                  value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  min={pickupDate || new Date().toISOString().split("T")[0]}
-                  className="p-2 rounded bg-gray-800 border border-gray-700 text-white"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={resetFilters}
-                  className="px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm text-white flex items-center gap-2"
-                >
+                <button onClick={resetFilters} className="px-3 py-2 rounded bg-gray-700 text-white flex items-center gap-2">
                   <FaSyncAlt /> Reset
                 </button>
-                <button
-                  onClick={() => obtainUserLocation()}
-                  className="px-3 py-2 rounded bg-orange-600 hover:bg-orange-500 text-sm text-white flex items-center gap-2"
-                >
-                  <FaMapMarkerAlt /> Locate
-                </button>
               </div>
-              <small className="text-xs text-gray-400">
-                {useMyLocation && userCoords ? `Sorting by your location (closest first)` : useMyLocation && !userCoords ? 'Obtaining your location...' : 'Filters applied live'}
+              <small className="text-xs text-gray-400 self-end">
+                {useMyLocation && userCoords ? `Sorting by distance — ${userCoords[0].toFixed(4)},${userCoords[1].toFixed(4)}` : geoError ? geoError : 'Filtering by Malaysian city (manual or select state→city).'}
               </small>
+            </div>
+          </div>
+
+          {/* Car types + dates */}
+          <div className="mt-3 bg-gray-900/50 border border-gray-800 rounded-xl p-3 flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-3 flex-wrap">
+              {DEFAULT_TYPES.map((t) => (
+                <label key={t} className="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => toggleType(t)} className="w-4 h-4" />
+                  <span className="text-gray-200">{t}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} min={new Date().toISOString().split("T")[0]} className="p-2 rounded bg-gray-800 text-white" />
+              <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} min={pickupDate || new Date().toISOString().split("T")[0]} className="p-2 rounded bg-gray-800 text-white" />
             </div>
           </div>
         </div>
@@ -633,7 +698,6 @@ const Cars = () => {
         {/* Grid */}
         <div className={carPageStyles.gridContainer}>
           {loading &&
-            // show skeleton placeholders when loading
             Array.from({ length: limit }).map((_, i) => (
               <div key={`skeleton-${i}`} className={carPageStyles.carCard}>
                 <div className={carPageStyles.glowEffect}></div>

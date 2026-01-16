@@ -107,7 +107,6 @@ const Cars = () => {
   };
 
   const fetchMalaysiaStates = async () => {
-    // countriesnow.space provides states list; using Malaysia fixed
     try {
       const resp = await axios.post(
         "https://countriesnow.space/api/v0.1/countries/states",
@@ -325,7 +324,22 @@ const Cars = () => {
     return R * c;
   };
 
-  // city / area matching
+  // state / city / area matching
+  const matchesState = (car, state) => {
+    if (!state) return true;
+    const q = state.trim().toLowerCase();
+    const candidates = [
+      car.company?.address?.state,
+      car.company?.address?.region,
+      car.company?.address?.stateName,
+      car.state,
+      car.company?.state,
+    ]
+      .filter(Boolean)
+      .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
+    return candidates.some((t) => t.includes(q));
+  };
+
   const matchesCity = (car, city) => {
     if (!city) return true;
     const c = city.trim().toLowerCase();
@@ -390,7 +404,7 @@ const Cars = () => {
     [selectedTypes]
   );
 
-  // final filtered list
+  // final filtered list (now includes state filter)
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
     const reqReturn = returnDate ? startOfDay(new Date(returnDate)) : null;
@@ -405,7 +419,12 @@ const Cars = () => {
       });
     }
 
-    // city filter (Malaysia focused)
+    // state filter (Malaysia-focused)
+    if (stateSelected) {
+      list = list.filter((car) => matchesState(car, stateSelected));
+    }
+
+    // city filter (narrow within state)
     if (citySelected) {
       list = list.filter((car) => matchesCity(car, citySelected));
     }
@@ -440,7 +459,7 @@ const Cars = () => {
     }
 
     return list;
-  }, [cars, activeTypes, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
+  }, [cars, activeTypes, stateSelected, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
 
   // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
@@ -591,7 +610,7 @@ const Cars = () => {
           <div className={carPageStyles.headerDecoration}></div>
           <h1 className={carPageStyles.title}>Premium Car Collection</h1>
           <p className={carPageStyles.subtitle}>
-            Find cars by city in Malaysia — or use Locate to find the closest vehicles to you.
+            Find cars by state & city in Malaysia — or use Locate to find the closest vehicles to you.
           </p>
         </div>
 
@@ -672,7 +691,7 @@ const Cars = () => {
                 </button>
               </div>
               <small className="text-xs text-gray-400 self-end">
-                {useMyLocation && userCoords ? `Sorting by distance — ${userCoords[0].toFixed(4)},${userCoords[1].toFixed(4)}` : geoError ? geoError : 'Filtering by Malaysian city (manual or select state→city).'}
+                {useMyLocation && userCoords ? `Sorting by distance — ${userCoords[0].toFixed(4)},${userCoords[1].toFixed(4)}` : geoError ? geoError : 'Filtering by Malaysian state & city (manual or select state→city).'}
               </small>
             </div>
           </div>

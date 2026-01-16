@@ -8,7 +8,6 @@ import {
   FaUserFriends,
   FaShieldAlt,
   FaMapMarkerAlt,
-  FaLocationArrow,
   FaSyncAlt,
 } from "react-icons/fa";
 import axios from "axios";
@@ -20,7 +19,6 @@ const startOfDay = (d) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
-// ceil so partial days count as next day
 const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
@@ -53,13 +51,12 @@ const Cars = () => {
   const [geoError, setGeoError] = useState("");
 
   const abortControllerRef = useRef(null);
-  const base = "http://localhost:7889";
+  const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
   const limit = 12;
   const fallbackImage = `${base}/uploads/default-car.png`;
 
   useEffect(() => {
     fetchCars();
-    // pre-load Malaysia states
     fetchMalaysiaStates();
     return () => {
       if (abortControllerRef.current) {
@@ -135,8 +132,7 @@ const Cars = () => {
         { country: "Malaysia", state: stateName },
         { timeout: 10000 }
       );
-      const ct =
-        resp?.data?.data?.map((c) => ({ name: c })) || [];
+      const ct = resp?.data?.data?.map((c) => ({ name: c })) || [];
       setCitiesForState(ct);
     } catch (err) {
       console.warn("Failed to load cities for state", err);
@@ -176,21 +172,6 @@ const Cars = () => {
     img.src = fallbackImage;
     img.alt = img.alt || "Image not available";
     img.style.objectFit = img.style.objectFit || "cover";
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "—";
-    try {
-      const d = new Date(dateStr);
-      const now = new Date();
-      const opts =
-        d.getFullYear() === now.getFullYear()
-          ? { day: "numeric", month: "short" }
-          : { day: "numeric", month: "short", year: "numeric" };
-      return new Intl.DateTimeFormat("en-IN", opts).format(d);
-    } catch {
-      return dateStr;
-    }
   };
 
   const plural = (n, singular, pluralForm) => {
@@ -391,7 +372,6 @@ const Cars = () => {
     );
   }, []);
 
-  // toggle locate off if unchecked
   useEffect(() => {
     if (!useMyLocation) {
       setUserCoords(null);
@@ -404,7 +384,7 @@ const Cars = () => {
     [selectedTypes]
   );
 
-  // final filtered list (now includes state filter)
+  // final filtered list (includes state + city)
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
     const reqReturn = returnDate ? startOfDay(new Date(returnDate)) : null;
@@ -461,7 +441,6 @@ const Cars = () => {
     return list;
   }, [cars, activeTypes, stateSelected, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
 
-  // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
     try {
@@ -495,10 +474,10 @@ const Cars = () => {
           return (
             <div className="flex flex-col items-end">
               <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-                Booked — available on {formatDate(meta.availableIso)}
+                Booked — available on {new Date(meta.availableIso).toLocaleDateString()}
               </span>
               <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
+                until {new Date(effective.until).toLocaleDateString()}
               </small>
             </div>
           );
@@ -509,7 +488,7 @@ const Cars = () => {
               Booked
             </span>
             <small className="text-xs text-gray-400 mt-1">
-              until {formatDate(effective.until)}
+              until {new Date(effective.until).toLocaleDateString()}
             </small>
           </div>
         );
@@ -533,7 +512,7 @@ const Cars = () => {
             </span>
             {effective.nextBookingStarts && (
               <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
+                from {new Date(effective.nextBookingStarts).toLocaleDateString()}
               </small>
             )}
           </div>
@@ -547,7 +526,7 @@ const Cars = () => {
             </span>
             {effective.nextBookingStarts && (
               <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
+                from {new Date(effective.nextBookingStarts).toLocaleDateString()}
               </small>
             )}
           </div>
@@ -560,7 +539,7 @@ const Cars = () => {
           </span>
           {effective.nextBookingStarts && (
             <small className="text-xs text-gray-400 mt-1">
-              from {formatDate(effective.nextBookingStarts)}
+              from {new Date(effective.nextBookingStarts).toLocaleDateString()}
             </small>
           )}
         </div>
@@ -581,10 +560,12 @@ const Cars = () => {
     return effective.state === "booked";
   };
 
+  // When booking from the cards, pass selected dates so CarDetail pre-fills the booking form
   const handleBook = (car, id) => {
     const disabled = isBookDisabled(car);
     if (disabled) return;
-    navigate(`/cars/${id}`, { state: { car } });
+    // pass the current filter dates so CarDetail can pre-fill them
+    navigate(`/cars/${id}`, { state: { car, pickupDate: pickupDate || null, returnDate: returnDate || null } });
   };
 
   const toggleType = (type) => {
@@ -768,7 +749,6 @@ const Cars = () => {
                       className={carPageStyles.carImage}
                     />
 
-                    {/* availability badge at top-right of card */}
                     <div className="absolute right-4 top-4 z-20">
                       {renderAvailabilityBadge(car.availability, car)}
                     </div>
@@ -848,7 +828,6 @@ const Cars = () => {
             })}
         </div>
 
-        {/* Floating decorative elements */}
         <div className={carPageStyles.decor1}></div>
         <div className={carPageStyles.decor2}></div>
       </div>

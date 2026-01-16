@@ -77,17 +77,24 @@ const CarDetail = () => {
   const initialPickup = location.state?.pickupDate || "";
   const initialReturn = location.state?.returnDate || "";
 
+  // If logged in, pre-fill email and use readOnly
+  const currentUser = authService.getCurrentUser();
+  const emailPrefill = currentUser?.email || "";
+
   const [formData, setFormData] = useState({
     pickupDate: initialPickup,
     returnDate: initialReturn,
     pickupLocation: "",
-    name: "",
-    email: "",
+    name: currentUser?.name || "",
+    email: emailPrefill,
     phone: "",
     city: "",
     state: "",
     zipCode: "",
   });
+
+  // If user is logged in, we want email read-only and not required to be typed.
+  const emailReadOnly = !!emailPrefill;
 
   const [activeField, setActiveField] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -169,12 +176,17 @@ const CarDetail = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // If email is not prefilled (guest), require it
     if (!formData.pickupDate || !formData.returnDate) {
       toast.error("Please select pickup and return dates.");
       return;
     }
     if (new Date(formData.returnDate) < new Date(formData.pickupDate)) {
       toast.error("Return date must be the same or after pickup date.");
+      return;
+    }
+    if (!emailReadOnly && !formData.email) {
+      toast.error("Please provide an email address.");
       return;
     }
 
@@ -188,12 +200,15 @@ const CarDetail = () => {
     submitControllerRef.current = controller;
 
     try {
+      // Prefer authenticated user id/email when available
       const user = authService.getCurrentUser();
       const userId = user?.id;
+      const emailToUse = user?.email || formData.email;
+
       const payload = {
         userId,
-        customer: formData.name,
-        email: formData.email,
+        customer: formData.name || (user?.name || "Guest"),
+        email: emailToUse,
         phone: formData.phone,
         car: {
           id: car._id ?? car.id ?? null,
@@ -213,6 +228,7 @@ const CarDetail = () => {
           : undefined,
       };
 
+      // Use api (it adds Authorization from in-memory token if present)
       const res = await api.post(
         `/api/payments/create-checkout-session`,
         payload,
@@ -238,8 +254,8 @@ const CarDetail = () => {
         pickupDate: "",
         returnDate: "",
         pickupLocation: "",
-        name: "",
-        email: "",
+        name: currentUser?.name || "",
+        email: emailPrefill,
         phone: "",
         city: "",
         state: "",
@@ -467,7 +483,6 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* rest of form unchanged */}
                 <div className="flex flex-col mt-3">
                   <label className={carDetailStyles.formLabel}>Full Name</label>
                   <div
@@ -492,9 +507,138 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* ... rest of form fields remain as in your current file ... */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                  <div className="flex flex-col">
+                    <label className={carDetailStyles.formLabel}>
+                      Email Address
+                    </label>
+                    <div
+                      className={carDetailStyles.inputContainer(
+                        activeField === "email"
+                      )}
+                    >
+                      <div className={carDetailStyles.inputIcon}>
+                        <FaEnvelope />
+                      </div>
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="Your email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("email")}
+                        onBlur={() => setActiveField(null)}
+                        required={!emailReadOnly}
+                        readOnly={emailReadOnly}
+                        className={carDetailStyles.textInputField + (emailReadOnly ? " opacity-80 bg-gray-800" : "")}
+                      />
+                    </div>
+                  </div>
 
-                <div className={carDetailStyles.priceBreakdown}>
+                  <div className="flex flex-col">
+                    <label className={carDetailStyles.formLabel}>
+                      Phone Number
+                    </label>
+                    <div
+                      className={carDetailStyles.inputContainer(
+                        activeField === "phone"
+                      )}
+                    >
+                      <div className={carDetailStyles.inputIcon}>
+                        <FaPhone />
+                      </div>
+                      <input
+                        type="tel"
+                        name="phone"
+                        placeholder="Your phone number"
+                        value={formData.phone}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("phone")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                  <div className="flex flex-col">
+                    <label className={carDetailStyles.formLabel}>City</label>
+                    <div
+                      className={carDetailStyles.inputContainer(
+                        activeField === "city"
+                      )}
+                    >
+                      <div className={carDetailStyles.inputIcon}>
+                        <FaCity />
+                      </div>
+                      <input
+                        type="text"
+                        name="city"
+                        placeholder="Your city"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("city")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className={carDetailStyles.formLabel}>State</label>
+                    <div
+                      className={carDetailStyles.inputContainer(
+                        activeField === "state"
+                      )}
+                    >
+                      <div className={carDetailStyles.inputIcon}>
+                        <FaGlobeAsia />
+                      </div>
+                      <input
+                        type="text"
+                        name="state"
+                        placeholder="Your state"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("state")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col">
+                    <label className={carDetailStyles.formLabel}>
+                      ZIP Code
+                    </label>
+                    <div
+                      className={carDetailStyles.inputContainer(
+                        activeField === "zipCode"
+                      )}
+                    >
+                      <div className={carDetailStyles.inputIcon}>
+                        <FaMapPin />
+                      </div>
+                      <input
+                        type="text"
+                        name="zipCode"
+                        placeholder="ZIP/Postal code"
+                        value={formData.zipCode}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("zipCode")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={carDetailStyles.priceBreakdown + " mt-4"}>
                   <div className={carDetailStyles.priceRow}>
                     <span>Rate/day</span>
                     <span>MYR&nbsp;{price}</span>

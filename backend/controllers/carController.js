@@ -1,4 +1,5 @@
 import Car from "../models/carModel.js";
+import Company from "../models/companyModel.js";
 import path from "path";
 import fs from "fs";
 import mongoose from "mongoose";
@@ -82,25 +83,57 @@ export const getCars = async (req, res, next) => {
     if (status) query.status = status;
 
     const total = await Car.countDocuments(query);
-    const cars = await Car.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
+
+    // populate company data (name, slug, logo, address, location) so frontend can filter by company.city/location
+    let cars = await Car.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate({ path: 'companyId', select: 'name slug logo address location' })
+      .lean();
 
     let carsWithAvailability = cars;
     if (Array.isArray(cars) && cars.length && typeof Car.computeAvailabilityForCars === "function") {
       try {
-        // computeAvailabilityForCars is async and queries bookings, await it
         carsWithAvailability = await Car.computeAvailabilityForCars(cars);
       } catch (err) {
         console.warn("computeAvailabilityForCars failed:", err);
-        // fallback to raw cars
         carsWithAvailability = cars;
       }
     }
+
+    // Ensure each returned car includes company info normalized under `company` and,
+    // if car.location is missing, copy company.location into car.location so client filtering works.
+    const normalized = carsWithAvailability.map((c) => {
+      const car = { ...c };
+      if (car.companyId && typeof car.companyId === 'object') {
+        car.company = {
+          id: car.companyId._id || car.companyId.id,
+          name: car.companyId.name,
+          slug: car.companyId.slug,
+          logo: car.companyId.logo,
+          address: car.companyId.address || {},
+          location: car.companyId.location || null,
+        };
+      } else {
+        car.company = null;
+      }
+
+      // If car has no location, but company has, copy it so frontend can use car.location consistently
+      if ((!car.location || !car.location.coordinates || car.location.coordinates.length === 0) && car.company && car.company.location) {
+        car.location = car.company.location;
+      }
+
+      // remove companyId to avoid confusion
+      delete car.companyId;
+      return car;
+    });
 
     return res.json({
       page,
       pages: Math.ceil(total / limit),
       total,
-      data: carsWithAvailability,
+      data: normalized,
     });
   } catch (err) {
     next(err);
@@ -128,6 +161,27 @@ export const getCarById = async (req, res, next) => {
       } catch (err) {
         console.warn("computeAvailabilityForCars failed for single car:", err);
       }
+    }
+
+    // attempt to populate company info for single car response
+    try {
+      const company = carWithAvailability.companyId ? await Company.findById(carWithAvailability.companyId).lean() : null;
+      if (company) {
+        carWithAvailability.company = {
+          id: company._id,
+          name: company.name,
+          slug: company.slug,
+          logo: company.logo,
+          address: company.address || {},
+          location: company.location || null,
+        };
+        if ((!carWithAvailability.location || !carWithAvailability.location.coordinates || carWithAvailability.location.coordinates.length === 0) && company.location) {
+          carWithAvailability.location = company.location;
+        }
+      }
+      delete carWithAvailability.companyId;
+    } catch (err) {
+      // non-fatal
     }
 
     return res.json({ success: true, data: carWithAvailability });

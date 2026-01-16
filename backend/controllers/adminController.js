@@ -93,16 +93,47 @@ export const getAdminCars = async (req, res) => {
 };
 
 // create car for company (accepts image on req.file)
+// Updated: when request doesn't provide a valid location, fall back to company's location (if any)
 export const createAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
     if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    // load company to possibly use its location if car location is missing
+    const company = await Company.findById(companyId).lean();
 
     const body = req.body || {};
     const required = ['make','model','year','dailyRate'];
     for (const f of required) if (!body[f]) return res.status(400).json({ success: false, message: `${f} is required` });
 
     const imageUrl = req.file ? buildCarImageUrl(req.file) : (body.image || "");
+
+    // Determine car location:
+    // - if body.location supplied, attempt to parse/normalize it
+    // - otherwise fallback to company's location (if present)
+    let carLocation;
+    if (body.location) {
+      try {
+        // body.location could be JSON-stringified array, an array, or a GeoJSON object
+        if (typeof body.location === 'string' && body.location.trim().startsWith('[')) {
+          const coords = JSON.parse(body.location);
+          if (Array.isArray(coords) && coords.length >= 2) {
+            carLocation = { type: 'Point', coordinates: coords };
+          }
+        } else if (Array.isArray(body.location) && body.location.length >= 2) {
+          carLocation = { type: 'Point', coordinates: body.location };
+        } else if (typeof body.location === 'object' && body.location.type === 'Point' && Array.isArray(body.location.coordinates)) {
+          carLocation = body.location;
+        }
+      } catch (err) {
+        // ignore parse errors and fallback below
+        carLocation = undefined;
+      }
+    }
+
+    if (!carLocation && company && company.location && company.location.type === 'Point' && Array.isArray(company.location.coordinates)) {
+      carLocation = company.location;
+    }
 
     const car = await Car.create({
       make: body.make,
@@ -118,7 +149,7 @@ export const createAdminCar = async (req, res) => {
       image: imageUrl,
       status: body.status || 'available',
       companyId,
-      location: body.location ? { type: 'Point', coordinates: body.location } : undefined
+      location: carLocation ? carLocation : undefined
     });
 
     return res.status(201).json({ success: true, car });

@@ -10,7 +10,8 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m'; // short lived
-const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 7); // days
+// Default refresh token lifetime in days (set to 1 day by default)
+const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 1);
 const REFRESH_TOKEN_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:7889';
 
@@ -61,6 +62,8 @@ function setRefreshCookie(res, token, maxAgeSec) {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
+    // Lax works for most flows; if you need cross-site cookies (e.g. different domain),
+    // you'd set SameSite='none' and secure=true on production with HTTPS.
     sameSite: 'lax',
     maxAge: maxAgeSec * 1000,
     path: '/', // allow refresh calls from any path under same origin
@@ -130,7 +133,7 @@ export async function register(req, res) {
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     await saveRefreshToken({ token: refreshToken, userId: newId, expiresAt, createdByIp: req.ip || '' });
 
-    // set cookie
+    // set cookie (persistent, HttpOnly)
     setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
     return res.status(201).json({

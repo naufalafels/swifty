@@ -23,6 +23,7 @@ import {
 } from "react-icons/fa";
 import { myBookingsStyles as s } from "../assets/dummyStyles.js";
 import { fetchMyBookings, cancelBooking as serviceCancelBooking } from "../services/bookingService.js";
+import api from "../utils/api";
 
 const TIMEOUT = 15000;
 
@@ -68,14 +69,10 @@ const daysBetween = (start, end) => {
   }
 };
 
-/**
- * Build a readable address string from various address shapes.
- */
 const buildCompanyAddress = (company) => {
   if (!company) return "";
   const addr = company.address || company || {};
-  // Try multiple possible field names
-  const street = addr.street || addr.address_street || addr.addressLine1 || "";
+  const street = addr.street || addr.address_street || "";
   const city = addr.city || addr.address_city || addr.town || "";
   const state = addr.state || addr.address_state || addr.region || "";
   const zip = addr.zipCode || addr.postal_code || addr.address_zipCode || "";
@@ -83,25 +80,16 @@ const buildCompanyAddress = (company) => {
   return [street, city, state, zip, country].filter(Boolean).join(", ");
 };
 
-/**
- * Resolve a company object from many possible locations/shapes within a booking payload.
- * Returns { id, name, address, logo } or null.
- *
- * This function now also attempts to recover a usable name/address from snapshot fields
- * (booking.car.companyName, booking.raw.*) so the UI doesn't show raw ObjectId strings.
- */
 const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
   if (!booking && !carSnapshot) return null;
 
   const normalize = (c) => {
     if (!c) return null;
     if (typeof c === "string") {
-      // If it looks like an ObjectId, treat as id; otherwise treat as name
       const isId = /^[0-9a-fA-F]{8,}$/.test(c);
       if (isId) return { id: c };
       return { name: c };
     }
-    // object shape
     const name =
       c.name ||
       c.companyName ||
@@ -115,18 +103,15 @@ const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
     return { id, name, address, logo };
   };
 
-  // 1) booking.company
   const bCompany = safeAccess(() => booking.company, null);
   const n1 = normalize(bCompany);
   if (n1 && (n1.name || n1.address || n1.logo || n1.id)) return n1;
 
-  // 2) booking.companyName or booking.company_name
   const bCompanyName =
     safeAccess(() => booking.companyName, null) ||
     safeAccess(() => booking.company_name, null);
   if (bCompanyName) return normalize(bCompanyName);
 
-  // 3) booking.raw?.company or booking.raw?.companyName
   const rawCompany = safeAccess(() => booking.raw?.company, null);
   const n3 = normalize(rawCompany);
   if (n3 && (n3.name || n3.address || n3.logo || n3.id)) return n3;
@@ -134,7 +119,6 @@ const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
   const rawCompanyName = safeAccess(() => booking.raw?.companyName, null);
   if (rawCompanyName) return normalize(rawCompanyName);
 
-  // 4) carSnapshot.company or booking.car.company or booking.raw?.car?.company
   const carCompany =
     safeAccess(() => carSnapshot.company, null) ||
     safeAccess(() => booking.car?.company, null) ||
@@ -143,7 +127,6 @@ const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
   const n4 = normalize(carCompany);
   if (n4 && (n4.name || n4.address || n4.logo || n4.id)) return n4;
 
-  // 5) fallback: sometimes the canonical company name is stored on the car snapshot as companyName
   const snapshotCompanyName =
     safeAccess(() => carSnapshot.companyName, null) ||
     safeAccess(() => booking.car?.companyName, null) ||
@@ -151,7 +134,6 @@ const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
     safeAccess(() => booking.raw?.companyName, null);
   if (snapshotCompanyName) return normalize(snapshotCompanyName);
 
-  // 6) company id fields (no metadata)
   const companyId =
     safeAccess(() => booking.companyId, null) ||
     safeAccess(() => booking.company_id, null) ||
@@ -159,19 +141,8 @@ const resolveCompanyFromBooking = (booking, carSnapshot = {}) => {
     safeAccess(() => booking.car?.companyId, null) ||
     safeAccess(() => carSnapshot.companyId, null) ||
     null;
-  if (companyId) {
-    // try to get a friendly name from other fields before exposing id
-    const fallbackName =
-      safeAccess(() => booking.car?.companyName, null) ||
-      safeAccess(() => booking.raw?.car?.companyName, null) ||
-      safeAccess(() => booking.raw?.company?.name, null) ||
-      null;
-    if (fallbackName) return { id: companyId, name: fallbackName };
-    // we will return id but caller will hide raw id if no name available
-    return { id: companyId };
-  }
+  if (companyId) return { id: companyId };
 
-  // no company found
   return null;
 };
 
@@ -188,7 +159,6 @@ const normalizeBooking = (booking) => {
       }
       return snapshot;
     }
-    // fallback to raw.car
     if (booking.raw?.car && typeof booking.raw.car === "object") {
       return { ...booking.raw.car };
     }
@@ -216,10 +186,8 @@ const normalizeBooking = (booking) => {
     booking.return ||
     null;
 
-  // Resolve company using robust helper; pass car snapshot for additional info
   const companyObj = resolveCompanyFromBooking(booking, carObj);
 
-  // If companyObj exists but only contains id, try a few more fallbacks for name/address
   let resolvedCompany = { name: "", address: "", logo: "", id: "" };
   if (companyObj) {
     resolvedCompany.id = companyObj.id || "";
@@ -228,7 +196,6 @@ const normalizeBooking = (booking) => {
     resolvedCompany.logo = companyObj.logo || "";
   }
 
-  // Additional fallback: car snapshot companyName or company address fields
   if (!resolvedCompany.name) {
     resolvedCompany.name =
       safeAccess(() => carObj.companyName, "") ||
@@ -237,17 +204,14 @@ const normalizeBooking = (booking) => {
       "";
   }
   if (!resolvedCompany.address) {
-    // possible fields on carObj or booking.raw
     resolvedCompany.address =
       safeAccess(() => carObj.companyAddress, "") ||
       safeAccess(() => booking.raw?.company?.address, "") ||
       safeAccess(() => booking.raw?.companyAddress, "") ||
       "";
   }
-
-  // If still no name and only id present, hide raw id and show unavailable label
   if (!resolvedCompany.name && resolvedCompany.id) {
-    resolvedCompany.name = ""; // keep empty so UI displays friendly fallback
+    resolvedCompany.name = "";
   }
 
   const normalized = {
@@ -307,7 +271,6 @@ const normalizeBooking = (booking) => {
     raw: booking,
   };
 
-  // derive completed/upcoming from return date
   try {
     const now = new Date();
     const _return = new Date(normalized.dates.return);
@@ -321,7 +284,6 @@ const normalizeBooking = (booking) => {
   return normalized;
 };
 
-// ---------- Small presentational components ----------
 const FilterButton = ({ filterKey, currentFilter, icon, label, onClick }) => (
   <button
     type="button"
@@ -368,7 +330,6 @@ const BookingCard = ({ booking, onViewDetails }) => {
           alt={booking.car.make}
           className={s.cardImage}
         />
-        {/* optional company logo badge */}
         {booking.company?.logo ? (
           <img
             src={booking.company.logo}
@@ -387,7 +348,6 @@ const BookingCard = ({ booking, onViewDetails }) => {
               {booking.car.category} • {booking.car.year}
             </p>
 
-            {/* Company line */}
             {booking.company?.name ? (
               <div className="flex items-center gap-2 mt-2 text-sm text-gray-300">
                 <FaBuilding className="text-gray-400" />
@@ -706,9 +666,51 @@ const MyBookings = () => {
           responseData ||
           [];
 
-      const normalized = (Array.isArray(rawData) ? rawData : []).map(
+      let normalized = (Array.isArray(rawData) ? rawData : []).map(
         normalizeBooking
       );
+
+      // Find bookings that only have a company id and no name, then batch fetch company metadata
+      const idsToFetch = Array.from(
+        new Set(
+          normalized
+            .map((b) => (b.company && b.company.id ? String(b.company.id) : null))
+            .filter((id) => id && id.length > 5 && !normalized.find((nb) => nb.company.id === id && nb.company.name))
+        )
+      );
+
+      if (idsToFetch.length > 0) {
+        try {
+          const res = await api.get("/api/companies", { params: { ids: idsToFetch.join(",") } });
+          const companies = (res?.data?.companies) || [];
+          const map = {};
+          companies.forEach((c) => {
+            map[String(c.id)] = {
+              name: c.name || "",
+              address: (c.address && (typeof c.address === "object" ? Object.values(c.address).filter(Boolean).join(", ") : c.address)) || "",
+              logo: c.logo || "",
+            };
+          });
+
+          normalized = normalized.map((b) => {
+            const cid = b.company?.id;
+            if (cid && map[cid]) {
+              return {
+                ...b,
+                company: {
+                  ...b.company,
+                  name: map[cid].name || b.company.name,
+                  address: map[cid].address || b.company.address,
+                  logo: map[cid].logo || b.company.logo,
+                },
+              };
+            }
+            return b;
+          });
+        } catch (err) {
+          console.warn("Failed to fetch company metadata for bookings", err);
+        }
+      }
 
       if (!isMounted.current) return;
       setBookings(normalized);

@@ -14,6 +14,7 @@ import carRouter from './routes/carRoutes.js';
 import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
+import companyRouter from './routes/companyRoutes.js'; // NEW
 
 dotenv.config();
 
@@ -61,6 +62,9 @@ app.use('/api/payments', paymentRouter);
 
 // Admin routes (protected by auth middleware inside the routes)
 app.use('/api/admin', adminRouter);
+
+// Public companies lookup (new)
+app.use('/api/companies', companyRouter);
 
 // health / ping route
 app.get('/api/ping', (req, res) => res.json({ ok: true, time: Date.now() }));

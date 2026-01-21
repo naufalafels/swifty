@@ -35,3 +35,13 @@ export async function cancelBooking(bookingId) {
   const res = await api.patch(`/api/bookings/${bookingId}/status`, { status: "cancelled" });
   return res.data;
 }
+
+/**
+ * lookupBooking (guest-friendly)
+ * params: { email?: string, bookingId?: string }
+ * returns { success, data: [...] }
+ */
+export async function lookupBooking(params) {
+  const res = await api.get("/api/bookings/lookup", { params });
+  return res.data;
+}

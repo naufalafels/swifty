@@ -20,9 +20,14 @@ import {
   FaReceipt,
   FaArrowRight,
   FaBuilding,
+  FaSearch,
 } from "react-icons/fa";
 import { myBookingsStyles as s } from "../assets/dummyStyles.js";
-import { fetchMyBookings, cancelBooking as serviceCancelBooking } from "../services/bookingService.js";
+import {
+  fetchMyBookings,
+  cancelBooking as serviceCancelBooking,
+  lookupBooking as serviceLookupBooking,
+} from "../services/bookingService.js";
 import api from "../utils/api";
 
 const TIMEOUT = 15000;
@@ -645,6 +650,11 @@ const MyBookings = () => {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState(null);
 
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestBookingId, setGuestBookingId] = useState("");
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState("");
+
   const isMounted = useRef(true);
   useEffect(() => () => (isMounted.current = false), []);
 
@@ -737,6 +747,38 @@ const MyBookings = () => {
     fetchBookings();
   }, [fetchBookings]);
 
+  const handleGuestLookup = async (e) => {
+    e.preventDefault();
+    setGuestError("");
+    if (!guestEmail && !guestBookingId) {
+      setGuestError("Please enter email and/or booking ID");
+      return;
+    }
+    try {
+      setGuestLoading(true);
+      const res = await serviceLookupBooking({
+        email: guestEmail || undefined,
+        bookingId: guestBookingId || undefined,
+      });
+      const raw = Array.isArray(res?.data) ? res.data : [];
+      const mapped = raw.map((b) => normalizeBooking(b));
+      setBookings(mapped);
+      if (mapped.length === 0) {
+        setGuestError("No bookings found for that email/booking ID");
+      }
+      setFilter("all");
+    } catch (err) {
+      console.error("Guest lookup failed:", err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Lookup failed. Please try again.";
+      setGuestError(msg);
+    } finally {
+      setGuestLoading(false);
+    }
+  };
+
   const cancelBooking = useCallback(
     async (bookingId) => {
       if (!window.confirm("Are you sure you want to cancel this booking?"))
@@ -791,6 +833,49 @@ const MyBookings = () => {
           <h1 className={s.title}>My Bookings</h1>
           <p className={s.subtitle}>
             View and manage all your current and past car rental bookings
+          </p>
+        </div>
+
+        {/* Guest lookup */}
+        <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 md:p-6 mb-8">
+          <div className="flex items-center gap-2 text-orange-300 font-semibold mb-3">
+            <FaSearch /> <span>Find your booking (no login required)</span>
+          </div>
+          <form className="grid md:grid-cols-3 gap-3" onSubmit={handleGuestLookup}>
+            <div>
+              <label className="text-xs text-gray-400">Email used during booking</label>
+              <input
+                type="email"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                className="w-full mt-1 p-2 rounded bg-gray-800 text-white border border-gray-700"
+                placeholder="you@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Booking ID (optional)</label>
+              <input
+                value={guestBookingId}
+                onChange={(e) => setGuestBookingId(e.target.value)}
+                className="w-full mt-1 p-2 rounded bg-gray-800 text-white border border-gray-700"
+                placeholder="Paste Booking ID"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={guestLoading}
+                className="w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold py-2.5 rounded-lg shadow"
+              >
+                {guestLoading ? "Searching..." : "Search"}
+              </button>
+            </div>
+          </form>
+          {guestError ? (
+            <p className="text-red-400 text-sm mt-2">{guestError}</p>
+          ) : null}
+          <p className="text-gray-500 text-xs mt-2">
+            Enter your booking email, and optionally the Booking ID from your confirmation. We’ll fetch matching bookings.
           </p>
         </div>
 

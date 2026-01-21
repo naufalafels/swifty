@@ -362,6 +362,34 @@ export const getMyBookings = async (req, res, next) => {
   }
 };
 
+// LOOKUP BOOKINGS (guest-friendly) by email and/or bookingId
+export const lookupBooking = async (req, res, next) => {
+  try {
+    const { email, bookingId } = req.query;
+    if (!email && !bookingId) {
+      return res.status(400).json({ success: false, message: "email or bookingId is required" });
+    }
+
+    const query = {};
+    if (email) query.email = { $regex: `^${email}$`, $options: "i" };
+
+    let results = [];
+    if (bookingId) {
+      if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ success: false, message: "Invalid bookingId" });
+      }
+      const doc = await Booking.findOne({ _id: bookingId, ...query }).lean();
+      results = doc ? [doc] : [];
+    } else {
+      results = await Booking.find(query).sort({ bookingDate: -1 }).limit(50).lean();
+    }
+
+    return res.json({ success: true, data: results });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // UPDATE BOOKING
 export const updateBooking = async (req, res, next) => {
   const session = await mongoose.startSession();

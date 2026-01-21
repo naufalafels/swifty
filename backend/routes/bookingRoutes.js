@@ -13,19 +13,19 @@ import { uploads } from '../middlewares/uploads.js';
 
 const bookingRouter = express.Router();
 
-// Allow guest and logged-in users to create bookings (auth handled inside controller)
+// Guest + logged-in booking creation (auth handled inside controller)
 bookingRouter.post('/', uploads.single('carImage'), createBooking);
 
-// Public lookup by email/bookingId (guest-friendly)
+// Guest-friendly lookup by email/bookingId
 bookingRouter.get('/lookup', lookupBooking);
 
 // Public list
 bookingRouter.get('/', getBookings);
 
-// Authenticated: my bookings
+// Authenticated: my bookings (for logged-in users)
 bookingRouter.get('/mybooking', authMiddleWare, getMyBookings);
 
-// Update booking (kept as in original)
+// Updates (kept as-is)
 bookingRouter.put('/:id', uploads.single('carImage'), updateBooking);
 bookingRouter.patch('/:id/status', updateBookingStatus);
 bookingRouter.delete('/:id', deleteBooking);

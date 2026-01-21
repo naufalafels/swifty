@@ -89,14 +89,8 @@ const App = () => {
         {/* Guest-friendly: no auth required to view and book */}
         <Route path='/cars/:id' element={<CarDetailPage />} />
 
-        <Route
-          path='/bookings'
-          element={
-            <ProtectedRoute>
-              <MyBookingsPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Guest-friendly: My Bookings now public (lookup by email/Booking ID on the page) */}
+        <Route path='/bookings' element={<MyBookingsPage />} />
 
         <Route path='/login' 
           element={

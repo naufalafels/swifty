@@ -727,7 +727,10 @@ const MyBookings = () => {
       setLoading(false);
     } catch (err) {
       if (!isMounted.current) return;
-      if (err?.name === "CanceledError" || err?.message === "canceled") {
+      if (err?.response?.status === 401) {
+        // Not logged in: silently allow guest mode (no blocking error)
+        setError(null);
+      } else if (err?.name === "CanceledError" || err?.message === "canceled") {
         setError("Request cancelled / timed out");
       } else {
         setError(
@@ -919,7 +922,7 @@ const MyBookings = () => {
             <h3 className={s.emptyTitle}>No bookings found</h3>
             <p className={s.emptyText}>
               {filter === "all"
-                ? "You haven't made any bookings yet. Browse our collection to get started!"
+                ? "Use the search above to find your booking by email or Booking ID."
                 : `You don't have any ${filter} bookings.`}
             </p>
             <Link to="/cars" className={s.browseButton}>

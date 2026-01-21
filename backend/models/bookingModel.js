@@ -2,8 +2,25 @@ import mongoose from "mongoose";
 const { Schema } = mongoose;
 
 const addressSchema = new Schema({
-  street: String, city: String, state: String, zipCode: String
+  street: String,
+  city: String,
+  state: String,
+  zipCode: String
 }, { _id: false, default: {} });
+
+const paymentBreakdownSchema = new Schema({
+  rent: { type: Number, default: 0 },
+  insurance: { type: Number, default: 0 },
+  deposit: { type: Number, default: 0 }
+}, { _id: false });
+
+const kycSchema = new Schema({
+  idType: { type: String, enum: ["passport", "nric", "other"], default: "passport" },
+  idNumber: { type: String, default: "" },
+  idCountry: { type: String, default: "" },
+  licenseReminderSent: { type: Boolean, default: false },
+  licenseNote: { type: String, default: "Please bring your valid driving license (domestic or international per Malaysian law)." }
+}, { _id: false });
 
 // Denormalized car snapshot schema includes company fields so Mongoose won't strip them
 const carSummarySchema = new Schema({
@@ -13,8 +30,6 @@ const carSummarySchema = new Schema({
   year: Number,
   dailyRate: Number,
   image: String,
-
-  // Multi-tenant: which company owns this car
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 }, { _id: false });
 
@@ -28,17 +43,25 @@ const bookingSchema = new Schema({
   pickupDate: { type: Date, required: true },
   returnDate: { type: Date, required: true },
   bookingDate: { type: Date, default: Date.now },
-  status: { type: String, enum: ['pending','active','completed','cancelled','upcoming'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'active', 'completed', 'cancelled', 'upcoming'], default: 'pending' },
   amount: { type: Number, default: 0 },
-  paymentStatus: { type: String, enum: ['pending','paid'], default: 'pending' },
-  sessionId: String,
-  paymentIntentId: String,
-  address: { type: addressSchema, default: () => ({}) },
+  paymentStatus: { type: String, enum: ['pending', 'paid'], default: 'pending' },
+  paymentGateway: { type: String, enum: ['razorpay'], default: 'razorpay' },
+  currency: { type: String, default: 'MYR' },
+  paymentBreakdown: { type: paymentBreakdownSchema, default: () => ({}) },
+  kyc: { type: kycSchema, default: () => ({}) },
 
-  // Denormalized: which company the booking belongs to (used by admin filters)
+  razorpayOrderId: { type: String, default: "" },
+  razorpayPaymentId: { type: String, default: "" },
+  razorpaySignature: { type: String, default: "" },
+
+  sessionId: String, // legacy stripe field (unused)
+  paymentIntentId: String, // legacy stripe field (unused)
+
+  address: { type: addressSchema, default: () => ({}) },
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 
-  stripeSession: { type: Schema.Types.Mixed, default: {} }
+  stripeSession: { type: Schema.Types.Mixed, default: {} } // legacy field (unused)
 }, { timestamps: true });
 
 bookingSchema.index({ companyId: 1 });

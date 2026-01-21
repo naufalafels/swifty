@@ -16,6 +16,9 @@ import {
   FaGlobeAsia,
   FaMapPin,
   FaBuilding,
+  FaPassport,
+  FaShieldAlt,
+  FaInfoCircle
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -23,6 +26,7 @@ import api from "../utils/api";
 import * as authService from "../utils/authService";
 import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
+import { createRazorpayOrder, verifyRazorpayPayment } from "../services/paymentService";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
 
@@ -64,6 +68,62 @@ const calculateDays = (from, to) => {
   return Math.max(1, days);
 };
 
+// Insurance plans (clean labels; fees per day)
+const insuranceOptions = [
+  {
+    value: "full_excess",
+    label: "Full Excess",
+    feePerDay: 0,
+    info: "You keep the standard excess; no extra daily fee."
+  },
+  {
+    value: "half_excess",
+    label: "Half Excess",
+    feePerDay: 15,
+    info: "Reduce your excess liability by half for a small daily fee."
+  },
+  {
+    value: "no_excess",
+    label: "No Excess (Incl. 24h cancellation)",
+    feePerDay: 30,
+    info: "Zero excess plus 24-hour cancellation coverage for peace of mind."
+  }
+];
+
+const countryOptions = [
+  "Malaysia",
+  "Singapore",
+  "Thailand",
+  "Indonesia",
+  "Brunei",
+  "Philippines",
+  "Vietnam",
+  "Japan",
+  "South Korea",
+  "China",
+  "India",
+  "Australia",
+  "New Zealand",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Germany",
+  "France",
+  "Netherlands",
+  "United Arab Emirates",
+  "Saudi Arabia"
+];
+
+const loadRazorpayScript = () =>
+  new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve(true);
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+    document.body.appendChild(script);
+  });
+
 const CarDetail = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -92,7 +152,14 @@ const CarDetail = () => {
     city: "",
     state: "",
     zipCode: "",
+    idType: "passport",
+    idNumber: "",
+    idCountry: "Malaysia",
+    insurancePlan: "no_excess"
   });
+
+  // constants for pricing
+  const deposit = 500; // MYR deposit paid at rental counter (not charged online)
 
   // If user is logged in, we want email read-only and not required to be typed.
   const emailReadOnly = !!emailPrefill;
@@ -168,7 +235,10 @@ const CarDetail = () => {
 
   const price = Number(car.price ?? car.dailyRate ?? 0) || 0;
   const days = calculateDays(formData.pickupDate, formData.returnDate);
-  const calculateTotal = () => days * price;
+
+  const selectedPlan = insuranceOptions.find((p) => p.value === formData.insurancePlan) || insuranceOptions[2];
+  const insuranceCost = days * (selectedPlan.feePerDay || 0);
+  const calculateTotal = () => days * price + insuranceCost;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -177,7 +247,6 @@ const CarDetail = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // If email is not prefilled (guest), require it
     if (!formData.pickupDate || !formData.returnDate) {
       toast.error("Please select pickup and return dates.");
       return;
@@ -188,6 +257,14 @@ const CarDetail = () => {
     }
     if (!emailReadOnly && !formData.email) {
       toast.error("Please provide an email address.");
+      return;
+    }
+    if (!formData.phone) {
+      toast.error("Please provide a phone number.");
+      return;
+    }
+    if (!formData.idNumber || !formData.idCountry) {
+      toast.error("Please provide your ID number and issuing country.");
       return;
     }
 
@@ -206,6 +283,13 @@ const CarDetail = () => {
       const userId = user?.id;
       const emailToUse = user?.email || formData.email;
 
+      const paymentBreakdown = {
+        rent: days * price,
+        insurance: insuranceCost,
+        insurancePlan: formData.insurancePlan,
+        deposit // shown to user, paid at counter (not charged online)
+      };
+
       const payload = {
         userId,
         customer: formData.name || (user?.name || "Guest"),
@@ -218,51 +302,78 @@ const CarDetail = () => {
         pickupDate: formData.pickupDate,
         returnDate: formData.returnDate,
         amount: calculateTotal(),
+        paymentBreakdown,
         details: { pickupLocation: formData.pickupLocation },
         address: {
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
         },
+        kyc: {
+          idType: formData.idType,
+          idNumber: formData.idNumber,
+          idCountry: formData.idCountry,
+          licenseReminderSent: false,
+          licenseNote: "Please bring your valid driving license (domestic or international per Malaysian law)."
+        },
         carImage: car.image
           ? buildImageSrc(Array.isArray(car.image) ? car.image[0] : car.image)
           : undefined,
       };
 
-      // Use api (it adds Authorization from in-memory token if present)
-      const res = await api.post(
-        `/api/payments/create-checkout-session`,
-        payload,
-        {
-          signal: controller.signal,
-        }
-      );
+      await loadRazorpayScript();
 
-      if (res?.data?.url) {
-        toast.success("Redirecting to payment...", {
-          position: "top-right",
-          autoClose: 1200,
-        });
-        window.location.href = res.data.url;
+      const res = await createRazorpayOrder(payload);
+
+      if (!res?.orderId || !res?.key) {
+        toast.error("Failed to initiate payment. Please try again.");
         return;
       }
 
-      toast.success(
-        "Booking created. Please complete payment from bookings page.",
-        { position: "top-right", autoClose: 2000 }
-      );
-      setFormData({
-        pickupDate: "",
-        returnDate: "",
-        pickupLocation: "",
-        name: currentUser?.name || "",
-        email: emailPrefill,
-        phone: "",
-        city: "",
-        state: "",
-        zipCode: "",
+      const rzp = new window.Razorpay({
+        key: res.key,
+        amount: res.amount,
+        currency: res.currency,
+        name: "Swifty Car Rental",
+        description: car.name || "Car Rental",
+        order_id: res.orderId,
+        prefill: {
+          name: payload.customer,
+          email: payload.email,
+          contact: payload.phone,
+        },
+        notes: {
+          bookingId: res.bookingId,
+          pickupDate: payload.pickupDate,
+          returnDate: payload.returnDate,
+        },
+        handler: async (response) => {
+          toast.success("Payment captured. Finalizing booking...", { autoClose: 1200 });
+          // Optional client verify (webhook is source of truth)
+          try {
+            await verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingId: res.bookingId,
+            });
+          } catch (e) {
+            console.warn("Client verification failed (webhook will handle):", e);
+          }
+          navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info("Payment was cancelled.");
+            navigate(`/cancel?booking_id=${res.bookingId}&payment_status=cancelled`, { replace: true });
+          },
+        },
+        theme: {
+          color: "#f97316"
+        }
       });
-      navigate("/bookings");
+
+      rzp.open();
     } catch (err) {
       const canceled =
         err?.code === "ERR_CANCELED" ||
@@ -670,6 +781,99 @@ const CarDetail = () => {
                   </div>
                 </div>
 
+                {/* KYC Section */}
+                <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FaPassport className="text-orange-400" />
+                    <h3 className="text-sm font-semibold text-gray-100">KYC (Passport / NRIC)</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className={carDetailStyles.formLabel}>ID Type</label>
+                      <select
+                        name="idType"
+                        value={formData.idType}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idType")}
+                        onBlur={() => setActiveField(null)}
+                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                      >
+                        <option value="passport">Passport</option>
+                        <option value="nric">Malaysian NRIC</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>ID Number</label>
+                      <input
+                        type="text"
+                        name="idNumber"
+                        placeholder="e.g. A1234567"
+                        value={formData.idNumber}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idNumber")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Issuing Country</label>
+                      <select
+                        name="idCountry"
+                        value={formData.idCountry}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idCountry")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                      >
+                        {countryOptions.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
+                    <FaShieldAlt className="mt-0.5" />
+                    <span>Reminder: Please bring your valid driving license (domestic or international) as required by Malaysian law.</span>
+                  </div>
+                </div>
+
+                {/* Insurance selection */}
+                <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FaShieldAlt className="text-orange-400" />
+                    <h3 className="text-sm font-semibold text-gray-100">Insurance / Excess</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {insuranceOptions.map((opt) => (
+                      <label
+                        key={opt.value}
+                        className="flex items-start gap-3 cursor-pointer rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 hover:border-orange-500 transition"
+                      >
+                        <input
+                          type="radio"
+                          name="insurancePlan"
+                          value={opt.value}
+                          checked={formData.insurancePlan === opt.value}
+                          onChange={handleInputChange}
+                          className="mt-1 accent-orange-500"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-100">
+                            {opt.label}
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-orange-300">
+                              {opt.feePerDay ? `MYR ${opt.feePerDay}/day` : "No daily fee"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{opt.info}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 <div className={carDetailStyles.priceBreakdown + " mt-4"}>
                   <div className={carDetailStyles.priceRow}>
                     <span>Rate/day</span>
@@ -681,10 +885,21 @@ const CarDetail = () => {
                       <span>{days}</span>
                     </div>
                   )}
+                  <div className={carDetailStyles.priceRow}>
+                    <span>Insurance ({selectedPlan.label})</span>
+                    <span>MYR&nbsp;{insuranceCost}</span>
+                  </div>
+                  <div className={carDetailStyles.priceRow}>
+                    <span>Deposit (pay at counter)</span>
+                    <span className="text-gray-300">MYR&nbsp;{deposit}</span>
+                  </div>
                   <div className={carDetailStyles.totalRow}>
-                    <span>Total</span>
+                    <span>Total (to pay now)</span>
                     <span>MYR&nbsp;{calculateTotal()}</span>
                   </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    No hidden costs. Deposit is collected at the rental desk and will not be charged online.
+                  </p>
                 </div>
 
                 <button
@@ -694,7 +909,7 @@ const CarDetail = () => {
                 >
                   <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
                   <span>
-                    {submitting ? "Confirming..." : "Confirm Booking"}
+                    {submitting ? "Processing..." : "Pay & Confirm Booking"}
                   </span>
                 </button>
               </form>

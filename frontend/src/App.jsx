@@ -86,14 +86,8 @@ const App = () => {
         <Route path='/contact' element={<ContactPage />} />
         <Route path='/cars' element={<CarsPage />} />
 
-        <Route
-          path='/cars/:id'
-          element={
-            <ProtectedRoute>
-              <CarDetailPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Guest-friendly: no auth required to view and book */}
+        <Route path='/cars/:id' element={<CarDetailPage />} />
 
         <Route
           path='/bookings'
@@ -139,4 +133,4 @@ const App = () => {
   )
 }
 
-export default App
+export default App;

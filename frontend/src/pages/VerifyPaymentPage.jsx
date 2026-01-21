@@ -1,88 +1,50 @@
-import React from 'react'
-import api from '../utils/api'
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import React, { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const VerifyPaymentPage = () => {
-
-  const [statusMsg, setStatusMsg] = useState('Verifying Payment...');
-  const navigate = useNavigate();
   const location = useLocation();
-  const search = location.search || '';
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const verifyPayment = async () => {
-      const params = new URLSearchParams(search);
-      const rawSession = params.get('session_id');
-      const session_id = rawSession ? rawSession.trim() : null;
-      const payment_status = params.get('payment_status');
-
-      if (payment_status === 'cancel') {
-        navigate('/checkout', {replace: true});
-        return;
-      }
-
-      if (!session_id) {
-        setStatusMsg('No session id provided in the URL');
-        return;
-      }
-
-      try {
-        setStatusMsg('Confirming payment with server...');
-
-        const res = await api.get(`/api/payments/confirm`, {
-          params: {session_id},
-          timeout: 15000,
-        });
-
-        if (cancelled) return;
-
-        if (res?.data?.success) {
-          setStatusMsg('Payment confirm. Redirecting...');
-          navigate('/bookings', {replace: true});
-          return;
-        }
-        else {
-          const msg = res?.data?.message || 'Payment not completed!'
-          setStatusMsg(msg);
-        }
-      } 
-
-      catch (err) {
-        console.error("Verification failed", err);
-
-        const status = err?.response?.status;
-        const serverMsg = err?.response?.data?.message;
-
-        if (status === 404) {
-          setStatusMsg(serverMsg || "Payment session not found!");
-        } else if (status === 400) {
-          setStatusMsg(serverMsg || "Payment not completed!");
-        } else {
-          setStatusMsg(serverMsg || "Error occured. Try again.");
-        }
-      }
-    };
-    verifyPayment();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [search, navigate]);
+  const { statusMsg, isSuccess } = useMemo(() => {
+    const params = new URLSearchParams(location.search || "");
+    const paymentStatus = params.get("payment_status");
+    const bookingId = params.get("booking_id");
+    const msgBase = bookingId ? `Booking ID: ${bookingId}` : "";
+    if (paymentStatus === "success") {
+      return { statusMsg: `Payment successful. ${msgBase}`, isSuccess: true };
+    }
+    if (paymentStatus === "cancelled") {
+      return { statusMsg: `Payment was cancelled. ${msgBase}`, isSuccess: false };
+    }
+    return { statusMsg: "Payment status unknown. Please check your email for booking details.", isSuccess: false };
+  }, [location.search]);
 
   return (
-    <div className=' min-h-screen flex items-center justify-center text-white p-4'>
-      <div className=' text-center max-w-lg'>
-        <p className=' mb-2'>{statusMsg}</p>
-        <p className=' text-sm opacity-70'>
-          If this page shows 'session not found', copy the 'session_id' from your URL and verify it with your backend logs or support contact.
+    <div className="min-h-screen flex items-center justify-center text-white p-4 bg-gray-900">
+      <div className="text-center max-w-lg bg-gray-800/60 border border-gray-700 rounded-2xl p-8 shadow-xl">
+        <p className={`text-xl font-semibold ${isSuccess ? "text-green-400" : "text-orange-300"}`}>
+          {statusMsg}
         </p>
+        <p className="text-sm opacity-80 mt-3">
+          You’ll also receive an email with your booking details. If you need help, contact support with your booking ID.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            onClick={() => navigate("/bookings", { replace: true })}
+            className="px-5 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white"
+          >
+            View My Bookings
+          </button>
+          <button
+            onClick={() => navigate("/", { replace: true })}
+            className="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+          >
+            Back to Home
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default VerifyPaymentPage
+export default VerifyPaymentPage;

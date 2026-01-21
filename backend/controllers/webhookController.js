@@ -1,65 +1,56 @@
 import dotenv from 'dotenv';
-import Stripe from 'stripe';
+import crypto from 'crypto';
 import Booking from '../models/bookingModel.js';
 
 dotenv.config();
-const getStripe = () => {
-  const key = (process.env.STRIPE_SECRET_KEY || '').trim();
-  if (!key) throw new Error('Stripe secret key is not defined');
-  return new Stripe(key);
+
+const verifySignature = (rawBody, signature, secret) => {
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  return expected === signature;
 };
 
-export const stripeWebhookHandler = async (req, res) => {
-  // IMPORTANT: express must be configured to expose raw body for this route.
-  // In server.js, for this route use: express.raw({type: 'application/json'}) middleware.
-  const sig = req.headers['stripe-signature'];
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || ''; // set this in env (from Stripe)
-  if (!webhookSecret) {
-    console.warn('Stripe webhook secret not configured');
-  }
-
-  let event;
+export const razorpayWebhookHandler = async (req, res) => {
   try {
-    const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(req.rawBody || req.body, sig, webhookSecret);
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+    if (!webhookSecret) {
+      console.warn('Razorpay webhook secret not configured');
+      return res.status(500).send('Webhook secret not configured');
+    }
 
-  // Handle events
-  try {
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object;
-      const bookingId = session.metadata?.bookingId;
-      if (bookingId) {
-        await Booking.findByIdAndUpdate(bookingId, {
-          paymentStatus: 'paid',
-          status: 'active',
-          paymentIntentId: session.payment_intent || '',
-          paymentDetails: {
-            amount_total: session.amount_total || null,
-            currency: session.currency || null
+    const signature = req.headers['x-razorpay-signature'];
+    const rawBody = req.rawBody || req.body; // express.raw provides Buffer
+    if (!signature || !rawBody) {
+      return res.status(400).send('Missing signature or body');
+    }
+
+    const isValid = verifySignature(rawBody, signature, webhookSecret);
+    if (!isValid) {
+      return res.status(400).send('Invalid signature');
+    }
+
+    const event = JSON.parse(rawBody.toString());
+
+    if (event.event === 'payment.captured' || event.event === 'order.paid') {
+      const payload = event.payload?.payment?.entity || event.payload?.order?.entity || {};
+      const razorpayOrderId = payload.order_id || payload.id || '';
+      const razorpayPaymentId = payload.id || payload.payment_id || '';
+
+      if (razorpayOrderId) {
+        await Booking.findOneAndUpdate(
+          { razorpayOrderId },
+          {
+            paymentStatus: 'paid',
+            status: 'active',
+            razorpayPaymentId,
+            razorpaySignature: signature
           }
-        });
-      } else {
-        // fallback: find booking by session.id
-        await Booking.findOneAndUpdate({ sessionId: session.id }, {
-          paymentStatus: 'paid',
-          status: 'active',
-          paymentIntentId: session.payment_intent || '',
-          paymentDetails: {
-            amount_total: session.amount_total || null,
-            currency: session.currency || null
-          }
-        });
+        );
       }
     }
 
-    // respond 200
-    res.json({ received: true });
+    return res.json({ received: true });
   } catch (err) {
     console.error('Webhook handler error:', err);
-    res.status(500).send();
+    return res.status(500).send();
   }
 };

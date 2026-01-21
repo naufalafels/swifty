@@ -1,21 +1,25 @@
+import dotenv from 'dotenv';
+import Razorpay from 'razorpay';
+import crypto from 'crypto';
+import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+
 import Booking from '../models/bookingModel.js';
 import Car from '../models/carModel.js';
-import Stripe from 'stripe';
-import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
+import User from '../models/userModel.js';
 
 dotenv.config();
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim() || 'http://localhost:5173';
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2022-11-15";
-const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toLowerCase();
+const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toUpperCase();
 const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
 
-const getStripe = () => {
-  const key = (process.env.STRIPE_SECRET_KEY || '').trim();
-  if (!key) throw new Error('Stripe secret key is not defined in environment variables');
-  return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
+const getRazorpay = () => {
+  const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+  if (!keyId || !keySecret) throw new Error('Razorpay keys are not configured');
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
 const getUserIdFromRequest = (req) => {
@@ -25,28 +29,41 @@ const getUserIdFromRequest = (req) => {
     const parts = String(auth).split(' ');
     if (parts.length !== 2) return null;
     const token = parts[1];
-    try {
-      const payload = jwt.verify(token, JWT_SECRET);
-      if (payload && (payload.id || payload._id)) return String(payload.id ?? payload._id);
-      return null;
-    } catch {
-      return null;
-    }
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload && (payload.id || payload._id)) return String(payload.id ?? payload._id);
+    return null;
   } catch {
     return null;
   }
 };
 
-export const createCheckoutSession = async (req, res) => {
+// Create or reuse a guest user so bookings always have a userId
+const getOrCreateGuestUser = async ({ name, email, phone }) => {
+  if (!email) throw new Error('Email is required for guest booking');
+  const existing = await User.findOne({ email }).lean();
+  if (existing) return existing._id;
+
+  const password = crypto.randomBytes(12).toString('hex');
+  const hashed = await bcrypt.hash(password, 10);
+
+  const guest = await User.create({
+    name: name || 'Guest',
+    email,
+    phone: phone || '',
+    password: hashed,
+    role: 'guest'
+  });
+
+  return guest._id;
+};
+
+export const createRazorpayOrder = async (req, res) => {
   try {
     if (!req.body) return res.status(400).json({ success: false, message: 'Request body is missing' });
 
-    // Attempt to derive userId from server-side (JWT) if not provided by client
-    let providedUserId = req.body.userId;
     const tokenUserId = getUserIdFromRequest(req);
-    const userId = tokenUserId || providedUserId || null;
-
-    const {
+    let {
+      userId: providedUserId,
       customer,
       email,
       phone,
@@ -54,13 +71,14 @@ export const createCheckoutSession = async (req, res) => {
       pickupDate,
       returnDate,
       amount,
+      paymentBreakdown,
       details,
       address,
       carImage,
-      currency
+      currency,
+      kyc
     } = req.body;
 
-    // Basic validation
     const total = Number(amount);
     if (!total || Number.isNaN(total) || total <= 0) return res.status(400).json({ success: false, message: "Invalid amount" });
     if (!email) return res.status(400).json({ success: false, message: "Email required" });
@@ -76,17 +94,16 @@ export const createCheckoutSession = async (req, res) => {
       try { carField = JSON.parse(car); } catch { carField = { name: car }; }
     }
 
-    // Ensure we have a valid userId for booking model (booking.userId is required)
-    if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized: missing user authentication' });
+    // Ensure userId (auth user or guest)
+    let finalUserId = tokenUserId || providedUserId || null;
+    if (!finalUserId) {
+      finalUserId = await getOrCreateGuestUser({ name: customer, email, phone });
     }
-
-    let finalUserId = userId;
     if (!mongoose.Types.ObjectId.isValid(finalUserId)) {
       return res.status(400).json({ success: false, message: 'Invalid userId format' });
     }
 
-    // --- NEW: if carField contains an id, fetch canonical Car and copy its companyId into carField and bookingCompanyId ---
+    // Enrich car with company
     let bookingCompanyId = null;
     try {
       const carRef = carField && (carField.id || carField._id);
@@ -96,19 +113,17 @@ export const createCheckoutSession = async (req, res) => {
         if (canonicalCar) {
           const canonicalCompany = canonicalCar.company || canonicalCar.companyId || null;
           if (canonicalCompany) {
-            // ensure carField has company info for snapshot
             carField = { ...(carField || {}), companyId: canonicalCompany, companyName: canonicalCar.companyName || (canonicalCar.company && canonicalCar.company.name) || "" };
             bookingCompanyId = canonicalCompany;
           }
         }
       }
     } catch (e) {
-      console.warn('createCheckoutSession: failed to fetch canonical Car for companyId:', e && e.message ? e.message : e);
+      console.warn('createRazorpayOrder: failed to fetch canonical Car for companyId:', e?.message || e);
     }
-    // --- end new section ---
 
-    // Create booking (pending) — include companyId top-level if we found it
-    let bookingInput = {
+    // Create pending booking
+    const bookingInput = {
       userId: finalUserId,
       customer: String(customer ?? ""),
       email: String(email ?? ""),
@@ -123,127 +138,80 @@ export const createCheckoutSession = async (req, res) => {
       address: typeof address === "string" ? JSON.parse(address) : (address || {}),
       status: "pending",
       currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+      paymentBreakdown: typeof paymentBreakdown === "string" ? JSON.parse(paymentBreakdown) : (paymentBreakdown || {}),
+      kyc: typeof kyc === "string" ? JSON.parse(kyc) : (kyc || {}),
+      paymentGateway: 'razorpay'
     };
     if (bookingCompanyId) bookingInput.companyId = bookingCompanyId;
 
-    let booking;
-    try {
-      booking = await Booking.create(bookingInput);
-    } catch (err) {
-      console.error('Booking.create failed:', err && err.stack ? err.stack : err);
-      return res.status(500).json({ success: false, message: 'Failed to create booking', error: String(err.message || err) });
-    }
+    const booking = await Booking.create(bookingInput);
 
-    let stripe;
-    try { stripe = getStripe(); } catch (err) {
-      await Booking.findByIdAndDelete(booking._id).catch(() => {});
-      console.error('Stripe config error:', err && err.stack ? err.stack : err);
-      return res.status(500).json({ success: false, message: 'Payment configuration error', error: String(err.message || err) });
-    }
+    const razorpay = getRazorpay();
+    const order = await razorpay.orders.create({
+      amount: Math.round(total * 100), // in paise
+      currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+      receipt: booking._id.toString(),
+      notes: {
+        bookingId: booking._id.toString(),
+        userId: String(finalUserId ?? ""),
+        carId: String((carField && (carField.id || carField._id)) || ""),
+        pickupDate: String(pickupDate || ""),
+        returnDate: String(returnDate || "")
+      }
+    });
 
-    let session;
-    try {
-      session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        mode: 'payment',
-        customer_email: email || undefined,
-        line_items: [
-          {
-            price_data: {
-              currency: (currency || DEFAULT_CURRENCY).toLowerCase(),
-              product_data: {
-                name: (carField && (carField.name || carField.title)) || "Car Rental",
-                description: `Rental ${pd.toISOString().split('T')[0]} → ${rd.toISOString().split('T')[0]}`,
-              },
-              unit_amount: Math.round(total * 100),
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: `${FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}&payment_status=success`,
-        cancel_url: `${FRONTEND_URL}/cancel?payment_status=cancelled`,
-        metadata: {
-          bookingId: booking._id.toString(),
-          userId: String(finalUserId ?? ""),
-          carId: String((carField && (carField.id || carField._id)) || ""),
-          pickupDate: String(pickupDate || ""),
-          returnDate: String(returnDate || ""),
-        },
-      });
-    } catch (stripeErr) {
-      console.error('Stripe session creation failed:', stripeErr && stripeErr.stack ? stripeErr.stack : stripeErr);
-      await Booking.findByIdAndDelete(booking._id).catch(() => {});
-      return res.status(500).json({ success: false, message: 'Failed to create Stripe checkout session', error: String(stripeErr.message || stripeErr) });
-    }
-
-    booking.sessionId = session.id;
-    booking.stripeSession = { id: session.id, url: session.url || null };
-    await booking.save().catch((err) => console.warn('Failed to save stripeSession on booking', err));
+    booking.razorpayOrderId = order.id;
+    await booking.save().catch((err) => console.warn('Failed to save razorpayOrderId on booking', err));
 
     return res.json({
       success: true,
-      id: session.id,
-      url: session.url,
-      bookingId: booking._id
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      bookingId: booking._id,
+      key: process.env.RAZORPAY_KEY_ID,
+      customer,
+      email,
+      phone,
+      redirect: {
+        success: `${FRONTEND_URL}/success?booking_id=${booking._id}&payment_status=success`,
+        cancel: `${FRONTEND_URL}/cancel?booking_id=${booking._id}&payment_status=cancelled`
+      }
     });
-
   } catch (error) {
-    console.error('Checkout Session Error', error && error.stack ? error.stack : error);
-    return res.status(500).json({ success: false, message: error.message || 'Internal server error' });
+    console.error('Razorpay Order Error', error?.stack || error);
+    return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(error?.message || error) });
   }
 };
 
-// Confirm payment endpoint (must be exported as named export)
-export const confirmPayment = async (req, res) => { 
+// Optional client-side verification (in addition to webhook)
+export const verifyRazorpayPayment = async (req, res) => {
   try {
-    const { session_id } = req.query;
-    if (!session_id) return res.status(400).json({ success: false, message: 'Session ID is required' });
-
-    let stripe;
-    try { stripe = getStripe(); } catch (err) {
-      return res.status(500).json({ success: false, message: 'Payment configuration error.', error: err.message });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body || {};
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
+      return res.status(400).json({ success: false, message: 'Missing payment verification fields' });
     }
 
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (!session) return res.status(404).json({ success: false, message: 'Session not found' });
+    const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const digest = hmac.digest('hex');
 
-    if (session.payment_status !== 'paid')
-      return res.status(400).json({ success: false, message: `Payment not completed. Status=${session.payment_status}`, session });
-
-    const bookingId = session.metadata?.bookingId;
-
-    let order = null;
-    if (bookingId) {
-      order = await Booking.findByIdAndUpdate(bookingId, {
-        paymentStatus: 'paid',
-        status: 'active',
-        paymentIntentId: session.payment_intent || '',
-        paymentDetails: {
-          amount_total: session.amount_total || null,
-          currency: session.currency || null
-        },
-      }, { new: true });
+    if (digest !== razorpay_signature) {
+      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
     }
 
-    if (!order) {
-      order = await Booking.findOneAndUpdate({ sessionId: session_id }, {
-        paymentStatus: 'paid',
-        status: 'active',
-        paymentIntentId: session.payment_intent || '',
-        paymentDetails: {
-          amount_total: session.amount_total || null,
-          currency: session.currency || null
-        },
-      }, { new: true });
-    }
+    await Booking.findByIdAndUpdate(bookingId, {
+      paymentStatus: 'paid',
+      status: 'active',
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature
+    });
 
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Booking not found for this session.' });
-    }
-
-    return res.json({ success: true, message: 'Payment confirmed', booking: order });
-  } catch (err) {
-    console.error('confirmPayment error', err);
-    return res.status(500).json({ success: false, message: err.message || 'Internal error' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('verifyRazorpayPayment error', error?.stack || error);
+    return res.status(500).json({ success: false, message: 'Payment verification failed', error: String(error?.message || error) });
   }
 };

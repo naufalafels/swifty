@@ -1,16 +1,19 @@
 import express from 'express';
-import { createCheckoutSession, confirmPayment } from '../controllers/paymentController.js';
-import { stripeWebhookHandler } from '../controllers/webhookController.js';
+import {
+  createRazorpayOrder,
+  verifyRazorpayPayment
+} from '../controllers/paymentController.js';
+import { razorpayWebhookHandler } from '../controllers/webhookController.js';
 
 const paymentRouter = express.Router();
 
-paymentRouter.post('/create-checkout-session', createCheckoutSession);
+// Create order + pending booking
+paymentRouter.post('/razorpay/order', createRazorpayOrder);
 
-// keep both endpoints as aliases so old clients still work
-paymentRouter.get('/confirm', confirmPayment);
-paymentRouter.get('/confirm-payment', confirmPayment);
+// Client-side verification hook (optional if you rely solely on webhooks)
+paymentRouter.post('/razorpay/verify', verifyRazorpayPayment);
 
-// webhook endpoint (Stripe will POST here)
-paymentRouter.post('/webhook', stripeWebhookHandler);
+// Razorpay webhook
+paymentRouter.post('/razorpay/webhook', razorpayWebhookHandler);
 
 export default paymentRouter;

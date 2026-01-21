@@ -14,7 +14,7 @@ import carRouter from './routes/carRoutes.js';
 import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
-import companyRouter from './routes/companyRoutes.js'; // NEW
+import companyRouter from './routes/companyRoutes.js';
 
 dotenv.config();
 
@@ -26,7 +26,6 @@ const __dirname = path.dirname(__filename);
 
 connectDB();
 
-// Middleware we need BEFORE body parsers for special routes (Stripe webhook requires raw body)
 app.use(cookieParser());
 
 // Serve uploads static files (allow cross origin)
@@ -39,8 +38,8 @@ app.use(
   express.static(path.join(process.cwd(), 'uploads'))
 );
 
-// IMPORTANT: mount raw body parser for Stripe webhook BEFORE express.json()
-app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+// Raw body for Razorpay webhook
+app.use('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }));
 
 // General middlewares
 app.use(cors({ origin: true, credentials: true }));
@@ -53,17 +52,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ROUTES
-app.use('/api/auth', userRouter); // auth routes
+app.use('/api/auth', userRouter);
 app.use('/api/cars', carRouter);
 app.use('/api/bookings', bookingRouter);
-
-// Mount payment router (webhook path already handled above by raw parser)
 app.use('/api/payments', paymentRouter);
-
-// Admin routes (protected by auth middleware inside the routes)
 app.use('/api/admin', adminRouter);
-
-// Public companies lookup (new)
 app.use('/api/companies', companyRouter);
 
 // health / ping route
@@ -74,7 +67,6 @@ app.get('/', (req, res) => {
   res.send('API WORKING');
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`Server started on http://localhost:${PORT}`);
 });

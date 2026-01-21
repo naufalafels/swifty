@@ -1,8 +1,11 @@
 import mongoose from "mongoose";
 import Booking from "../models/bookingModel.js";
 import Car from "../models/carModel.js";
+import User from "../models/userModel.js";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 const BLOCKING_STATUSES = ["pending", "active", "upcoming"];
@@ -102,6 +105,25 @@ async function updateCarStatusBasedOnBookings(carId, session = null) {
   await Car.findByIdAndUpdate(carId, { status: newStatus }, { session });
 }
 
+// Create or reuse a guest user so bookings always have a userId
+const getOrCreateGuestUser = async ({ name, email, phone }) => {
+  if (!email) throw new Error("Email is required for guest booking");
+  const existing = await User.findOne({ email }).lean();
+  if (existing) return existing._id;
+
+  const password = crypto.randomBytes(12).toString("hex");
+  const hashed = await bcrypt.hash(password, 10);
+
+  const guest = await User.create({
+    name: name || "Guest",
+    email,
+    phone: phone || "",
+    password: hashed,
+    role: "guest",
+  });
+  return guest._id;
+};
+
 // CREATE BOOKING
 export const createBooking = async (req, res) => {
   const session = await mongoose.startSession();
@@ -180,9 +202,17 @@ export const createBooking = async (req, res) => {
       }
     }
 
+    // Determine userId: auth user or guest
+    let userId = null;
+    if (req.user && (req.user.id || req.user._id)) {
+      userId = req.user.id || req.user._id;
+    } else {
+      userId = await getOrCreateGuestUser({ name: customer, email, phone });
+    }
+
     // Compose bookingData. Embed car snapshot with company info if available.
     const bookingData = {
-      userId: req.user && (req.user.id || req.user._id) ? (req.user.id || req.user._id) : null,
+      userId,
       customer,
       email,
       phone,

@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
   // multi-tenant fields
   role: {
     type: String,
-    enum: ['user', 'company_admin', 'superadmin'],
+    enum: ['user', 'company_admin', 'superadmin', 'guest'],
     default: 'user'
   },
   companyId: {

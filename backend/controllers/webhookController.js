@@ -9,6 +9,29 @@ const verifySignature = (rawBody, signature, secret) => {
   return expected === signature;
 };
 
+// Extract helpers (covers payment/refund payload shapes)
+const getOrderAndPaymentIds = (payload = {}) => {
+  const paymentEntity = payload.payment?.entity || {};
+  const orderEntity = payload.order?.entity || {};
+  const refundEntity = payload.refund?.entity || {};
+
+  const razorpayOrderId =
+    paymentEntity.order_id ||
+    orderEntity.id ||
+    refundEntity.order_id ||
+    '';
+
+  const razorpayPaymentId =
+    paymentEntity.id ||
+    paymentEntity.payment_id ||
+    refundEntity.payment_id ||
+    '';
+
+  const razorpayRefundId = refundEntity.id || '';
+
+  return { razorpayOrderId, razorpayPaymentId, razorpayRefundId };
+};
+
 export const razorpayWebhookHandler = async (req, res) => {
   try {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
@@ -29,12 +52,10 @@ export const razorpayWebhookHandler = async (req, res) => {
     }
 
     const event = JSON.parse(rawBody.toString());
+    const { razorpayOrderId, razorpayPaymentId, razorpayRefundId } = getOrderAndPaymentIds(event.payload || {});
 
+    // Payments captured / orders paid -> mark active/paid
     if (event.event === 'payment.captured' || event.event === 'order.paid') {
-      const payload = event.payload?.payment?.entity || event.payload?.order?.entity || {};
-      const razorpayOrderId = payload.order_id || payload.id || '';
-      const razorpayPaymentId = payload.id || payload.payment_id || '';
-
       if (razorpayOrderId) {
         await Booking.findOneAndUpdate(
           { razorpayOrderId },
@@ -46,8 +67,70 @@ export const razorpayWebhookHandler = async (req, res) => {
           }
         );
       }
+      return res.json({ received: true });
     }
 
+    // Payment failed -> mark failed/cancelled but keep record
+    if (event.event === 'payment.failed') {
+      if (razorpayOrderId) {
+        await Booking.findOneAndUpdate(
+          { razorpayOrderId },
+          {
+            paymentStatus: 'failed',
+            status: 'cancelled',
+            razorpayPaymentId,
+            razorpaySignature: signature
+          }
+        );
+      }
+      return res.json({ received: true });
+    }
+
+    // Refund processed -> mark refunded/cancelled (24h cancellation promise)
+    if (event.event === 'refund.processed') {
+      if (razorpayOrderId || razorpayPaymentId) {
+        await Booking.findOneAndUpdate(
+          {
+            $or: [
+              { razorpayOrderId: razorpayOrderId || undefined },
+              { razorpayPaymentId: razorpayPaymentId || undefined }
+            ]
+          },
+          {
+            paymentStatus: 'refunded',
+            status: 'cancelled',
+            razorpayPaymentId,
+            razorpaySignature: signature,
+            refundId: razorpayRefundId || ''
+          }
+        );
+      }
+      return res.json({ received: true });
+    }
+
+    // Refund failed -> flag for manual attention
+    if (event.event === 'refund.failed') {
+      if (razorpayOrderId || razorpayPaymentId) {
+        await Booking.findOneAndUpdate(
+          {
+            $or: [
+              { razorpayOrderId: razorpayOrderId || undefined },
+              { razorpayPaymentId: razorpayPaymentId || undefined }
+            ]
+          },
+          {
+            paymentStatus: 'refund_failed',
+            razorpayPaymentId,
+            razorpaySignature: signature,
+            refundId: razorpayRefundId || ''
+          }
+        );
+      }
+      return res.json({ received: true });
+    }
+
+    // Unhandled events: acknowledge to avoid retries, but log
+    console.info('Unhandled Razorpay event', event.event);
     return res.json({ received: true });
   } catch (err) {
     console.error('Webhook handler error:', err);

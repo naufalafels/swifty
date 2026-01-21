@@ -44,8 +44,9 @@ const bookingSchema = new Schema({
   returnDate: { type: Date, required: true },
   bookingDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['pending', 'active', 'completed', 'cancelled', 'upcoming'], default: 'pending' },
+
   amount: { type: Number, default: 0 },
-  paymentStatus: { type: String, enum: ['pending', 'paid'], default: 'pending' },
+  paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded', 'refund_failed'], default: 'pending' },
   paymentGateway: { type: String, enum: ['razorpay'], default: 'razorpay' },
   currency: { type: String, default: 'MYR' },
   paymentBreakdown: { type: paymentBreakdownSchema, default: () => ({}) },
@@ -54,6 +55,7 @@ const bookingSchema = new Schema({
   razorpayOrderId: { type: String, default: "" },
   razorpayPaymentId: { type: String, default: "" },
   razorpaySignature: { type: String, default: "" },
+  refundId: { type: String, default: "" }, // new: track refund identifier
 
   sessionId: String, // legacy stripe field (unused)
   paymentIntentId: String, // legacy stripe field (unused)

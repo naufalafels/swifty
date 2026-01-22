@@ -64,7 +64,6 @@ function buildCarSummary(src) {
   let companyName = null;
 
   if (src.company) {
-    // company may be string id or object
     if (typeof src.company === "string") companyId = src.company;
     else if (src.company._id || src.company.id) companyId = idToString(src.company._id || src.company.id);
     if (src.company.name) companyName = src.company.name;
@@ -84,7 +83,6 @@ function buildCarSummary(src) {
     fuelType: src.fuelType || src.fuel || null,
     mileage: src.mileage ? Number(src.mileage) : null,
     image: src.image || src.carImage || "",
-    // keep companyId as string here; we'll convert to ObjectId when saving top-level or nested fields where appropriate
     companyId: companyId ? String(companyId) : null,
     companyName: companyName || "",
   };
@@ -147,7 +145,6 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid pickup or return date" });
     }
 
-    // Determine car summary and company info
     let carSummary = null;
     if (typeof car === "string" && /^[0-9a-fA-F]{24}$/.test(car)) {
       const carDoc = await Car.findById(car).session(session).lean();
@@ -157,7 +154,6 @@ export const createBooking = async (req, res) => {
         return res.status(404).json({ success: false, message: "Car not found" });
       }
       carSummary = buildCarSummary(carDoc);
-      // If company on carDoc is populated in some shape, prefer it
       if (!carSummary.companyId && (carDoc.company || carDoc.companyId)) {
         const c = carDoc.company || carDoc.companyId;
         carSummary.companyId = idToString(c);
@@ -187,7 +183,6 @@ export const createBooking = async (req, res) => {
 
     const carId = carSummary.id;
 
-    // Defensive: ensure company info comes from canonical Car record when available
     if (carSummary.id) {
       try {
         const canonicalCar = await Car.findById(carSummary.id).session(session).lean();
@@ -197,12 +192,10 @@ export const createBooking = async (req, res) => {
           carSummary.companyName = canonicalCar.companyName || (canonicalCar.company && canonicalCar.company.name) || carSummary.companyName || "";
         }
       } catch (e) {
-        // non-fatal: proceed with whatever company info we have
         console.warn("createBooking: failed to fetch canonical car for companyId:", e);
       }
     }
 
-    // Determine userId: auth user or guest
     let userId = null;
     if (req.user && (req.user.id || req.user._id)) {
       userId = req.user.id || req.user._id;
@@ -210,21 +203,18 @@ export const createBooking = async (req, res) => {
       userId = await getOrCreateGuestUser({ name: customer, email, phone });
     }
 
-    // Compose bookingData. Embed car snapshot with company info if available.
     const bookingData = {
       userId,
       customer,
       email,
       phone,
       car: {
-        // try to store id as ObjectId if valid
         id: carSummary.id && mongoose.Types.ObjectId.isValid(carSummary.id) ? mongoose.Types.ObjectId(carSummary.id) : carSummary.id,
         make: carSummary.make,
         model: carSummary.model,
         year: carSummary.year,
         dailyRate: carSummary.dailyRate,
         image: carSummary.image,
-        // nested company fields: store as ObjectId if valid, else null (Mongoose will store according to schema)
         companyId: carSummary.companyId && mongoose.Types.ObjectId.isValid(carSummary.companyId) ? mongoose.Types.ObjectId(carSummary.companyId) : (carSummary.companyId || null),
         companyName: carSummary.companyName || "",
       },
@@ -238,17 +228,14 @@ export const createBooking = async (req, res) => {
       status: "pending",
     };
 
-    // Top-level companyId (for admin filters) — set as ObjectId if possible
     if (carSummary.companyId) {
       const oid = toObjectIdIfValid(carSummary.companyId);
       bookingData.companyId = oid || null;
     }
 
-    // Create booking document inside transaction
     const createdArr = await Booking.create([bookingData], { session });
     const createdBooking = createdArr[0];
 
-    // create booking entry for car document
     const bookingEntry = {
       bookingId: createdBooking._id,
       pickupDate: createdBooking.pickupDate,
@@ -256,7 +243,6 @@ export const createBooking = async (req, res) => {
       status: createdBooking.status,
     };
 
-    // Atomically push to car.bookings only if no overlapping blocking bookings exist
     const carUpdate = await Car.findOneAndUpdate(
       {
         _id: carId,
@@ -275,13 +261,11 @@ export const createBooking = async (req, res) => {
     );
 
     if (!carUpdate) {
-      // Conflict found, abort
       await session.abortTransaction();
       session.endSession();
       return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
     }
 
-    // Recompute car.status
     await updateCarStatusBasedOnBookings(carId, session);
 
     await session.commitTransaction();
@@ -323,7 +307,6 @@ export const getBookings = async (req, res, next) => {
 
     if (companyFilter) {
       if (/^[0-9a-fA-F]{24}$/.test(companyFilter)) {
-        // try top-level first, fallback to snapshot
         query.$or = query.$or || [];
         query.$or.push({ companyId: companyFilter }, { "car.companyId": companyFilter });
       } else {
@@ -404,7 +387,6 @@ export const updateBooking = async (req, res, next) => {
 
     const prevCarId = booking.car && (booking.car.id ? idToString(booking.car.id) : null);
 
-    // image handling
     if (req.file) {
       if (booking.carImage && booking.carImage.startsWith("/uploads/")) deleteLocalFileIfPresent(booking.carImage);
       booking.carImage = `/uploads/${req.file.filename}`;
@@ -429,7 +411,6 @@ export const updateBooking = async (req, res, next) => {
           if (!summary.id && booking.car && booking.car.id) summary.id = idToString(booking.car.id);
           if (!summary.companyId && booking.car && booking.car.companyId) summary.companyId = idToString(booking.car.companyId);
           if (!summary.companyName && booking.car && booking.car.companyName) summary.companyName = booking.car.companyName || "";
-          // assign snapshot fields
           booking.car = {
             id: summary.id && mongoose.Types.ObjectId.isValid(summary.id) ? mongoose.Types.ObjectId(summary.id) : summary.id,
             make: summary.make,
@@ -441,7 +422,6 @@ export const updateBooking = async (req, res, next) => {
             companyName: summary.companyName || "",
           };
 
-          // Defensive: if we have a car id, ensure companyId comes from canonical Car record when available
           if (summary.id) {
             try {
               const canonicalCar = await Car.findById(summary.id).session(session).lean();
@@ -450,7 +430,6 @@ export const updateBooking = async (req, res, next) => {
                 booking.car.companyId = (cval && mongoose.Types.ObjectId.isValid(cval)) ? mongoose.Types.ObjectId(cval) : (cval || booking.car.companyId);
                 booking.companyId = toObjectIdIfValid(cval) || booking.companyId || null;
               } else {
-                // keep top-level companyId in sync with snapshot if present
                 if (summary.companyId) {
                   booking.companyId = toObjectIdIfValid(summary.companyId) || null;
                 } else {
@@ -466,7 +445,6 @@ export const updateBooking = async (req, res, next) => {
               }
             }
           } else {
-            // keep top-level companyId in sync
             if (summary.companyId) {
               booking.companyId = toObjectIdIfValid(summary.companyId) || null;
             } else {
@@ -479,7 +457,6 @@ export const updateBooking = async (req, res, next) => {
       }
     }
 
-    // If dates or car changed, ensure no overlap on new car
     const newCarId = booking.car && booking.car.id ? idToString(booking.car.id) : null;
     const pickup = booking.pickupDate;
     const ret = booking.returnDate;
@@ -500,7 +477,6 @@ export const updateBooking = async (req, res, next) => {
 
     const updated = await booking.save({ session });
 
-    // If car changed, move booking entry between cars
     if (prevCarId && prevCarId !== newCarId) {
       await Car.findByIdAndUpdate(prevCarId, { $pull: { bookings: { bookingId: updated._id } } }, { session });
       const bookingEntry = { bookingId: updated._id, pickupDate: updated.pickupDate, returnDate: updated.returnDate, status: updated.status };
@@ -526,7 +502,6 @@ export const updateBooking = async (req, res, next) => {
         return res.status(409).json({ success: false, message: "Updated booking conflicts with existing booking on target car" });
       }
 
-      // ensure top-level companyId updated from snapshot
       const newCompanyId = updated.car && updated.car.companyId ? idToString(updated.car.companyId) : null;
       if (newCompanyId) {
         updated.companyId = toObjectIdIfValid(newCompanyId) || null;
@@ -539,13 +514,11 @@ export const updateBooking = async (req, res, next) => {
       await updateCarStatusBasedOnBookings(prevCarId, session);
       await updateCarStatusBasedOnBookings(newCarId, session);
     } else {
-      // update bookings entry inside car doc if present, and recompute status
       try {
         if (newCarId) {
           await Car.findByIdAndUpdate(newCarId, { $set: { "bookings.$[elem].status": updated.status, "bookings.$[elem].pickupDate": updated.pickupDate, "bookings.$[elem].returnDate": updated.returnDate } }, { arrayFilters: [{ "elem.bookingId": updated._id }], session });
         }
       } catch (e) {
-        // ignore
       }
       await updateCarStatusBasedOnBookings(newCarId, session);
     }
@@ -561,7 +534,7 @@ export const updateBooking = async (req, res, next) => {
   }
 };
 
-// UPDATE STATUS
+// UPDATE STATUS (auth required & must own booking)
 export const updateBookingStatus = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -572,11 +545,25 @@ export const updateBookingStatus = async (req, res, next) => {
       session.endSession();
       return res.status(400).json({ message: "Status is required" });
     }
+    if (!req.user || !(req.user.id || req.user._id)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const booking = await Booking.findById(req.params.id).session(session);
     if (!booking) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const bookingUserId = booking.userId ? String(booking.userId) : null;
+    const requesterId = String(req.user.id || req.user._id || "");
+    if (!bookingUserId || bookingUserId !== requesterId) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({ message: "Forbidden: not your booking" });
     }
 
     booking.status = status;
@@ -588,7 +575,6 @@ export const updateBookingStatus = async (req, res, next) => {
         await Car.findByIdAndUpdate(carId, { $set: { "bookings.$[elem].status": status } }, { arrayFilters: [{ "elem.bookingId": booking._id }], session });
       }
     } catch (e) {
-      // ignore
     }
 
     const carId = booking.car && booking.car.id ? idToString(booking.car.id) : null;

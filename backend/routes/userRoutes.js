@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, register, refresh, logout, me } from '../controllers/userController.js';
+import { login, register, refresh, logout, me, submitKyc, getKyc, becomeHost, hostGetRenterKyc } from '../controllers/userController.js';
 import authMiddleware from '../middlewares/auth.js';
 
 const userRouter = express.Router();
@@ -8,11 +8,21 @@ const userRouter = express.Router();
 userRouter.post('/login', login);
 userRouter.post('/register', register);
 
-// Refresh and logout (works with HttpOnly cookie)
+// Refresh and logout
 userRouter.post('/refresh', refresh);
 userRouter.post('/logout', logout);
 
-// Protected: get current user profile
+// Protected: profile
 userRouter.get('/me', authMiddleware, me);
+
+// Protected: renter KYC
+userRouter.post('/kyc', authMiddleware, submitKyc);
+userRouter.get('/kyc', authMiddleware, getKyc);
+
+// Protected: become host
+userRouter.post('/host/onboard', authMiddleware, becomeHost);
+
+// Protected: host fetch renter KYC by userId
+userRouter.get('/host/kyc/:userId', authMiddleware, hostGetRenterKyc);
 
 export default userRouter;

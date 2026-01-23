@@ -9,8 +9,7 @@ import mongoose from 'mongoose';
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
-const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m'; // short lived
-// Default refresh token lifetime in days (set to 1 day by default)
+const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m';
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 1);
 const REFRESH_TOKEN_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:7889';
@@ -20,7 +19,7 @@ function createAccessToken(userId, extra = {}) {
 }
 
 function generateRefreshToken() {
-  return crypto.randomBytes(64).toString('hex'); // opaque token
+  return crypto.randomBytes(64).toString('hex');
 }
 
 function hashToken(token) {
@@ -55,45 +54,34 @@ async function findRefreshTokenDoc(token) {
   return doc || null;
 }
 
-/**
- * Set refresh cookie in response
- */
 function setRefreshCookie(res, token, maxAgeSec) {
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    // Lax works for most flows; if you need cross-site cookies (e.g. different domain),
-    // you'd set SameSite='none' and secure=true on production with HTTPS.
     sameSite: 'lax',
     maxAge: maxAgeSec * 1000,
-    path: '/', // allow refresh calls from any path under same origin
+    path: '/',
   };
   res.cookie(REFRESH_TOKEN_COOKIE_NAME, token, cookieOptions);
 }
 
-/**
- * Clear refresh cookie
- */
 function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/' });
 }
 
-/**
- * Helper to build user response object
- */
 function userResponse(user) {
   return {
     id: user._id,
     name: user.name,
     email: user.email,
     role: user.role,
+    roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
     companyId: user.companyId || null,
+    kyc: user.kyc || { status: 'not_submitted' },
+    isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
   };
 }
 
-/**
- * REGISTER
- */
 export async function register(req, res) {
   try {
     const name = String(req.body.name || "").trim();
@@ -124,16 +112,14 @@ export async function register(req, res) {
       name,
       email,
       password: hashedPassword,
+      roles: ['renter'],
     });
     await user.save();
 
-    // Issue tokens: access token + refresh cookie
     const accessToken = createAccessToken(newId.toString());
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     await saveRefreshToken({ token: refreshToken, userId: newId, expiresAt, createdByIp: req.ip || '' });
-
-    // set cookie (persistent, HttpOnly)
     setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
     return res.status(201).json({
@@ -151,9 +137,6 @@ export async function register(req, res) {
   }
 }
 
-/**
- * LOGIN
- */
 export async function login(req, res) {
   try {
     const emailRaw = String(req.body.email || "").trim();
@@ -170,12 +153,14 @@ export async function login(req, res) {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid password!' });
 
-    const accessToken = createAccessToken(user._id.toString());
+    const accessToken = createAccessToken(user._id.toString(), {
+      role: user.role,
+      companyId: user.companyId || null,
+      roles: user.roles || ['renter'],
+    });
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     await saveRefreshToken({ token: refreshToken, userId: user._id, expiresAt, createdByIp: req.ip || '' });
-
-    // set HttpOnly cookie with refresh token
     setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
     return res.status(200).json({
@@ -190,10 +175,6 @@ export async function login(req, res) {
   }
 }
 
-/**
- * REFRESH
- * Rotates refresh tokens. Expects client to send cookie named REFRESH_TOKEN_COOKIE_NAME.
- */
 export async function refresh(req, res) {
   try {
     const token = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -201,13 +182,10 @@ export async function refresh(req, res) {
 
     const saved = await findRefreshTokenDoc(token);
     if (!saved) {
-      // token not found => possible reuse or invalid token
       return res.status(401).json({ success: false, message: 'Invalid refresh token' });
     }
 
-    // check expiry & revocation
     if (saved.revoked) {
-      // token reuse detected: revoke all tokens for user and require login
       await revokeAllUserRefreshTokens(saved.userId);
       clearRefreshCookie(res);
       return res.status(401).json({ success: false, message: 'Refresh token revoked. Please login again.' });
@@ -219,21 +197,16 @@ export async function refresh(req, res) {
       return res.status(401).json({ success: false, message: 'Refresh token expired. Please login again.' });
     }
 
-    // Rotate: create new refresh token, mark old as revoked & replacedByToken
     const newToken = generateRefreshToken();
     const newExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     await saveRefreshToken({ token: newToken, userId: saved.userId, expiresAt: newExpiresAt, createdByIp: req.ip || '' });
+    await RefreshToken.findOneAndUpdate(
+      { tokenHash: saved.tokenHash },
+      { revoked: true, replacedByToken: hashToken(newToken), revokedByIp: req.ip || '' }
+    ).exec();
 
-    // mark old as revoked and point to new
-    await RefreshToken.findOneAndUpdate({ tokenHash: saved.tokenHash }, { revoked: true, replacedByToken: hashToken(newToken), revokedByIp: req.ip || '' }).exec();
-
-    // issue new access token
     const accessToken = createAccessToken(saved.userId.toString());
-
-    // set new cookie
     setRefreshCookie(res, newToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
-
-    // optionally return user profile
     const user = await User.findById(saved.userId).lean();
     return res.json({ success: true, accessToken, user: user ? userResponse(user) : null });
   } catch (err) {
@@ -242,10 +215,6 @@ export async function refresh(req, res) {
   }
 }
 
-/**
- * LOGOUT
- * Revokes refresh token in cookie (if any) and clears cookie.
- */
 export async function logout(req, res) {
   try {
     const token = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -264,10 +233,6 @@ export async function logout(req, res) {
   }
 }
 
-/**
- * ME endpoint (protected)
- * Returns current user's profile. auth middleware attaches req.user.
- */
 export async function me(req, res) {
   try {
     if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -276,6 +241,129 @@ export async function me(req, res) {
     return res.json({ success: true, user: userResponse(user) });
   } catch (err) {
     console.error('Me error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+/** Renter: submit KYC (NRIC/Passport only) */
+export async function submitKyc(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const idType = String(req.body.idType || 'passport').toLowerCase();
+    if (!['passport', 'nric'].includes(idType)) {
+      return res.status(400).json({ success: false, message: 'idType must be passport or nric' });
+    }
+
+    const idNumber = String(req.body.idNumber || '').trim();
+    const idCountry = String(req.body.idCountry || 'MY').trim() || 'MY';
+    const frontImageUrl = String(req.body.frontImageUrl || '').trim();
+    const backImageUrl = String(req.body.backImageUrl || '').trim();
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.kyc = {
+      idType,
+      idNumber,
+      idCountry,
+      frontImageUrl,
+      backImageUrl,
+      status: 'pending',
+      statusReason: '',
+      submittedAt: new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
+    };
+
+    await user.save();
+    return res.json({ success: true, message: 'KYC submitted for host review', kyc: user.kyc });
+  } catch (err) {
+    console.error('submitKyc error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+/** Renter: get own KYC */
+export async function getKyc(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(userId).lean();
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    return res.json({ success: true, kyc: user.kyc || { status: 'not_submitted' } });
+  } catch (err) {
+    console.error('getKyc error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+/** Become a host */
+export async function becomeHost(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+    user.roles = roles;
+
+    user.hostProfile = {
+      payoutProvider: 'razorpay_curlec_my',
+      payoutAccountRef,
+      notes,
+      onboardingCompletedAt: new Date(),
+    };
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Host role enabled. You can now list cars; renter KYC will be shown to you for in-person validation.',
+      user: userResponse(user),
+    });
+  } catch (err) {
+    console.error('becomeHost error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+/** Host: fetch renter KYC by userId (for in-person validation) */
+export async function hostGetRenterKyc(req, res) {
+  try {
+    const hostRoles = req.user?.roles || [];
+    const legacy = req.user?.role;
+    const isHost = hostRoles.includes('host') || legacy === 'company_admin' || legacy === 'superadmin';
+    if (!isHost) return res.status(403).json({ success: false, message: 'Forbidden' });
+
+    const renterId = req.params?.userId;
+    if (!renterId || !mongoose.Types.ObjectId.isValid(renterId)) {
+      return res.status(400).json({ success: false, message: 'Invalid userId' });
+    }
+
+    const renter = await User.findById(renterId).lean();
+    if (!renter) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Only return KYC metadata, not password, etc.
+    return res.json({
+      success: true,
+      renter: {
+        id: renter._id,
+        name: renter.name,
+        email: renter.email,
+        kyc: renter.kyc || { status: 'not_submitted' },
+      },
+    });
+  } catch (err) {
+    console.error('hostGetRenterKyc error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }

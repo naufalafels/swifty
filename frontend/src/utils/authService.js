@@ -38,11 +38,10 @@ function scheduleRefreshFromToken(token) {
     const expMs = payload.exp * 1000;
     const now = Date.now();
     const msUntilExp = expMs - now;
-    const refreshBeforeMs = 30 * 1000; // refresh 30s before expiry
+    const refreshBeforeMs = 30 * 1000;
     let timeout = Math.max(2000, msUntilExp - refreshBeforeMs);
     if (msUntilExp <= 2000) timeout = 2000;
 
-    // clear any existing timer
     if (refreshTimerId) {
       clearTimeout(refreshTimerId);
       refreshTimerId = null;
@@ -52,7 +51,6 @@ function scheduleRefreshFromToken(token) {
       try {
         const r = await refresh();
         if (!(r && r.ok)) {
-          // failed refresh -> clear session
           accessToken = null;
           currentUser = null;
           if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
@@ -64,7 +62,7 @@ function scheduleRefreshFromToken(token) {
       }
     }, timeout);
   } catch {
-    // ignore scheduling errors
+    // ignore
   }
 }
 
@@ -92,12 +90,6 @@ export const clearLocalSession = () => {
 };
 
 /* Auth API calls */
-
-/**
- * login(credentials)
- * - POST /api/auth/login
- * - Server sets HttpOnly refresh cookie and returns access token + user
- */
 export const login = async (credentials) => {
   const url = `${API_BASE}/api/auth/login`;
   const res = await axios.post(url, credentials, {
@@ -112,15 +104,11 @@ export const login = async (credentials) => {
   return data;
 };
 
-/**
- * register(payload)
- * - POST /api/auth/register (if you use a different route adjust accordingly)
- */
-export const register = async (payload, isFormData = false) => {
+export const register = async (payload) => {
   const url = `${API_BASE}/api/auth/register`;
   const res = await axios.post(url, payload, {
     withCredentials: true,
-    headers: isFormData ? {} : { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
   });
   const data = res.data || {};
   const token = data.accessToken || data.token || null;
@@ -130,12 +118,6 @@ export const register = async (payload, isFormData = false) => {
   return data;
 };
 
-/**
- * refresh()
- * - POST /api/auth/refresh
- * - Server should read refresh cookie and return new accessToken and optionally user
- * - De-duplicated so parallel calls share same promise
- */
 export const refresh = async () => {
   if (refreshing) return refreshing;
   refreshing = (async () => {
@@ -144,12 +126,14 @@ export const refresh = async () => {
       const res = await axios.post(url, {}, { withCredentials: true });
       const data = res.data || {};
       const token = data.accessToken || data.token || null;
-      const user = data.user || null;
-      setAccessToken(token);
-      if (user) setCurrentUser(user);
+      if (token) {
+        setAccessToken(token);
+        if (data.user) setCurrentUser(data.user);
+      } else {
+        clearLocalSession();
+      }
       return { ok: true, data };
     } catch (err) {
-      // clear local memory state on refresh failure
       clearLocalSession();
       return { ok: false, err };
     } finally {
@@ -159,28 +143,49 @@ export const refresh = async () => {
   return refreshing;
 };
 
-/**
- * ensureAuth(): make sure access token is available, otherwise attempt refresh
- * returns boolean: true if access token is present or obtained, false otherwise
- */
-export const ensureAuth = async () => {
-  if (getAccessToken()) return true;
-  const r = await refresh();
-  return !!(r && r.ok && getAccessToken());
-};
-
-/**
- * logout()
- * - POST /api/auth/logout (server should clear HttpOnly refresh cookie and revoke tokens)
- * - Clear in-memory tokens regardless of server result
- */
 export const logout = async () => {
   try {
     const url = `${API_BASE}/api/auth/logout`;
-    await axios.post(url, {}, { withCredentials: true, timeout: 3000 });
-  } catch (err) {
-    // ignore network errors
-  } finally {
-    clearLocalSession();
+    await axios.post(url, {}, { withCredentials: true });
+  } catch {}
+  clearLocalSession();
+};
+
+export const ensureAuth = async () => {
+  if (accessToken && currentUser) return currentUser;
+  const { ok, data } = await refresh();
+  if (ok && data?.user && data?.accessToken) {
+    return data.user;
   }
+  return null;
+};
+
+function authHeaders() {
+  const token = getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/* KYC + Host APIs */
+export const submitKyc = async (payload) => {
+  const url = `${API_BASE}/api/auth/kyc`;
+  const res = await axios.post(url, payload, { headers: { ...authHeaders(), "Content-Type": "application/json" } });
+  return res.data;
+};
+
+export const getKyc = async () => {
+  const url = `${API_BASE}/api/auth/kyc`;
+  const res = await axios.get(url, { headers: authHeaders() });
+  return res.data;
+};
+
+export const becomeHost = async (payload) => {
+  const url = `${API_BASE}/api/auth/host/onboard`;
+  const res = await axios.post(url, payload, { headers: { ...authHeaders(), "Content-Type": "application/json" } });
+  return res.data;
+};
+
+export const hostGetRenterKyc = async (userId) => {
+  const url = `${API_BASE}/api/auth/host/kyc/${userId}`;
+  const res = await axios.get(url, { headers: authHeaders() });
+  return res.data;
 };

@@ -5,7 +5,7 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 
-// Verifies token and attaches req.user = { id, name, email, role, companyId }
+// Verifies token and attaches req.user = { id, name, email, role, roles, companyId }
 export default async function authMiddleware(req, res, next) {
   try {
     const auth = req.headers?.authorization || req.headers?.Authorization;
@@ -27,19 +27,18 @@ export default async function authMiddleware(req, res, next) {
       return res.status(401).json({ success: false, message: 'Invalid authentication token' });
     }
 
-    // If token already contains role/companyId, attach
-    if (payload && (payload.role || payload.companyId)) {
+    if (payload && (payload.role || payload.companyId || payload.roles)) {
       req.user = {
         id: payload.id || payload._id,
         name: payload.name || null,
         email: payload.email || null,
         role: payload.role || 'user',
+        roles: payload.roles || ['renter'],
         companyId: payload.companyId || null
       };
       return next();
     }
 
-    // Otherwise load user from DB to get latest role/companyId
     const userId = payload?.id || payload?._id;
     if (!userId) return res.status(401).json({ success: false, message: 'Invalid token payload' });
 
@@ -51,6 +50,7 @@ export default async function authMiddleware(req, res, next) {
       name: user.name,
       email: user.email,
       role: user.role || 'user',
+      roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
       companyId: user.companyId || null
     };
 
@@ -59,4 +59,18 @@ export default async function authMiddleware(req, res, next) {
     console.error('Auth middleware error', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
+}
+
+// Role guard helper
+export function requireRoles(allowed = []) {
+  return (req, res, next) => {
+    const userRoles = req.user?.roles || [];
+    const legacyRole = req.user?.role;
+    const ok =
+      userRoles.some(r => allowed.includes(r)) ||
+      (legacyRole === 'company_admin' && allowed.includes('host')) ||
+      (legacyRole === 'superadmin' && allowed.includes('admin'));
+    if (!ok) return res.status(403).json({ success: false, message: 'Forbidden' });
+    next();
+  };
 }

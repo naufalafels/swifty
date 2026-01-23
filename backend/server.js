@@ -15,6 +15,7 @@ import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import companyRouter from './routes/companyRoutes.js';
+import hostRouter from './routes/hostRoutes.js';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/bookings', bookingRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/companies', companyRouter);
+app.use('/api/host', hostRouter);
 
 // health / ping route
 app.get('/api/ping', (req, res) => res.json({ ok: true, time: Date.now() }));

@@ -157,9 +157,12 @@ const Navbar = () => {
 
   const isHost = Array.isArray(user?.roles) && user.roles.includes("host");
 
+  // If host -> host dashboard, if logged-in non-host -> onboard, if guest -> login then dashboard
   const goHost = () => {
     if (!isLoggedIn) {
-      navigate("/login", { replace: false, state: { from: "/host/onboard" } });
+      navigate("/login", { replace: false, state: { from: "/host/dashboard" } });
+    } else if (isHost) {
+      navigate("/host/dashboard");
     } else {
       navigate("/host/onboard");
     }

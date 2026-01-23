@@ -11,6 +11,7 @@ import VerifyPaymentPage from './pages/VerifyPaymentPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import KycPage from './pages/KycPage';
 import HostOnboardPage from './pages/HostOnboardPage';
+import HostDashboard from './pages/HostDashboard';
 import * as authService from './utils/authService';
 
 // PROTECTED ROUTE that supports async token refresh on page load
@@ -113,11 +114,20 @@ const App = () => {
           }
         />
 
-        {/* Host onboarding + KYC lookup */}
+        {/* Host onboarding */}
         <Route path='/host/onboard'
           element={
             <ProtectedRoute>
               <HostOnboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Host dashboard */}
+        <Route path='/host/dashboard'
+          element={
+            <ProtectedRoute>
+              <HostDashboard />
             </ProtectedRoute>
           }
         />

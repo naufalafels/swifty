@@ -18,7 +18,8 @@ import {
   FaBuilding,
   FaPassport,
   FaShieldAlt,
-  FaInfoCircle
+  FaInfoCircle,
+  FaImage
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -134,11 +135,9 @@ const CarDetail = () => {
   const [carError, setCarError] = useState("");
   const [currentImage, setCurrentImage] = useState(0);
 
-  // Initialize pickup/return from navigation state if passed (so clicking Book Now carries dates)
   const initialPickup = location.state?.pickupDate || "";
   const initialReturn = location.state?.returnDate || "";
 
-  // If logged in, pre-fill email and use readOnly
   const currentUser = authService.getCurrentUser();
   const emailPrefill = currentUser?.email || "";
 
@@ -155,13 +154,12 @@ const CarDetail = () => {
     idType: "passport",
     idNumber: "",
     idCountry: "Malaysia",
+    frontImageUrl: "",
+    backImageUrl: "",
     insurancePlan: "no_excess"
   });
 
-  // constants for pricing
   const deposit = 500; // MYR deposit paid at rental counter (not charged online)
-
-  // If user is logged in, we want email read-only and not required to be typed.
   const emailReadOnly = !!emailPrefill;
 
   const [activeField, setActiveField] = useState(null);
@@ -245,6 +243,40 @@ const CarDetail = () => {
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
+  const ensureAuthOrLogin = async () => {
+    const user = await authService.ensureAuth();
+    if (!user) {
+      navigate("/login", { replace: false, state: { from: `/cars/${id}` } });
+      return null;
+    }
+    return user;
+  };
+
+  const submitKycInline = async () => {
+    if (!formData.frontImageUrl || !formData.backImageUrl) {
+      toast.error("Please provide front and back ID images.");
+      return false;
+    }
+    const countryCode = formData.idCountry === "Malaysia"
+      ? "MY"
+      : (formData.idCountry || "MY").slice(0, 2).toUpperCase();
+
+    try {
+      await authService.submitKyc({
+        idType: formData.idType === "other" ? "passport" : formData.idType,
+        idNumber: formData.idNumber || "provided_at_pickup",
+        idCountry: countryCode,
+        frontImageUrl: formData.frontImageUrl,
+        backImageUrl: formData.backImageUrl,
+      });
+      return true;
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "KYC submission failed.";
+      toast.error(msg);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.pickupDate || !formData.returnDate) {
@@ -263,24 +295,29 @@ const CarDetail = () => {
       toast.error("Please provide a phone number.");
       return;
     }
-    if (!formData.idNumber || !formData.idCountry) {
-      toast.error("Please provide your ID number and issuing country.");
+    if (!formData.idCountry) {
+      toast.error("Please provide your ID issuing country.");
+      return;
+    }
+    if (!formData.frontImageUrl || !formData.backImageUrl) {
+      toast.error("Please provide front and back ID images.");
       return;
     }
 
+    const user = await ensureAuthOrLogin();
+    if (!user) return;
+
+    const kycOk = await submitKycInline();
+    if (!kycOk) return;
+
     setSubmitting(true);
     if (submitControllerRef.current) {
-      try {
-        submitControllerRef.current.abort();
-      } catch {}
+      try { submitControllerRef.current.abort(); } catch {}
     }
     const controller = new AbortController();
     submitControllerRef.current = controller;
 
     try {
-      // Prefer authenticated user id/email when available
-      const user = authService.getCurrentUser();
-      const userId = user?.id;
       const emailToUse = user?.email || formData.email;
 
       const paymentBreakdown = {
@@ -290,8 +327,12 @@ const CarDetail = () => {
         deposit // shown to user, paid at counter (not charged online)
       };
 
+      const countryCode = formData.idCountry === "Malaysia"
+        ? "MY"
+        : (formData.idCountry || "MY").slice(0, 2).toUpperCase();
+
       const payload = {
-        userId,
+        userId: user?.id,
         customer: formData.name || (user?.name || "Guest"),
         email: emailToUse,
         phone: formData.phone,
@@ -303,16 +344,20 @@ const CarDetail = () => {
         returnDate: formData.returnDate,
         amount: calculateTotal(),
         paymentBreakdown,
-        details: { pickupLocation: formData.pickupLocation },
+        details: {
+          pickupLocation: formData.pickupLocation,
+          kycFrontImageUrl: formData.frontImageUrl,
+          kycBackImageUrl: formData.backImageUrl,
+        },
         address: {
           city: formData.city,
           state: formData.state,
           zipCode: formData.zipCode,
         },
         kyc: {
-          idType: formData.idType,
-          idNumber: formData.idNumber,
-          idCountry: formData.idCountry,
+          idType: formData.idType === "other" ? "passport" : formData.idType,
+          idNumber: formData.idNumber || "provided_at_pickup",
+          idCountry: countryCode,
           licenseReminderSent: false,
           licenseNote: "Please bring your valid driving license (domestic or international per Malaysian law)."
         },
@@ -349,7 +394,6 @@ const CarDetail = () => {
         },
         handler: async (response) => {
           toast.success("Payment captured. Finalizing booking...", { autoClose: 1200 });
-          // Optional client verify (webhook is source of truth)
           try {
             await verifyRazorpayPayment({
               razorpay_order_id: response.razorpay_order_id,
@@ -396,7 +440,6 @@ const CarDetail = () => {
     ? String(car.transmission).toLowerCase()
     : "standard";
 
-  // company info helpers
   const companyName = car.company?.name || car.companyName || car.ownerName || "";
   const companyAddress = (() => {
     const addr = car.company?.address || {};
@@ -453,7 +496,6 @@ const CarDetail = () => {
               <span className={carDetailStyles.pricePerDay}>/ day</span>
             </p>
 
-            {/* Company brief */}
             {companyName ? (
               <div className="mt-3 mb-3 p-3 bg-gray-800 rounded-md border border-gray-700">
                 <div className="flex items-start gap-3">
@@ -804,7 +846,7 @@ const CarDetail = () => {
                       </select>
                     </div>
                     <div>
-                      <label className={carDetailStyles.formLabel}>ID Number</label>
+                      <label className={carDetailStyles.formLabel}>ID Number (optional)</label>
                       <input
                         type="text"
                         name="idNumber"
@@ -813,7 +855,6 @@ const CarDetail = () => {
                         onChange={handleInputChange}
                         onFocus={() => setActiveField("idNumber")}
                         onBlur={() => setActiveField(null)}
-                        required
                         className={carDetailStyles.textInputField}
                       />
                     </div>
@@ -834,9 +875,57 @@ const CarDetail = () => {
                       </select>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Front Image URL</label>
+                      <div
+                        className={carDetailStyles.inputContainer(
+                          activeField === "frontImageUrl"
+                        )}
+                      >
+                        <div className={carDetailStyles.inputIcon}>
+                          <FaImage />
+                        </div>
+                        <input
+                          type="url"
+                          name="frontImageUrl"
+                          placeholder="https://..."
+                          value={formData.frontImageUrl}
+                          onChange={handleInputChange}
+                          onFocus={() => setActiveField("frontImageUrl")}
+                          onBlur={() => setActiveField(null)}
+                          required
+                          className={carDetailStyles.textInputField}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Back Image URL</label>
+                      <div
+                        className={carDetailStyles.inputContainer(
+                          activeField === "backImageUrl"
+                        )}
+                      >
+                        <div className={carDetailStyles.inputIcon}>
+                          <FaImage />
+                        </div>
+                        <input
+                          type="url"
+                          name="backImageUrl"
+                          placeholder="https://..."
+                          value={formData.backImageUrl}
+                          onChange={handleInputChange}
+                          onFocus={() => setActiveField("backImageUrl")}
+                          onBlur={() => setActiveField(null)}
+                          required
+                          className={carDetailStyles.textInputField}
+                        />
+                      </div>
+                    </div>
+                  </div>
                   <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
                     <FaShieldAlt className="mt-0.5" />
-                    <span>Reminder: Please bring your valid driving license (domestic or international) as required by Malaysian law.</span>
+                    <span>Reminder: Please bring your valid driving license (domestic or international) as required by Malaysian law. Host will verify ID in person.</span>
                   </div>
                 </div>
 

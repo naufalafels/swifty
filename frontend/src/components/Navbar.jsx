@@ -37,15 +37,12 @@ const Navbar = () => {
   const validateToken = useCallback(
     async (signal) => {
       try {
-        // Ensure we have an access token (or attempt refresh)
         const ok = await authService.ensureAuth();
         if (!ok) {
           setIsLoggedIn(false);
           setUser(null);
           return;
         }
-
-        // If access token present, fetch profile from server
         const res = await api.get(ME_ENDPOINT, { signal });
         const profile = res?.data?.user ?? res?.data ?? null;
         if (profile) {
@@ -59,11 +56,7 @@ const Navbar = () => {
           setUser(null);
         }
       } catch (err) {
-        if (
-          err?.response &&
-          err.response.status === 401
-        ) {
-          // clear in-memory session
+        if (err?.response && err.response.status === 401) {
           authService.setAccessToken(null);
           authService.setCurrentUser(null);
           setIsLoggedIn(false);
@@ -78,26 +71,19 @@ const Navbar = () => {
 
   useEffect(() => {
     if (abortRef.current) {
-      try {
-        abortRef.current.abort();
-      } catch {}
+      try { abortRef.current.abort(); } catch {}
     }
     const controller = new AbortController();
     abortRef.current = controller;
     validateToken(controller.signal);
-
     return () => {
-      try {
-        controller.abort();
-      } catch {}
+      try { controller.abort(); } catch {}
       abortRef.current = null;
     };
   }, [validateToken]);
 
   useEffect(() => {
-    // listen for visibility or storage changes in case server clears session
     const handleVisibility = () => {
-      // try to validate again when tab becomes visible
       if (document.visibilityState === "visible") {
         if (abortRef.current) {
           try { abortRef.current.abort(); } catch {}
@@ -113,10 +99,8 @@ const Navbar = () => {
 
   const handleLogout = useCallback(async () => {
     try {
-      // call server logout to clear HttpOnly refresh cookie
       await api.post(LOGOUT_ENDPOINT, {}, { withCredentials: true, timeout: 2000 });
     } catch {}
-    // clear in-memory session
     await authService.logout();
     setIsLoggedIn(false);
     setUser(null);
@@ -126,7 +110,6 @@ const Navbar = () => {
 
   useEffect(() => {
     setIsOpen(false);
-    // derive initial UI state from in-memory user (may be null until validateToken completes)
     setIsLoggedIn(!!authService.getAccessToken());
     try {
       setUser(authService.getCurrentUser());
@@ -170,6 +153,16 @@ const Navbar = () => {
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
+  };
+
+  const isHost = Array.isArray(user?.roles) && user.roles.includes("host");
+
+  const goHost = () => {
+    if (!isLoggedIn) {
+      navigate("/login", { replace: false, state: { from: "/host/onboard" } });
+    } else {
+      navigate("/host/onboard");
+    }
   };
 
   return (
@@ -225,44 +218,53 @@ const Navbar = () => {
                 </div>
               </div>
 
-              <div className={styles.userActions}>
-                {isLoggedIn ? (
-                  <button
-                    onClick={handleLogout}
-                    className={styles.authButton}
-                    aria-label="Logout"
-                    title={user?.name || "Logout"}
-                  >
-                    <FaSignOutAlt className="text-base" />
-                    <span className={styles.authText}>Logout</span>
-                  </button>
-                ) : (
-                  <Link
-                    to="/login"
-                    className={styles.authButton}
-                    aria-label="Login"
-                  >
-                    <FaUser className="text-base" />
-                    <span className={styles.authText}>Login</span>
-                  </Link>
-                )}
-              </div>
-
-              <div className="md:hidden flex items-center">
+              <div className="flex items-center gap-2">
                 <button
-                  ref={buttonRef}
-                  onClick={() => setIsOpen((p) => !p)}
-                  className={styles.mobileMenuButton}
-                  aria-expanded={isOpen}
-                  aria-controls="mobile-menu"
-                  aria-label={isOpen ? "Close menu" : "Open menu"}
+                  onClick={goHost}
+                  className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 transition"
                 >
-                  {isOpen ? (
-                    <FaTimes className="h-5 w-5" />
-                  ) : (
-                    <FaBars className="h-5 w-5" />
-                  )}
+                  {isHost ? "Host Center" : "Become a Host"}
                 </button>
+
+                <div className={styles.userActions}>
+                  {isLoggedIn ? (
+                    <button
+                      onClick={handleLogout}
+                      className={styles.authButton}
+                      aria-label="Logout"
+                      title={user?.name || "Logout"}
+                    >
+                      <FaSignOutAlt className="text-base" />
+                      <span className={styles.authText}>Logout</span>
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className={styles.authButton}
+                      aria-label="Login"
+                    >
+                      <FaUser className="text-base" />
+                      <span className={styles.authText}>Login</span>
+                    </Link>
+                  )}
+                </div>
+
+                <div className="md:hidden flex items-center">
+                  <button
+                    ref={buttonRef}
+                    onClick={() => setIsOpen((p) => !p)}
+                    className={styles.mobileMenuButton}
+                    aria-expanded={isOpen}
+                    aria-controls="mobile-menu"
+                    aria-label={isOpen ? "Close menu" : "Open menu"}
+                  >
+                    {isOpen ? (
+                      <FaTimes className="h-5 w-5" />
+                    ) : (
+                      <FaBars className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -298,7 +300,14 @@ const Navbar = () => {
 
             <div className={styles.divider} />
 
-            <div className="pt-1">
+            <div className="pt-1 space-y-2">
+              <button
+                onClick={() => { setIsOpen(false); goHost(); }}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-amber-100 text-amber-900 font-semibold border border-amber-200"
+              >
+                {isHost ? "Host Center" : "Become a Host"}
+              </button>
+
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}

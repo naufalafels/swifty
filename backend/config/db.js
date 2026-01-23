@@ -1,18 +1,21 @@
 import mongoose from "mongoose";
 
 export const connectDB = async () => {
+  const mongoUri = process.env.MONGO_URI;
+  if (!mongoUri) {
+    console.error("MONGO_URI is not set. Please configure the environment variable.");
+    throw new Error("Missing MONGO_URI environment variable");
+  }
+
   try {
-    await mongoose.connect('mongodb+srv://zamrinaufalcode_db_user:qYx9SfMPWPtn4Se6@cluster0.30zmgid.mongodb.net/SwiftyCarRental', {
-      // options to improve diagnostics / behavior
-      // use the defaults in Mongoose v6+/v7+; explicit options can still help
+    await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 10000, // fail fast if can't connect
       socketTimeoutMS: 45000,
     });
     console.log("DB Connected");
   } catch (err) {
     console.error("MongoDB connection error:", err);
-    // Do not crash immediately in dev if you want nodemon to keep running.
-    // Optionally exit(1) in production:
+    // Optionally exit(1) in production if you want a hard fail:
     // process.exit(1);
   }
 

@@ -1,14 +1,14 @@
 import api from "../utils/api";
 
 /**
- * createRazorpayOrder(payload)
- * payload should include: customer, email, phone, car, pickupDate, returnDate,
- * amount, paymentBreakdown, details, address, carImage, currency, kyc
- * Returns { orderId, bookingId, key, amount, currency, redirect }
+ * createRazorpayOrder(payloadOrFormData)
+ * If FormData is passed, it will be sent as multipart/form-data (for file uploads).
+ * Otherwise, JSON body is used.
  */
-export async function createRazorpayOrder(payload) {
-  const res = await api.post("/api/payments/razorpay/order", payload, {
-    headers: { "Content-Type": "application/json" },
+export async function createRazorpayOrder(body) {
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const res = await api.post("/api/payments/razorpay/order", body, {
+    headers: isFormData ? {} : { "Content-Type": "application/json" },
   });
   return res.data;
 }

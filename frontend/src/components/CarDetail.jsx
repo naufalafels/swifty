@@ -36,8 +36,7 @@ const todayISO = () => new Date().toISOString().split("T")[0];
 const buildImageSrc = (image) => {
   if (!image) return `${API_BASE}/uploads/default-car.png`;
   if (Array.isArray(image)) image = image[0];
-  if (!image || typeof image !== "string")
-    return `${API_BASE}/uploads/default-car.png`;
+  if (!image || typeof image !== "string") return `${API_BASE}/uploads/default-car.png`;
   const t = image.trim();
   if (!t) return `${API_BASE}/uploads/default-car.png`;
   if (t.startsWith("http://") || t.startsWith("https://")) return t;
@@ -45,10 +44,7 @@ const buildImageSrc = (image) => {
   return `${API_BASE}/uploads/${t}`;
 };
 
-const handleImageError = (
-  e,
-  fallback = `${API_BASE}/uploads/default-car.png`
-) => {
+const handleImageError = (e, fallback = `${API_BASE}/uploads/default-car.png`) => {
   const img = e?.target;
   if (!img) return;
   img.onerror = null;
@@ -63,56 +59,20 @@ const handleImageError = (
 
 const calculateDays = (from, to) => {
   if (!from || !to) return 1;
-  const days = Math.ceil(
-    (new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24)
-  );
+  const days = Math.ceil((new Date(to) - new Date(from)) / (1000 * 60 * 60 * 24));
   return Math.max(1, days);
 };
 
 // Insurance plans (clean labels; fees per day)
 const insuranceOptions = [
-  {
-    value: "full_excess",
-    label: "Full Excess",
-    feePerDay: 0,
-    info: "You keep the standard excess; no extra daily fee."
-  },
-  {
-    value: "half_excess",
-    label: "Half Excess",
-    feePerDay: 15,
-    info: "Reduce your excess liability by half for a small daily fee."
-  },
-  {
-    value: "no_excess",
-    label: "No Excess (Incl. 24h cancellation)",
-    feePerDay: 30,
-    info: "Zero excess plus 24-hour cancellation coverage for peace of mind."
-  }
+  { value: "full_excess", label: "Full Excess", feePerDay: 0, info: "You keep the standard excess; no extra daily fee." },
+  { value: "half_excess", label: "Half Excess", feePerDay: 15, info: "Reduce your excess liability by half for a small daily fee." },
+  { value: "no_excess", label: "No Excess (Incl. 24h cancellation)", feePerDay: 30, info: "Zero excess plus 24-hour cancellation coverage for peace of mind." }
 ];
 
 const countryOptions = [
-  "Malaysia",
-  "Singapore",
-  "Thailand",
-  "Indonesia",
-  "Brunei",
-  "Philippines",
-  "Vietnam",
-  "Japan",
-  "South Korea",
-  "China",
-  "India",
-  "Australia",
-  "New Zealand",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Germany",
-  "France",
-  "Netherlands",
-  "United Arab Emirates",
-  "Saudi Arabia"
+  "Malaysia","Singapore","Thailand","Indonesia","Brunei","Philippines","Vietnam","Japan","South Korea","China","India",
+  "Australia","New Zealand","United Kingdom","United States","Canada","Germany","France","Netherlands","United Arab Emirates","Saudi Arabia"
 ];
 
 const loadRazorpayScript = () =>
@@ -154,10 +114,11 @@ const CarDetail = () => {
     idType: "passport",
     idNumber: "",
     idCountry: "Malaysia",
-    frontImageUrl: "",
-    backImageUrl: "",
-    insurancePlan: "no_excess"
+    insurancePlan: "no_excess",
   });
+
+  const [frontFile, setFrontFile] = useState(null);
+  const [backFile, setBackFile] = useState(null);
 
   const deposit = 500; // MYR deposit paid at rental counter (not charged online)
   const emailReadOnly = !!emailPrefill;
@@ -189,22 +150,15 @@ const CarDetail = () => {
       setLoadingCar(true);
       setCarError("");
       try {
-        const res = await api.get(`/api/cars/${id}`, {
-          signal: controller.signal,
-        });
+        const res = await api.get(`/api/cars/${id}`, { signal: controller.signal });
         const payload = res.data?.data ?? res.data ?? null;
         if (payload) setCar(payload);
         else setCarError("Car not found.");
       } catch (err) {
-        const canceled =
-          err?.code === "ERR_CANCELED" ||
-          err?.name === "CanceledError" ||
-          err?.message === "canceled";
+        const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
         if (!canceled) {
           console.error("Failed to fetch car:", err);
-          setCarError(
-            err?.response?.data?.message || err.message || "Failed to load car"
-          );
+          setCarError(err?.response?.data?.message || err.message || "Failed to load car");
         }
       } finally {
         setLoadingCar(false);
@@ -212,18 +166,13 @@ const CarDetail = () => {
     })();
 
     return () => {
-      try {
-        controller.abort();
-      } catch {}
+      try { controller.abort(); } catch {}
       fetchControllerRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (!car && loadingCar)
-    return <div className="p-6 text-white">Loading car...</div>;
-  if (!car && carError)
-    return <div className="p-6 text-red-400">{carError}</div>;
+  if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
+  if (!car && carError) return <div className="p-6 text-red-400">{carError}</div>;
   if (!car) return <div className="p-6 text-white">Car not found.</div>;
 
   const carImages = [
@@ -243,40 +192,6 @@ const CarDetail = () => {
     setFormData((f) => ({ ...f, [name]: value }));
   };
 
-  const ensureAuthOrLogin = async () => {
-    const user = await authService.ensureAuth();
-    if (!user) {
-      navigate("/login", { replace: false, state: { from: `/cars/${id}` } });
-      return null;
-    }
-    return user;
-  };
-
-  const submitKycInline = async () => {
-    if (!formData.frontImageUrl || !formData.backImageUrl) {
-      toast.error("Please provide front and back ID images.");
-      return false;
-    }
-    const countryCode = formData.idCountry === "Malaysia"
-      ? "MY"
-      : (formData.idCountry || "MY").slice(0, 2).toUpperCase();
-
-    try {
-      await authService.submitKyc({
-        idType: formData.idType === "other" ? "passport" : formData.idType,
-        idNumber: formData.idNumber || "provided_at_pickup",
-        idCountry: countryCode,
-        frontImageUrl: formData.frontImageUrl,
-        backImageUrl: formData.backImageUrl,
-      });
-      return true;
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || "KYC submission failed.";
-      toast.error(msg);
-      return false;
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.pickupDate || !formData.returnDate) {
@@ -287,7 +202,7 @@ const CarDetail = () => {
       toast.error("Return date must be the same or after pickup date.");
       return;
     }
-    if (!emailReadOnly && !formData.email) {
+    if (!formData.email) {
       toast.error("Please provide an email address.");
       return;
     }
@@ -299,16 +214,10 @@ const CarDetail = () => {
       toast.error("Please provide your ID issuing country.");
       return;
     }
-    if (!formData.frontImageUrl || !formData.backImageUrl) {
-      toast.error("Please provide front and back ID images.");
+    if (!frontFile || !backFile) {
+      toast.error("Please upload front and back ID images.");
       return;
     }
-
-    const user = await ensureAuthOrLogin();
-    if (!user) return;
-
-    const kycOk = await submitKycInline();
-    if (!kycOk) return;
 
     setSubmitting(true);
     if (submitControllerRef.current) {
@@ -318,6 +227,7 @@ const CarDetail = () => {
     submitControllerRef.current = controller;
 
     try {
+      const user = await authService.ensureAuth(); // non-blocking; if null, we proceed as guest
       const emailToUse = user?.email || formData.email;
 
       const paymentBreakdown = {
@@ -331,44 +241,41 @@ const CarDetail = () => {
         ? "MY"
         : (formData.idCountry || "MY").slice(0, 2).toUpperCase();
 
-      const payload = {
-        userId: user?.id,
-        customer: formData.name || (user?.name || "Guest"),
-        email: emailToUse,
-        phone: formData.phone,
-        car: {
-          id: car._id ?? car.id ?? null,
-          name: car.name ?? `${car.make ?? ""} ${car.model ?? ""}`.trim(),
-        },
-        pickupDate: formData.pickupDate,
-        returnDate: formData.returnDate,
-        amount: calculateTotal(),
-        paymentBreakdown,
-        details: {
-          pickupLocation: formData.pickupLocation,
-          kycFrontImageUrl: formData.frontImageUrl,
-          kycBackImageUrl: formData.backImageUrl,
-        },
-        address: {
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-        },
-        kyc: {
-          idType: formData.idType === "other" ? "passport" : formData.idType,
-          idNumber: formData.idNumber || "provided_at_pickup",
-          idCountry: countryCode,
-          licenseReminderSent: false,
-          licenseNote: "Please bring your valid driving license (domestic or international per Malaysian law)."
-        },
-        carImage: car.image
-          ? buildImageSrc(Array.isArray(car.image) ? car.image[0] : car.image)
-          : undefined,
-      };
+      const form = new FormData();
+      if (user?.id) form.append("userId", user.id);
+      form.append("customer", formData.name || user?.name || "Guest");
+      form.append("email", emailToUse);
+      form.append("phone", formData.phone);
+      form.append("pickupDate", formData.pickupDate);
+      form.append("returnDate", formData.returnDate);
+      form.append("amount", calculateTotal());
+      form.append("currency", "MYR");
+      form.append("paymentBreakdown", JSON.stringify(paymentBreakdown));
+      form.append("details", JSON.stringify({ pickupLocation: formData.pickupLocation }));
+      form.append("address", JSON.stringify({
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+      }));
+      form.append("car", JSON.stringify({
+        id: car._id ?? car.id ?? null,
+        make: car.make,
+        model: car.model,
+        year: car.year,
+        dailyRate: car.dailyRate,
+        image: car.image,
+        companyId: car.companyId || car.company?.id || null,
+        companyName: car.company?.name || car.companyName || "",
+      }));
+      form.append("kyc[idType]", formData.idType === "other" ? "passport" : formData.idType);
+      form.append("kyc[idNumber]", formData.idNumber || "provided_at_pickup");
+      form.append("kyc[idCountry]", countryCode);
+      form.append("kycFront", frontFile);
+      form.append("kycBack", backFile);
 
       await loadRazorpayScript();
 
-      const res = await createRazorpayOrder(payload);
+      const res = await createRazorpayOrder(form);
 
       if (!res?.orderId || !res?.key) {
         toast.error("Failed to initiate payment. Please try again.");
@@ -383,14 +290,14 @@ const CarDetail = () => {
         description: car.name || "Car Rental",
         order_id: res.orderId,
         prefill: {
-          name: payload.customer,
-          email: payload.email,
-          contact: payload.phone,
+          name: formData.name || user?.name || "Guest",
+          email: emailToUse,
+          contact: formData.phone,
         },
         notes: {
           bookingId: res.bookingId,
-          pickupDate: payload.pickupDate,
-          returnDate: payload.returnDate,
+          pickupDate: formData.pickupDate,
+          returnDate: formData.returnDate,
         },
         handler: async (response) => {
           toast.success("Payment captured. Finalizing booking...", { autoClose: 1200 });
@@ -419,10 +326,7 @@ const CarDetail = () => {
 
       rzp.open();
     } catch (err) {
-      const canceled =
-        err?.code === "ERR_CANCELED" ||
-        err?.name === "CanceledError" ||
-        err?.message === "canceled";
+      const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
       if (canceled) return;
       console.error("Booking error:", err);
       const serverMessage =
@@ -436,10 +340,7 @@ const CarDetail = () => {
     }
   };
 
-  const transmissionLabel = car.transmission
-    ? String(car.transmission).toLowerCase()
-    : "standard";
-
+  const transmissionLabel = car.transmission ? String(car.transmission).toLowerCase() : "standard";
   const companyName = car.company?.name || car.companyName || car.ownerName || "";
   const companyAddress = (() => {
     const addr = car.company?.address || {};
@@ -456,10 +357,7 @@ const CarDetail = () => {
     <div className={carDetailStyles.pageContainer}>
       <div className={carDetailStyles.contentContainer}>
         <ToastContainer />
-        <button
-          onClick={() => navigate(-1)}
-          className={carDetailStyles.backButton}
-        >
+        <button onClick={() => navigate(-1)} className={carDetailStyles.backButton}>
           <FaArrowLeft className={carDetailStyles.backButtonIcon} />
         </button>
 
@@ -474,26 +372,21 @@ const CarDetail = () => {
               />
               {(carImages.length > 0 || (car.image && car.image !== "")) && (
                 <div className={carDetailStyles.carouselIndicators}>
-                  {(carImages.length > 0 ? carImages : [car.image]).map(
-                    (_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentImage(idx)}
-                        aria-label={`Show image ${idx + 1}`}
-                        className={carDetailStyles.carouselIndicator(
-                          idx === currentImage
-                        )}
-                      />
-                    )
-                  )}
+                  {(carImages.length > 0 ? carImages : [car.image]).map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImage(idx)}
+                      aria-label={`Show image ${idx + 1}`}
+                      className={carDetailStyles.carouselIndicator(idx === currentImage)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
 
             <h1 className={carDetailStyles.carName}>{car.make}</h1>
             <p className={carDetailStyles.carPrice}>
-              MYR&nbsp;{price}{" "}
-              <span className={carDetailStyles.pricePerDay}>/ day</span>
+              MYR&nbsp;{price} <span className={carDetailStyles.pricePerDay}>/ day</span>
             </p>
 
             {companyName ? (
@@ -515,44 +408,14 @@ const CarDetail = () => {
 
             <div className={carDetailStyles.specsGrid}>
               {[
-                {
-                  Icon: FaUserFriends,
-                  label: "Seats",
-                  value: car.seats ?? "—",
-                  color: "text-orange-400",
-                },
-                {
-                  Icon: FaGasPump,
-                  label: "Fuel",
-                  value: car.fuel ?? car.fuelType ?? "—",
-                  color: "text-green-400",
-                },
-                {
-                  Icon: FaTachometerAlt,
-                  label: "Mileage",
-                  value: car.mileage ? `${car.mileage} kmpl` : "—",
-                  color: "text-yellow-400",
-                },
-                {
-                  Icon: FaCheckCircle,
-                  label: "Transmission",
-                  value: transmissionLabel,
-                  color: "text-purple-400",
-                },
+                { Icon: FaUserFriends, label: "Seats", value: car.seats ?? "—", color: "text-orange-400" },
+                { Icon: FaGasPump, label: "Fuel", value: car.fuel ?? car.fuelType ?? "—", color: "text-green-400" },
+                { Icon: FaTachometerAlt, label: "Mileage", value: car.mileage ? `${car.mileage} kmpl` : "—", color: "text-yellow-400" },
+                { Icon: FaCheckCircle, label: "Transmission", value: transmissionLabel, color: "text-purple-400" },
               ].map((spec, i) => (
                 <div key={i} className={carDetailStyles.specCard}>
-                  <spec.Icon
-                    className={`${spec.color} ${carDetailStyles.specIcon}`}
-                  />
-                  <p
-                    className={
-                      carDetailStyles.aboutText +
-                      " " +
-                      carDetailStyles.specLabel
-                    }
-                  >
-                    {spec.label}
-                  </p>
+                  <spec.Icon className={`${spec.color} ${carDetailStyles.specIcon}`} />
+                  <p className={carDetailStyles.aboutText + " " + carDetailStyles.specLabel}>{spec.label}</p>
                   <p className={carDetailStyles.specValue}>{spec.value}</p>
                 </div>
               ))}
@@ -561,40 +424,17 @@ const CarDetail = () => {
             <div className={carDetailStyles.aboutSection}>
               <h2 className={carDetailStyles.aboutTitle}>About this car</h2>
               <p className={carDetailStyles.aboutText}>
-                Experience luxury in the {car.name}. With its{" "}
-                {transmissionLabel} transmission and seating for{" "}
-                {car.seats ?? "—"}, every journey is exceptional.
+                Experience luxury in the {car.name}. With its {transmissionLabel} transmission and seating for {car.seats ?? "—"}, every journey is exceptional.
               </p>
               <p className={carDetailStyles.aboutText}>
-                {car.description ??
-                  "This car combines performance and comfort for an unforgettable drive."}
+                {car.description ?? "This car combines performance and comfort for an unforgettable drive."}
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="flex items-center">
-                  <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                  <span className="text-gray-300 text-sm">
-                    Free cancellation
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                  <span className="text-gray-300 text-sm">
-                    24/7 Roadside assistance
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                  <span className="text-gray-300 text-sm">
-                    Unlimited mileage
-                  </span>
-                </div>
-                <div className="flex items-center">
-                  <FaCheckCircle className="text-green-400 mr-2 text-sm" />
-                  <span className="text-gray-300 text-sm">
-                    Collision damage waiver
-                  </span>
-                </div>
+                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Free cancellation</span></div>
+                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
+                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
+                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
               </div>
             </div>
           </div>
@@ -602,29 +442,16 @@ const CarDetail = () => {
           <div className={carDetailStyles.rightColumn}>
             <div className={carDetailStyles.bookingCard}>
               <h2 className={carDetailStyles.bookingTitle}>
-                Reserve{" "}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">
-                  Your Drive
-                </span>
+                Reserve <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">Your Drive</span>
               </h2>
-              <p className={carDetailStyles.bookingSubtitle}>
-                Fast · Secure · Easy
-              </p>
+              <p className={carDetailStyles.bookingSubtitle}>Fast · Secure · Easy</p>
 
               <form onSubmit={handleSubmit} className={carDetailStyles.form}>
                 <div className={carDetailStyles.grid2}>
                   <div>
-                    <label className={carDetailStyles.formLabel}>
-                      Pickup Date
-                    </label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "pickupDate"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaCalendarAlt />
-                      </div>
+                    <label className={carDetailStyles.formLabel}>Pickup Date</label>
+                    <div className={carDetailStyles.inputContainer(activeField === "pickupDate")}>
+                      <div className={carDetailStyles.inputIcon}><FaCalendarAlt /></div>
                       <input
                         id="pickupDate"
                         type="date"
@@ -639,19 +466,10 @@ const CarDetail = () => {
                       />
                     </div>
                   </div>
-
                   <div>
-                    <label className={carDetailStyles.formLabel}>
-                      Return Date
-                    </label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "returnDate"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaCalendarAlt />
-                      </div>
+                    <label className={carDetailStyles.formLabel}>Return Date</label>
+                    <div className={carDetailStyles.inputContainer(activeField === "returnDate")}>
+                      <div className={carDetailStyles.inputIcon}><FaCalendarAlt /></div>
                       <input
                         id="returnDate"
                         type="date"
@@ -670,14 +488,8 @@ const CarDetail = () => {
 
                 <div className="flex flex-col mt-3">
                   <label className={carDetailStyles.formLabel}>Full Name</label>
-                  <div
-                    className={carDetailStyles.inputContainer(
-                      activeField === "name"
-                    )}
-                  >
-                    <div className={carDetailStyles.inputIcon}>
-                      <FaUser />
-                    </div>
+                  <div className={carDetailStyles.inputContainer(activeField === "name")}>
+                    <div className={carDetailStyles.inputIcon}><FaUser /></div>
                     <input
                       type="text"
                       name="name"
@@ -694,17 +506,9 @@ const CarDetail = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                   <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>
-                      Email Address
-                    </label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "email"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaEnvelope />
-                      </div>
+                    <label className={carDetailStyles.formLabel}>Email Address</label>
+                    <div className={carDetailStyles.inputContainer(activeField === "email")}>
+                      <div className={carDetailStyles.inputIcon}><FaEnvelope /></div>
                       <input
                         type="email"
                         name="email"
@@ -713,25 +517,15 @@ const CarDetail = () => {
                         onChange={handleInputChange}
                         onFocus={() => setActiveField("email")}
                         onBlur={() => setActiveField(null)}
-                        required={!emailReadOnly}
-                        readOnly={emailReadOnly}
+                        required
                         className={carDetailStyles.textInputField + (emailReadOnly ? " opacity-80 bg-gray-800" : "")}
                       />
                     </div>
                   </div>
-
                   <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>
-                      Phone Number
-                    </label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "phone"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaPhone />
-                      </div>
+                    <label className={carDetailStyles.formLabel}>Phone Number</label>
+                    <div className={carDetailStyles.inputContainer(activeField === "phone")}>
+                      <div className={carDetailStyles.inputIcon}><FaPhone /></div>
                       <input
                         type="tel"
                         name="phone"
@@ -750,14 +544,8 @@ const CarDetail = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                   <div className="flex flex-col">
                     <label className={carDetailStyles.formLabel}>City</label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "city"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaCity />
-                      </div>
+                    <div className={carDetailStyles.inputContainer(activeField === "city")}>
+                      <div className={carDetailStyles.inputIcon}><FaCity /></div>
                       <input
                         type="text"
                         name="city"
@@ -771,17 +559,10 @@ const CarDetail = () => {
                       />
                     </div>
                   </div>
-
                   <div className="flex flex-col">
                     <label className={carDetailStyles.formLabel}>State</label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "state"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaGlobeAsia />
-                      </div>
+                    <div className={carDetailStyles.inputContainer(activeField === "state")}>
+                      <div className={carDetailStyles.inputIcon}><FaGlobeAsia /></div>
                       <input
                         type="text"
                         name="state"
@@ -795,19 +576,10 @@ const CarDetail = () => {
                       />
                     </div>
                   </div>
-
                   <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>
-                      ZIP Code
-                    </label>
-                    <div
-                      className={carDetailStyles.inputContainer(
-                        activeField === "zipCode"
-                      )}
-                    >
-                      <div className={carDetailStyles.inputIcon}>
-                        <FaMapPin />
-                      </div>
+                    <label className={carDetailStyles.formLabel}>ZIP Code</label>
+                    <div className={carDetailStyles.inputContainer(activeField === "zipCode")}>
+                      <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
                       <input
                         type="text"
                         name="zipCode"
@@ -823,7 +595,7 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* KYC Section */}
+                {/* KYC Section with uploads */}
                 <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
                   <div className="flex items-center gap-2 mb-2">
                     <FaPassport className="text-orange-400" />
@@ -877,22 +649,15 @@ const CarDetail = () => {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                     <div>
-                      <label className={carDetailStyles.formLabel}>Front Image URL</label>
-                      <div
-                        className={carDetailStyles.inputContainer(
-                          activeField === "frontImageUrl"
-                        )}
-                      >
-                        <div className={carDetailStyles.inputIcon}>
-                          <FaImage />
-                        </div>
+                      <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
+                      <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
+                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
                         <input
-                          type="url"
-                          name="frontImageUrl"
-                          placeholder="https://..."
-                          value={formData.frontImageUrl}
-                          onChange={handleInputChange}
-                          onFocus={() => setActiveField("frontImageUrl")}
+                          type="file"
+                          accept="image/*"
+                          name="frontImage"
+                          onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
+                          onFocus={() => setActiveField("frontImage")}
                           onBlur={() => setActiveField(null)}
                           required
                           className={carDetailStyles.textInputField}
@@ -900,22 +665,15 @@ const CarDetail = () => {
                       </div>
                     </div>
                     <div>
-                      <label className={carDetailStyles.formLabel}>Back Image URL</label>
-                      <div
-                        className={carDetailStyles.inputContainer(
-                          activeField === "backImageUrl"
-                        )}
-                      >
-                        <div className={carDetailStyles.inputIcon}>
-                          <FaImage />
-                        </div>
+                      <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
+                      <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
+                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
                         <input
-                          type="url"
-                          name="backImageUrl"
-                          placeholder="https://..."
-                          value={formData.backImageUrl}
-                          onChange={handleInputChange}
-                          onFocus={() => setActiveField("backImageUrl")}
+                          type="file"
+                          accept="image/*"
+                          name="backImage"
+                          onChange={(e) => setBackFile(e.target.files?.[0] || null)}
+                          onFocus={() => setActiveField("backImage")}
                           onBlur={() => setActiveField(null)}
                           required
                           className={carDetailStyles.textInputField}
@@ -964,42 +722,19 @@ const CarDetail = () => {
                 </div>
 
                 <div className={carDetailStyles.priceBreakdown + " mt-4"}>
-                  <div className={carDetailStyles.priceRow}>
-                    <span>Rate/day</span>
-                    <span>MYR&nbsp;{price}</span>
-                  </div>
+                  <div className={carDetailStyles.priceRow}><span>Rate/day</span><span>MYR&nbsp;{price}</span></div>
                   {formData.pickupDate && formData.returnDate && (
-                    <div className={carDetailStyles.priceRow}>
-                      <span>Days</span>
-                      <span>{days}</span>
-                    </div>
+                    <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
                   )}
-                  <div className={carDetailStyles.priceRow}>
-                    <span>Insurance ({selectedPlan.label})</span>
-                    <span>MYR&nbsp;{insuranceCost}</span>
-                  </div>
-                  <div className={carDetailStyles.priceRow}>
-                    <span>Deposit (pay at counter)</span>
-                    <span className="text-gray-300">MYR&nbsp;{deposit}</span>
-                  </div>
-                  <div className={carDetailStyles.totalRow}>
-                    <span>Total (to pay now)</span>
-                    <span>MYR&nbsp;{calculateTotal()}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    No hidden costs. Deposit is collected at the rental desk and will not be charged online.
-                  </p>
+                  <div className={carDetailStyles.priceRow}><span>Insurance ({selectedPlan.label})</span><span>MYR&nbsp;{insuranceCost}</span></div>
+                  <div className={carDetailStyles.priceRow}><span>Deposit (pay at counter)</span><span className="text-gray-300">MYR&nbsp;{deposit}</span></div>
+                  <div className={carDetailStyles.totalRow}><span>Total (to pay now)</span><span>MYR&nbsp;{calculateTotal()}</span></div>
+                  <p className="text-xs text-gray-400 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className={carDetailStyles.submitButton}
-                >
+                <button type="submit" disabled={submitting} className={carDetailStyles.submitButton}>
                   <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
-                  <span>
-                    {submitting ? "Processing..." : "Pay & Confirm Booking"}
-                  </span>
+                  <span>{submitting ? "Processing..." : "Pay & Confirm Booking"}</span>
                 </button>
               </form>
             </div>

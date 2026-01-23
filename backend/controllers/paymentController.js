@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import path from 'path';
 
 import Booking from '../models/bookingModel.js';
 import Car from '../models/carModel.js';
@@ -89,6 +90,7 @@ export const createRazorpayOrder = async (req, res) => {
     if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) return res.status(400).json({ success: false, message: "Invalid dates" });
     if (rd < pd) return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
 
+    // Parse car if sent as JSON string
     let carField = car;
     if (typeof car === 'string') {
       try { carField = JSON.parse(car); } catch { carField = { name: car }; }
@@ -122,6 +124,17 @@ export const createRazorpayOrder = async (req, res) => {
       console.warn('createRazorpayOrder: failed to fetch canonical Car for companyId:', e?.message || e);
     }
 
+    // Normalize KYC with uploaded files (kycFront, kycBack)
+    const kycFront = req.files?.kycFront?.[0] || null;
+    const kycBack = req.files?.kycBack?.[0] || null;
+    const toUrl = (fileObj) => fileObj ? `/uploads/${path.basename(fileObj.path)}` : '';
+
+    const normalizedKyc = {
+      ...(typeof kyc === 'string' ? (() => { try { return JSON.parse(kyc); } catch { return {}; } })() : (kyc || {})),
+      frontImageUrl: kycFront ? toUrl(kycFront) : (kyc?.frontImageUrl || ''),
+      backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
+    };
+
     // Create pending booking
     const bookingInput = {
       userId: finalUserId,
@@ -139,7 +152,15 @@ export const createRazorpayOrder = async (req, res) => {
       status: "pending",
       currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
       paymentBreakdown: typeof paymentBreakdown === "string" ? JSON.parse(paymentBreakdown) : (paymentBreakdown || {}),
-      kyc: typeof kyc === "string" ? JSON.parse(kyc) : (kyc || {}),
+      kyc: {
+        idType: normalizedKyc.idType || "passport",
+        idNumber: normalizedKyc.idNumber || "",
+        idCountry: normalizedKyc.idCountry || "MY",
+        licenseReminderSent: false,
+        licenseNote: "Please bring your valid driving license (domestic or international per Malaysian law).",
+        frontImageUrl: normalizedKyc.frontImageUrl || "",
+        backImageUrl: normalizedKyc.backImageUrl || "",
+      },
       paymentGateway: 'razorpay'
     };
     if (bookingCompanyId) bookingInput.companyId = bookingCompanyId;

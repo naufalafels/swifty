@@ -31,6 +31,48 @@ export const getHostCars = async (req, res) => {
   }
 };
 
+// Create a car as a host (no file upload; accepts image URL/path)
+export const createHostCar = async (req, res) => {
+  try {
+    const hostId = req.user?.id;
+    if (!hostId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const companyId = req.user?.companyId || null;
+    const body = req.body || {};
+
+    const required = ["make", "model", "year", "dailyRate", "seats", "transmission", "fuelType"];
+    for (const k of required) {
+      if (body[k] === undefined || body[k] === null || String(body[k]).trim() === "") {
+        return res.status(400).json({ success: false, message: `${k} is required` });
+      }
+    }
+
+    const car = await Car.create({
+      make: body.make,
+      model: body.model,
+      year: Number(body.year),
+      color: body.color || "",
+      category: body.category || "Sedan",
+      seats: Number(body.seats) || 4,
+      transmission: body.transmission || "Automatic",
+      fuelType: body.fuelType || "Gasoline",
+      mileage: Number(body.mileage) || 0,
+      dailyRate: Number(body.dailyRate || 0),
+      image: body.image || body.imageUrl || "",
+      status: body.status || "available",
+      hostId,
+      ownerId: hostId,
+      createdBy: hostId,
+      companyId: companyId || undefined,
+    });
+
+    return res.status(201).json({ success: true, data: car });
+  } catch (err) {
+    console.error("createHostCar error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 // Bookings for host-owned cars; include KYC and car snapshot
 export const getHostBookings = async (req, res) => {
   try {

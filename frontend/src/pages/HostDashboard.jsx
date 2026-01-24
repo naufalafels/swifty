@@ -8,8 +8,10 @@ import {
   FaExternalLinkAlt,
   FaCar,
   FaInfoCircle,
+  FaHome,
+  FaPlus,
 } from "react-icons/fa";
-import { getHostCars, getHostBookings, updateHostBookingStatus } from "../services/hostService";
+import { getHostCars, createHostCar, getHostBookings, updateHostBookingStatus } from "../services/hostService";
 import * as authService from "../utils/authService";
 
 const Pill = ({ children, tone = "slate" }) => {
@@ -39,9 +41,24 @@ const HostDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [loadingCars, setLoadingCars] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [savingCar, setSavingCar] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
   const [isHost, setIsHost] = useState(true);
+  const [carForm, setCarForm] = useState({
+    make: "",
+    model: "",
+    year: "",
+    dailyRate: "",
+    seats: "4",
+    transmission: "Automatic",
+    fuelType: "Gasoline",
+    mileage: "",
+    image: "",
+    category: "Sedan",
+  });
+  const [carFormError, setCarFormError] = useState("");
+  const [statusNote, setStatusNote] = useState("");
   const navigate = useNavigate();
 
   // Gate: only approved hosts should see Host Centre
@@ -79,11 +96,64 @@ const HostDashboard = () => {
     }
   };
 
+  const validateCar = () => {
+    const required = ["make", "model", "year", "dailyRate", "seats", "transmission", "fuelType"];
+    for (const k of required) {
+      if (!String(carForm[k] || "").trim()) {
+        setCarFormError(`${k} is required`);
+        return false;
+      }
+    }
+    if (Number(carForm.dailyRate) <= 0 || Number.isNaN(Number(carForm.dailyRate))) {
+      setCarFormError("dailyRate must be a positive number");
+      return false;
+    }
+    if (Number(carForm.year) < 1900 || Number.isNaN(Number(carForm.year))) {
+      setCarFormError("year is invalid");
+      return false;
+    }
+    setCarFormError("");
+    return true;
+  };
+
+  const submitCar = async (e) => {
+    e.preventDefault();
+    if (!validateCar()) return;
+    setSavingCar(true);
+    try {
+      await createHostCar({
+        ...carForm,
+        year: Number(carForm.year),
+        dailyRate: Number(carForm.dailyRate),
+        seats: Number(carForm.seats),
+        mileage: Number(carForm.mileage || 0),
+      });
+      setCarForm({
+        make: "",
+        model: "",
+        year: "",
+        dailyRate: "",
+        seats: "4",
+        transmission: "Automatic",
+        fuelType: "Gasoline",
+        mileage: "",
+        image: "",
+        category: "Sedan",
+      });
+      await loadCars();
+    } catch (err) {
+      setCarFormError(err?.response?.data?.message || "Failed to create car");
+    } finally {
+      setSavingCar(false);
+    }
+  };
+
   const setStatus = async (id, status) => {
     try {
       setUpdatingId(id + status);
-      await updateHostBookingStatus(id, status);
+      await updateHostBookingStatus(id, status, statusNote);
       await loadBookings();
+      setStatusNote("");
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to update booking");
     } finally {
@@ -123,12 +193,20 @@ const HostDashboard = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate("/host/onboard")}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700"
-          >
-            Start Host Onboarding
-          </button>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              onClick={() => navigate("/host/onboard")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Start Host Onboarding
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-amber-300 text-amber-900 hover:bg-amber-100"
+            >
+              <FaHome /> Back to Frontpage
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -136,12 +214,12 @@ const HostDashboard = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Host Centre</h1>
-          <p className="text-sm text-slate-400">Manage your cars, bookings, and renter KYC in one place.</p>
+          <p className="text-sm text-slate-400">Add cars, manage bookings, view KYC, and keep audit notes.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => {
               loadCars();
@@ -152,10 +230,10 @@ const HostDashboard = () => {
             <FaSyncAlt /> Refresh
           </button>
           <button
-            onClick={() => navigate("/host/onboard")}
-            className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+            onClick={() => navigate("/")}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
           >
-            Update payout details
+            <FaHome /> Frontpage
           </button>
         </div>
       </div>
@@ -174,6 +252,90 @@ const HostDashboard = () => {
         ))}
       </div>
 
+      {/* Add Car */}
+      <section className="bg-slate-900/70 border border-slate-800 rounded-lg p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <FaPlus className="text-emerald-400" />
+          <h2 className="text-lg font-semibold">Add a Car</h2>
+        </div>
+        <form onSubmit={submitCar} className="grid gap-3 sm:grid-cols-2">
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Make*"
+            value={carForm.make}
+            onChange={(e) => setCarForm({ ...carForm, make: e.target.value })}
+          />
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Model*"
+            value={carForm.model}
+            onChange={(e) => setCarForm({ ...carForm, model: e.target.value })}
+          />
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Year*"
+            type="number"
+            value={carForm.year}
+            onChange={(e) => setCarForm({ ...carForm, year: e.target.value })}
+          />
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Daily Rate (MYR)*"
+            type="number"
+            value={carForm.dailyRate}
+            onChange={(e) => setCarForm({ ...carForm, dailyRate: e.target.value })}
+          />
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Seats*"
+            type="number"
+            value={carForm.seats}
+            onChange={(e) => setCarForm({ ...carForm, seats: e.target.value })}
+          />
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Mileage (km)"
+            type="number"
+            value={carForm.mileage}
+            onChange={(e) => setCarForm({ ...carForm, mileage: e.target.value })}
+          />
+          <select
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            value={carForm.transmission}
+            onChange={(e) => setCarForm({ ...carForm, transmission: e.target.value })}
+          >
+            <option>Automatic</option>
+            <option>Manual</option>
+          </select>
+          <select
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            value={carForm.fuelType}
+            onChange={(e) => setCarForm({ ...carForm, fuelType: e.target.value })}
+          >
+            <option>Gasoline</option>
+            <option>Diesel</option>
+            <option>Hybrid</option>
+            <option>Electric</option>
+          </select>
+          <input
+            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white sm:col-span-2"
+            placeholder="Image URL (optional)"
+            value={carForm.image}
+            onChange={(e) => setCarForm({ ...carForm, image: e.target.value })}
+          />
+          <div className="sm:col-span-2 flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={savingCar}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {savingCar ? "Saving..." : "Save Car"}
+            </button>
+            {carFormError && <span className="text-sm text-rose-300">{carFormError}</span>}
+          </div>
+        </form>
+      </section>
+
       {/* Cars */}
       <section className="bg-slate-900/70 border border-slate-800 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
@@ -183,7 +345,7 @@ const HostDashboard = () => {
         {loadingCars ? (
           <div className="text-sm text-slate-300">Loading cars...</div>
         ) : cars.length === 0 ? (
-          <div className="text-sm text-slate-300">No cars yet. Add a car from the admin portal.</div>
+          <div className="text-sm text-slate-300">No cars yet. Add a car above.</div>
         ) : (
           <div className="grid md:grid-cols-2 gap-3">
             {cars.map((c) => (
@@ -195,10 +357,12 @@ const HostDashboard = () => {
                   <div className="font-semibold text-white">
                     {c.make} {c.model}
                   </div>
-                  <Pill tone="blue">{c.status || "—"}</Pill>
+                  <Pill tone="blue">{c.status || "available"}</Pill>
                 </div>
                 <div className="text-xs text-slate-400">Rate: {c.dailyRate ? `MYR ${c.dailyRate}` : "—"}</div>
                 <div className="text-xs text-slate-400">Year: {c.year || "—"}</div>
+                <div className="text-xs text-slate-400">Seats: {c.seats || "—"}</div>
+                <div className="text-xs text-slate-400">Fuel: {c.fuelType || "—"}</div>
               </div>
             ))}
           </div>
@@ -210,6 +374,15 @@ const HostDashboard = () => {
         <div className="flex items-center gap-2 mb-3">
           <FaExternalLinkAlt className="text-emerald-400" />
           <h2 className="text-lg font-semibold">Bookings</h2>
+        </div>
+        <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:gap-3">
+          <input
+            className="w-full sm:w-80 rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+            placeholder="Host note for status updates (audit)"
+            value={statusNote}
+            onChange={(e) => setStatusNote(e.target.value)}
+          />
+          <span className="text-xs text-slate-400">Note is stored with the booking update.</span>
         </div>
         {loadingBookings ? (
           <div className="text-sm text-slate-300">Loading bookings...</div>
@@ -270,6 +443,9 @@ const HostDashboard = () => {
                           </div>
                         )}
                         <div>ID: {b.kyc?.idType || "—"} {b.kyc?.idNumber || ""}</div>
+                        {b.details?.hostNote && (
+                          <div className="text-amber-200">Host note: {b.details.hostNote}</div>
+                        )}
                       </td>
                       <td className="px-3 py-2 space-x-2">
                         <button

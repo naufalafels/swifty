@@ -226,7 +226,7 @@ const Navbar = () => {
                   onClick={goHost}
                   className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 transition"
                 >
-                  {isHost ? "Host Center" : "Become a Host"}
+                  {isHost ? "Host Centre" : "Become a Host"}
                 </button>
 
                 <div className={styles.userActions}>

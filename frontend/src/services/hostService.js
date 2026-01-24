@@ -6,7 +6,13 @@ export const getHostCars = async () => {
 };
 
 export const createHostCar = async (payload) => {
-  const res = await api.post("/api/host/cars", payload);
+  const form = new FormData();
+  Object.entries(payload || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) form.append(k, v);
+  });
+  const res = await api.post("/api/host/cars", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
   return res.data;
 };
 

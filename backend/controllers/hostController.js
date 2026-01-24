@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import path from "path";
+import fs from "fs";
 import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
 
@@ -10,6 +12,12 @@ function asObjectId(v) {
     return null;
   }
 }
+
+const removeFileIfExists = (p) => {
+  if (!p) return;
+  const full = path.join(process.cwd(), "uploads", p);
+  fs.unlink(full, () => {});
+};
 
 // Cars a host should see: hostId/ownerId match OR companyId match
 export const getHostCars = async (req, res) => {
@@ -31,7 +39,7 @@ export const getHostCars = async (req, res) => {
   }
 };
 
-// Create a car as a host (no file upload; accepts image URL/path)
+// Create a car as a host (accepts multipart image)
 export const createHostCar = async (req, res) => {
   try {
     const hostId = req.user?.id;
@@ -43,9 +51,13 @@ export const createHostCar = async (req, res) => {
     const required = ["make", "model", "year", "dailyRate", "seats", "transmission", "fuelType"];
     for (const k of required) {
       if (body[k] === undefined || body[k] === null || String(body[k]).trim() === "") {
+        // clean up uploaded file if validation fails
+        if (req.file?.filename) removeFileIfExists(path.join("car-images", req.file.filename));
         return res.status(400).json({ success: false, message: `${k} is required` });
       }
     }
+
+    const imagePath = req.file ? `car-images/${req.file.filename}` : (body.image || body.imageUrl || "");
 
     const car = await Car.create({
       make: body.make,
@@ -58,7 +70,7 @@ export const createHostCar = async (req, res) => {
       fuelType: body.fuelType || "Gasoline",
       mileage: Number(body.mileage) || 0,
       dailyRate: Number(body.dailyRate || 0),
-      image: body.image || body.imageUrl || "",
+      image: imagePath,
       status: body.status || "available",
       hostId,
       ownerId: hostId,

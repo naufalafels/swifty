@@ -12,6 +12,7 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import KycPage from './pages/KycPage';
 import HostOnboardPage from './pages/HostOnboardPage';
 import HostDashboard from './pages/HostDashboard';
+import ProfilePage from './pages/ProfilePage';
 import * as authService from './utils/authService';
 
 // PROTECTED ROUTE that supports async token refresh on page load
@@ -128,6 +129,15 @@ const App = () => {
           element={
             <ProtectedRoute>
               <HostDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Profile */}
+        <Route path='/profile'
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

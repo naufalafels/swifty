@@ -10,6 +10,9 @@ import {
   FaInfoCircle,
   FaHome,
   FaPlus,
+  FaChevronDown,
+  FaChevronUp,
+  FaImage,
 } from "react-icons/fa";
 import { getHostCars, createHostCar, getHostBookings, updateHostBookingStatus } from "../services/hostService";
 import * as authService from "../utils/authService";
@@ -45,6 +48,11 @@ const HostDashboard = () => {
   const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
   const [isHost, setIsHost] = useState(true);
+  const [statusNote, setStatusNote] = useState("");
+  const [carFormOpen, setCarFormOpen] = useState(false); // start collapsed
+  const [carFormError, setCarFormError] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+
   const [carForm, setCarForm] = useState({
     make: "",
     model: "",
@@ -54,14 +62,13 @@ const HostDashboard = () => {
     transmission: "Automatic",
     fuelType: "Gasoline",
     mileage: "",
-    image: "",
+    image: null, // File
     category: "Sedan",
   });
-  const [carFormError, setCarFormError] = useState("");
-  const [statusNote, setStatusNote] = useState("");
+
   const navigate = useNavigate();
 
-  // Gate: only approved hosts should see Host Centre
+  // Gate: only approved hosts should see Host Centre (frontend guard)
   useEffect(() => {
     const user = authService.getCurrentUser?.();
     const allowed = Array.isArray(user?.roles) && user.roles.includes("host");
@@ -116,6 +123,17 @@ const HostDashboard = () => {
     return true;
   };
 
+  const handleImage = (file) => {
+    setCarForm((f) => ({ ...f, image: file }));
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target.result || "");
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview("");
+    }
+  };
+
   const submitCar = async (e) => {
     e.preventDefault();
     if (!validateCar()) return;
@@ -137,10 +155,12 @@ const HostDashboard = () => {
         transmission: "Automatic",
         fuelType: "Gasoline",
         mileage: "",
-        image: "",
+        image: null,
         category: "Sedan",
       });
+      setImagePreview("");
       await loadCars();
+      // Do NOT auto-collapse; user controls it
     } catch (err) {
       setCarFormError(err?.response?.data?.message || "Failed to create car");
     } finally {
@@ -189,7 +209,7 @@ const HostDashboard = () => {
             <div>
               <h1 className="text-xl font-semibold mb-1">Become a Host</h1>
               <p className="text-sm text-amber-800">
-                Your account hasn&apos;t been approved as a host yet. Complete onboarding to access the Host Centre.
+                Your account hasn&apos;t been approved as a host yet. Swifty admins must approve you before you can access the Host Centre.
               </p>
             </div>
           </div>
@@ -252,88 +272,116 @@ const HostDashboard = () => {
         ))}
       </div>
 
-      {/* Add Car */}
+      {/* Add Car (collapsible) */}
       <section className="bg-slate-900/70 border border-slate-800 rounded-lg p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <FaPlus className="text-emerald-400" />
-          <h2 className="text-lg font-semibold">Add a Car</h2>
-        </div>
-        <form onSubmit={submitCar} className="grid gap-3 sm:grid-cols-2">
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Make*"
-            value={carForm.make}
-            onChange={(e) => setCarForm({ ...carForm, make: e.target.value })}
-          />
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Model*"
-            value={carForm.model}
-            onChange={(e) => setCarForm({ ...carForm, model: e.target.value })}
-          />
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Year*"
-            type="number"
-            value={carForm.year}
-            onChange={(e) => setCarForm({ ...carForm, year: e.target.value })}
-          />
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Daily Rate (MYR)*"
-            type="number"
-            value={carForm.dailyRate}
-            onChange={(e) => setCarForm({ ...carForm, dailyRate: e.target.value })}
-          />
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Seats*"
-            type="number"
-            value={carForm.seats}
-            onChange={(e) => setCarForm({ ...carForm, seats: e.target.value })}
-          />
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            placeholder="Mileage (km)"
-            type="number"
-            value={carForm.mileage}
-            onChange={(e) => setCarForm({ ...carForm, mileage: e.target.value })}
-          />
-          <select
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            value={carForm.transmission}
-            onChange={(e) => setCarForm({ ...carForm, transmission: e.target.value })}
-          >
-            <option>Automatic</option>
-            <option>Manual</option>
-          </select>
-          <select
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
-            value={carForm.fuelType}
-            onChange={(e) => setCarForm({ ...carForm, fuelType: e.target.value })}
-          >
-            <option>Gasoline</option>
-            <option>Diesel</option>
-            <option>Hybrid</option>
-            <option>Electric</option>
-          </select>
-          <input
-            className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white sm:col-span-2"
-            placeholder="Image URL (optional)"
-            value={carForm.image}
-            onChange={(e) => setCarForm({ ...carForm, image: e.target.value })}
-          />
-          <div className="sm:col-span-2 flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={savingCar}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {savingCar ? "Saving..." : "Save Car"}
-            </button>
-            {carFormError && <span className="text-sm text-rose-300">{carFormError}</span>}
+        <button
+          onClick={() => setCarFormOpen((v) => !v)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <FaPlus className="text-emerald-400" />
+            <h2 className="text-lg font-semibold">Add a Car</h2>
           </div>
-        </form>
+          {carFormOpen ? <FaChevronUp /> : <FaChevronDown />}
+        </button>
+
+        {carFormOpen && (
+          <div className="mt-2">
+            <form onSubmit={submitCar} className="grid gap-3 sm:grid-cols-2">
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Make*"
+                value={carForm.make}
+                onChange={(e) => setCarForm({ ...carForm, make: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Model*"
+                value={carForm.model}
+                onChange={(e) => setCarForm({ ...carForm, model: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Year*"
+                type="number"
+                value={carForm.year}
+                onChange={(e) => setCarForm({ ...carForm, year: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Daily Rate (MYR)*"
+                type="number"
+                value={carForm.dailyRate}
+                onChange={(e) => setCarForm({ ...carForm, dailyRate: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Seats*"
+                type="number"
+                value={carForm.seats}
+                onChange={(e) => setCarForm({ ...carForm, seats: e.target.value })}
+              />
+              <input
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                placeholder="Mileage (km)"
+                type="number"
+                value={carForm.mileage}
+                onChange={(e) => setCarForm({ ...carForm, mileage: e.target.value })}
+              />
+              <select
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                value={carForm.transmission}
+                onChange={(e) => setCarForm({ ...carForm, transmission: e.target.value })}
+              >
+                <option>Automatic</option>
+                <option>Manual</option>
+              </select>
+              <select
+                className="w-full rounded-md border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-white"
+                value={carForm.fuelType}
+                onChange={(e) => setCarForm({ ...carForm, fuelType: e.target.value })}
+              >
+                <option>Gasoline</option>
+                <option>Diesel</option>
+                <option>Hybrid</option>
+                <option>Electric</option>
+              </select>
+
+              {/* Image upload with full-width preview */}
+              <div className="sm:col-span-2 space-y-2">
+                <label className="text-sm text-slate-200 flex items-center gap-2">
+                  <FaImage /> Upload image (jpg/png, max 5MB)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImage(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-slate-200"
+                />
+                {imagePreview && (
+                  <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-auto max-h-[480px] object-contain rounded-md"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="sm:col-span-2 flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={savingCar}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {savingCar ? "Saving..." : "Save Car"}
+                </button>
+                {carFormError && <span className="text-sm text-rose-300">{carFormError}</span>}
+              </div>
+            </form>
+          </div>
+        )}
       </section>
 
       {/* Cars */}

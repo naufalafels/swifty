@@ -26,6 +26,7 @@ const Navbar = () => {
     { to: "/cars", label: "Cars" },
     { to: "/contact", label: "Contact" },
     { to: "/bookings", label: "My Bookings" },
+    { to: "/profile", label: "Profile" }, // added
   ];
 
   useEffect(() => {
@@ -308,7 +309,7 @@ const Navbar = () => {
                 onClick={() => { setIsOpen(false); goHost(); }}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-amber-100 text-amber-900 font-semibold border border-amber-200"
               >
-                {isHost ? "Host Center" : "Become a Host"}
+                {isHost ? "Host Centre" : "Become a Host"}
               </button>
 
               {isLoggedIn ? (

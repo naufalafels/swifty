@@ -57,6 +57,9 @@ const bookingSchema = new Schema({
   razorpaySignature: { type: String, default: "" },
   refundId: { type: String, default: "" }, // new: track refund identifier
 
+  // small audit / idempotency trail for webhook processing (store event ids or short markers)
+  processedWebhookEvents: { type: [String], default: [] },
+
   sessionId: String, // legacy stripe field (unused)
   paymentIntentId: String, // legacy stripe field (unused)
 
@@ -67,4 +70,10 @@ const bookingSchema = new Schema({
 }, { timestamps: true });
 
 bookingSchema.index({ companyId: 1 });
+
+// RECOMMENDATION (one-time migration/manual):
+// It is advisable to create a sparse unique index on razorpayPaymentId to prevent two bookings sharing a payment id.
+// Run once as a migration or manual DB operation (don't create on every app start in production without migration):
+// await mongoose.connection.collection('bookings').createIndex({ razorpayPaymentId: 1 }, { unique: true, sparse: true });
+
 export default mongoose.models.Booking || mongoose.model('Booking', bookingSchema);

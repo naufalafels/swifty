@@ -214,25 +214,44 @@ export const createRazorpayOrder = async (req, res) => {
     const createdArr = await Booking.create([bookingInput], { session });
     const booking = createdArr[0];
 
+    // remember bookingId for cleanup in failure cases
+    const bookingIdForCleanup = booking._id && String(booking._id);
+
     await session.commitTransaction();
     session.endSession();
 
+    // Create razorpay order AFTER booking successfully created.
     const razorpay = getRazorpay();
-    const order = await razorpay.orders.create({
-      amount: Math.round(total * 100), // in paise
-      currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
-      receipt: booking._id.toString(),
-      notes: {
-        bookingId: booking._id.toString(),
-        userId: String(finalUserId ?? ""),
-        carId: String(carIdStr || ""),
-        pickupDate: String(pickupDate || ""),
-        returnDate: String(returnDate || "")
+    let order;
+    try {
+      order = await razorpay.orders.create({
+        amount: Math.round(total * 100), // in paise
+        currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
+        receipt: booking._id.toString(),
+        notes: {
+          bookingId: booking._id.toString(),
+          userId: String(finalUserId ?? ""),
+          carId: String(carIdStr || ""),
+          pickupDate: String(pickupDate || ""),
+          returnDate: String(returnDate || "")
+        }
+      });
+    } catch (e) {
+      // If Razorpay order creation fails, mark booking as cancelled/failed to free up the slot
+      if (bookingIdForCleanup) {
+        await Booking.findByIdAndUpdate(bookingIdForCleanup, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
       }
-    });
+      console.error('Razorpay order creation failed:', e?.stack || e);
+      return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(e?.message || e) });
+    }
 
-    booking.razorpayOrderId = order.id;
-    await booking.save().catch((err) => console.warn('Failed to save razorpayOrderId on booking', err));
+    // Persist razorpayOrderId atomically (avoid in-memory save race)
+    try {
+      await Booking.findByIdAndUpdate(booking._id, { razorpayOrderId: order.id }).exec();
+    } catch (err) {
+      console.warn('Failed to persist razorpayOrderId on booking', err);
+      // Not fatal: continue to return order info to client, webhook matching uses notes.bookingId as fallback
+    }
 
     return res.json({
       success: true,
@@ -250,7 +269,7 @@ export const createRazorpayOrder = async (req, res) => {
       }
     });
   } catch (error) {
-    // If we created a booking but failed to create order, free the slot
+    // If we created a booking but something failed, attempt to free the slot
     const bookingId = (error?.bookingId) || null;
     if (bookingId) {
       await Booking.findByIdAndUpdate(bookingId, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
@@ -281,13 +300,34 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid payment signature' });
     }
 
-    await Booking.findByIdAndUpdate(bookingId, {
-      paymentStatus: 'paid',
-      status: 'active',
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature
-    });
+    // Atomic update: only mark as paid if booking doesn't already have this payment id or is already paid.
+    const filter = {
+      _id: bookingId,
+      $or: [
+        { razorpayPaymentId: { $exists: false } },
+        { razorpayPaymentId: { $ne: razorpay_payment_id } },
+        { paymentStatus: { $ne: 'paid' } }
+      ]
+    };
+
+    const update = {
+      $set: {
+        paymentStatus: 'paid',
+        status: 'active',
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature
+      }
+    };
+
+    const updated = await Booking.findOneAndUpdate(filter, update, { new: true }).exec();
+    if (!updated) {
+      const maybe = await Booking.findById(bookingId).lean().exec();
+      if (!maybe) {
+        return res.status(404).json({ success: false, message: 'Booking not found' });
+      }
+      return res.json({ success: true, message: 'Payment already recorded' });
+    }
 
     return res.json({ success: true });
   } catch (error) {

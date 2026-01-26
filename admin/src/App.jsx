@@ -8,7 +8,7 @@ import AuthPage from "./pages/Auth.jsx";
 import CompanyProfile from "./pages/CompanyProfile.jsx";
 import { useState, useEffect } from "react";
 import { ensureAuth } from "./utils/auth.js";
-import CookieConsent from "./components/CookieConsent.jsx";
+import CookieConsent from "./components/CookiesConsent.jsx";
 
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();

@@ -13,6 +13,10 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
+import { GoogleMap, LoadScript, InfoWindow } from "@react-google-maps/api";
+
+// Move libraries outside component to prevent re-renders
+const GOOGLE_MAPS_LIBRARIES = ['marker'];
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const startOfDay = (d) => {
@@ -57,9 +61,15 @@ const Cars = () => {
   const limit = 12;
   const fallbackImage = `${base}/uploads/default-car.png`;
 
+  // Map state
+  const [selectedMarker, setSelectedMarker] = useState(null);
+  const [mapError, setMapError] = useState(""); // New: For map load errors
+  const mapCenter = { lat: 3.1390, lng: 101.6869 }; // KL default
+  const [map, setMap] = useState(null); // New: Reference to the map instance
+  const markersRef = useRef([]); // New: To manage markers
+
   useEffect(() => {
     fetchCars();
-    // pre-load Malaysia states
     fetchMalaysiaStates();
     return () => {
       if (abortControllerRef.current) {
@@ -107,7 +117,6 @@ const Cars = () => {
   };
 
   const fetchMalaysiaStates = async () => {
-    // countriesnow.space provides states list; using Malaysia fixed
     try {
       const resp = await axios.post(
         "https://countriesnow.space/api/v0.1/countries/states",
@@ -462,6 +471,23 @@ const Cars = () => {
     return list;
   }, [cars, activeTypes, stateSelected, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
 
+  // New: Group cars by company
+  const companyMarkers = useMemo(() => {
+    const companies = {};
+    filteredCars.forEach((car) => {
+      const companyKey = car.company?.name || car.company?.id || 'Unknown';
+      if (!companies[companyKey]) {
+        companies[companyKey] = {
+          company: car.company,
+          location: getCarCoordinates(car), // Use first car's location
+          cars: [],
+        };
+      }
+      companies[companyKey].cars.push(car);
+    });
+    return Object.values(companies).filter((comp) => comp.location); // Only with valid locations
+  }, [filteredCars]);
+
   // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
@@ -586,7 +612,6 @@ const Cars = () => {
   const handleBook = (car, id) => {
     const disabled = isBookDisabled(car);
     if (disabled) return;
-    // pass the current filter dates so CarDetail can pre-fill them
     navigate(`/cars/${id}`, { state: { car, pickupDate: pickupDate || null, returnDate: returnDate || null } });
   };
 
@@ -606,6 +631,37 @@ const Cars = () => {
     setGeoError("");
   };
 
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  console.log("API Key loaded:", apiKey ? "Present" : "Missing"); // Debug: Check if key is loaded
+
+  // New: Create AdvancedMarkerElement markers when map loads
+  const createMarkers = useCallback(async () => {
+    if (!map || !window.google) return;
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current = [];
+
+    try {
+      const { AdvancedMarkerElement } = await window.google.maps.importLibrary("marker");
+      companyMarkers.forEach((companyData) => {
+        const marker = new AdvancedMarkerElement({
+          map,
+          position: { lat: companyData.location[0], lng: companyData.location[1] },
+          title: companyData.company?.name || 'Company',
+        });
+        marker.addListener('click', () => setSelectedMarker(companyData));
+        markersRef.current.push(marker);
+      });
+    } catch (err) {
+      console.error("Error creating AdvancedMarkerElement:", err);
+      setMapError("Failed to create map markers.");
+    }
+  }, [map, companyMarkers]);
+
+  useEffect(() => {
+    createMarkers();
+  }, [createMarkers]);
+
   return (
     <div className={carPageStyles.pageContainer}>
       <div className={carPageStyles.contentContainer}>
@@ -613,7 +669,7 @@ const Cars = () => {
           <div className={carPageStyles.headerDecoration}></div>
           <h1 className={carPageStyles.title}>Premium Car Collection</h1>
           <p className={carPageStyles.subtitle}>
-            Find cars by state & city in Malaysia — or use Locate to find the closest vehicles to you.
+            Find cars by state & city in Malaysia — or use Locate to find the closest vehicles to you. Map-first discovery for nearest cars.
           </p>
         </div>
 
@@ -717,7 +773,55 @@ const Cars = () => {
           </div>
         </div>
 
-        {/* Grid */}
+        {/* Map View (above list) with Error Handling */}
+        <div className="w-full mb-6">
+          {apiKey ? (
+            <LoadScript
+              googleMapsApiKey={apiKey}
+              libraries={GOOGLE_MAPS_LIBRARIES} // Use static constant
+              onError={() => setMapError("Failed to load Google Maps. Check your API key and billing.")}
+            >
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '400px' }}
+                center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
+                zoom={12}
+                mapId="DEMO_MAP_ID" // Replace with real Map ID
+                onLoad={(mapInstance) => { setMap(mapInstance); setMapError(""); }}
+                onError={() => setMapError("Map failed to load.")}
+              >
+                {/* Markers created in createMarkers */}
+                {selectedMarker && (
+                  <InfoWindow position={{ lat: selectedMarker.location[0], lng: selectedMarker.location[1] }} onCloseClick={() => setSelectedMarker(null)}>
+                    <div>
+                      <h3>{selectedMarker.company?.name || 'Company'}</h3>
+                      <p>{selectedMarker.company?.address?.city || ''}</p>
+                      <h4>Cars Available:</h4>
+                      <ul>
+                        {selectedMarker.cars.map((car) => (
+                          <li key={car._id}>
+                            {car.make} {car.model} - MYR {car.dailyRate}/day
+                            <button onClick={() => handleBook(car, car._id)} className="ml-2 bg-blue-600 text-white px-2 py-1 rounded">Book</button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </InfoWindow>
+                )}
+              </GoogleMap>
+            </LoadScript>
+          ) : (
+            <div className="text-center text-red-400 p-4 bg-gray-800 rounded">
+              Google Maps API key is missing. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file and ensure it's enabled in Google Cloud Console.
+            </div>
+          )}
+          {mapError && (
+            <div className="text-center text-red-400 p-4 bg-gray-800 rounded mt-2">
+              {mapError} Refer to Google Maps documentation for setup.
+            </div>
+          )}
+        </div>
+
+        {/* List View (below map) */}
         <div className={carPageStyles.gridContainer}>
           {loading &&
             Array.from({ length: limit }).map((_, i) => (
@@ -758,7 +862,6 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
-              // company display helpers
               const companyName = car.company?.name || car.companyName || car.ownerName || "";
               const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
               const companyState = car.company?.address?.state || "";
@@ -776,7 +879,6 @@ const Cars = () => {
                       className={carPageStyles.carImage}
                     />
 
-                    {/* availability badge at top-right of card */}
                     <div className="absolute right-4 top-4 z-20">
                       {renderAvailabilityBadge(car.availability, car)}
                     </div>
@@ -795,7 +897,6 @@ const Cars = () => {
                           {car.category ?? car.type ?? "Sedan"}
                         </p>
 
-                        {/* Company name (small) */}
                         {companyName ? (
                           <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
                             <FaBuilding className="text-gray-400" />
@@ -864,7 +965,6 @@ const Cars = () => {
             })}
         </div>
 
-        {/* Floating decorative elements */}
         <div className={carPageStyles.decor1}></div>
         <div className={carPageStyles.decor2}></div>
       </div>

@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import { Server } from 'socket.io';
+import http from 'http';
 
 import path from 'path';
 import helmet from 'helmet';
@@ -27,6 +29,9 @@ const PORT = process.env.PORT || 7889;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*", credentials: true } });
 
 connectDB();
 
@@ -66,6 +71,13 @@ app.use('/api/payments', paymentRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/companies', companyRouter);
 app.use('/api/host', hostRouter);
+
+// socket.io
+io.on('connection', (socket) => {
+  socket.on('join', (room) => socket.join(room));
+  socket.on('message', (data) => socket.to(data.room).emit('message', data));
+});
+server.listen(PORT, () => console.log(`Server with Socket.io on ${PORT}`));
 
 // health / ping route
 app.get('/api/ping', (req, res) => res.json({ ok: true, time: Date.now() }));

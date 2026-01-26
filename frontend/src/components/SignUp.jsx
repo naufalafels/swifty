@@ -4,7 +4,7 @@ import { FaArrowLeft, FaCheck, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaUser } f
 import { useNavigate } from 'react-router-dom'
 import logo from "../assets/swifty-logo.png"
 import { ToastContainer, toast } from "react-toastify"
-import axios from 'axios'
+import api from '../utils/api'; // central axios instance
 import * as authService from '../utils/authService';
 
 const SignUp = () => {
@@ -42,13 +42,13 @@ const SignUp = () => {
         setLoading(true);
 
         try {
-            // Use authService.register when available
-            const base = import.meta.env.VITE_API_URL || 'http://localhost:7889';
-            const url = `${base}/api/auth/register`;
+            // Respect cookie consent: if user declined, send without credentials (backend must honor this and return token in body)
+            const consent = typeof window !== 'undefined' ? localStorage.getItem('cookie_consent') : null;
+            const allowCookies = consent !== 'declined'; // default allow unless explicitly declined
 
-            const res = await axios.post(url, formData, {
+            const res = await api.post('/api/auth/register', formData, {
                 headers: { 'Content-Type': 'application/json' },
-                withCredentials: true,
+                withCredentials: allowCookies, // per-request override
             });
 
             if (res.status >= 200 && res.status < 300) {

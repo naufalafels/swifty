@@ -14,6 +14,7 @@ import HostOnboardPage from './pages/HostOnboardPage';
 import HostDashboard from './pages/HostDashboard';
 import ProfilePage from './pages/ProfilePage';
 import * as authService from './utils/authService';
+import CookieConsent from './components/CookieConsent';
 
 // PROTECTED ROUTE that supports async token refresh on page load
 const ProtectedRoute = ({ children }) => {
@@ -155,6 +156,9 @@ const App = () => {
           <FaArrowUp />
         </button>
       )}
+
+      {/* Cookie consent banner */}
+      <CookieConsent />
     </>
   );
 };

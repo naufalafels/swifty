@@ -52,7 +52,24 @@ const Login = () => {
 
     catch (err) {
       console.error("Login error (frontend):", err);
-      if (err.response) {
+
+      // Handle rate limit (429) with improved UX
+      if (err?.response?.status === 429) {
+        // Try to extract Retry-After header (seconds) to show more actionable message
+        const retryAfterHeader = err.response?.headers?.['retry-after'];
+        let waitInfo = '';
+        if (retryAfterHeader) {
+          const secs = Number(retryAfterHeader);
+          if (!Number.isNaN(secs) && secs > 0) {
+            waitInfo = ` Try again in ${Math.ceil(secs / 60)} minute(s).`;
+          }
+        }
+        const serverMessage =
+          err.response.data?.message ||
+          `Too many login attempts. Please try again later.${waitInfo}`;
+        // Persistent, prominent toast for rate-limits
+        toast.error(serverMessage, { theme: "colored", autoClose: 8000 });
+      } else if (err.response) {
         const serverMessage =
           err.response.data?.message ||
           err.response.data?.error ||

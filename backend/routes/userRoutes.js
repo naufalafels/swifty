@@ -2,10 +2,14 @@ import express from 'express';
 import { login, register, refresh, logout, me, submitKyc, getKyc, becomeHost, hostGetRenterKyc } from '../controllers/userController.js';
 import authMiddleware from '../middlewares/auth.js';
 
+// Import login-specific rate limiter
+import { loginLimiter } from '../middlewares/rateLimit.js';
+
 const userRouter = express.Router();
 
 // Public
-userRouter.post('/login', login);
+// Apply the loginLimiter to the login route to limit brute-force attempts
+userRouter.post('/login', loginLimiter, login);
 userRouter.post('/register', register);
 
 // Refresh and logout

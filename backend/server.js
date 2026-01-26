@@ -17,6 +17,9 @@ import adminRouter from './routes/adminRoutes.js';
 import companyRouter from './routes/companyRoutes.js';
 import hostRouter from './routes/hostRoutes.js';
 
+// New: general API rate limiter
+import { generalLimiter } from './middlewares/rateLimit.js';
+
 dotenv.config();
 
 const app = express();
@@ -51,6 +54,9 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply general API rate limiter to all /api routes (prevents mass abuse at the edge)
+app.use('/api', generalLimiter);
 
 // ROUTES
 app.use('/api/auth', userRouter);

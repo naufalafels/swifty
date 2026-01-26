@@ -15,6 +15,7 @@ dotenv.config();
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim() || 'http://localhost:5173';
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toUpperCase();
 const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
+const BLOCKING_STATUSES = ['pending', 'active', 'upcoming'];
 
 const getRazorpay = () => {
   const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
@@ -59,8 +60,11 @@ const getOrCreateGuestUser = async ({ name, email, phone }) => {
 };
 
 export const createRazorpayOrder = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     if (!req.body) return res.status(400).json({ success: false, message: 'Request body is missing' });
+
+    session.startTransaction();
 
     const tokenUserId = getUserIdFromRequest(req);
     let {
@@ -81,19 +85,47 @@ export const createRazorpayOrder = async (req, res) => {
     } = req.body;
 
     const total = Number(amount);
-    if (!total || Number.isNaN(total) || total <= 0) return res.status(400).json({ success: false, message: "Invalid amount" });
-    if (!email) return res.status(400).json({ success: false, message: "Email required" });
-    if (!pickupDate || !returnDate) return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
+    if (!total || Number.isNaN(total) || total <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "Invalid amount" });
+    }
+    if (!email) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "Email required" });
+    }
+    if (!pickupDate || !returnDate) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
+    }
 
     const pd = new Date(pickupDate);
     const rd = new Date(returnDate);
-    if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) return res.status(400).json({ success: false, message: "Invalid dates" });
-    if (rd < pd) return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
+    if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "Invalid dates" });
+    }
+    if (rd < pd) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
+    }
 
     // Parse car if sent as JSON string
     let carField = car;
     if (typeof car === 'string') {
       try { carField = JSON.parse(car); } catch { carField = { name: car }; }
+    }
+
+    const carRef = carField && (carField.id || carField._id);
+    const carIdStr = carRef ? String(carRef) : null;
+    if (!carIdStr || !mongoose.Types.ObjectId.isValid(carIdStr)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: "Valid car id is required" });
     }
 
     // Ensure userId (auth user or guest)
@@ -102,15 +134,15 @@ export const createRazorpayOrder = async (req, res) => {
       finalUserId = await getOrCreateGuestUser({ name: customer, email, phone });
     }
     if (!mongoose.Types.ObjectId.isValid(finalUserId)) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ success: false, message: 'Invalid userId format' });
     }
 
     // Enrich car with company
     let bookingCompanyId = null;
     try {
-      const carRef = carField && (carField.id || carField._id);
-      const carIdStr = carRef ? String(carRef) : null;
-      if (carIdStr && mongoose.Types.ObjectId.isValid(carIdStr)) {
+      if (carIdStr) {
         const canonicalCar = await Car.findById(carIdStr).lean();
         if (canonicalCar) {
           const canonicalCompany = canonicalCar.company || canonicalCar.companyId || null;
@@ -134,6 +166,20 @@ export const createRazorpayOrder = async (req, res) => {
       frontImageUrl: kycFront ? toUrl(kycFront) : (kyc?.frontImageUrl || ''),
       backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
     };
+
+    // Conflict check inside the transaction to prevent double booking
+    const conflict = await Booking.findOne({
+      "car.id": mongoose.Types.ObjectId(carIdStr),
+      status: { $in: BLOCKING_STATUSES },
+      pickupDate: { $lte: rd },
+      returnDate: { $gte: pd },
+    }).session(session).lean();
+
+    if (conflict) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
+    }
 
     // Create pending booking
     const bookingInput = {
@@ -165,7 +211,11 @@ export const createRazorpayOrder = async (req, res) => {
     };
     if (bookingCompanyId) bookingInput.companyId = bookingCompanyId;
 
-    const booking = await Booking.create(bookingInput);
+    const createdArr = await Booking.create([bookingInput], { session });
+    const booking = createdArr[0];
+
+    await session.commitTransaction();
+    session.endSession();
 
     const razorpay = getRazorpay();
     const order = await razorpay.orders.create({
@@ -175,7 +225,7 @@ export const createRazorpayOrder = async (req, res) => {
       notes: {
         bookingId: booking._id.toString(),
         userId: String(finalUserId ?? ""),
-        carId: String((carField && (carField.id || carField._id)) || ""),
+        carId: String(carIdStr || ""),
         pickupDate: String(pickupDate || ""),
         returnDate: String(returnDate || "")
       }
@@ -200,6 +250,15 @@ export const createRazorpayOrder = async (req, res) => {
       }
     });
   } catch (error) {
+    // If we created a booking but failed to create order, free the slot
+    const bookingId = (error?.bookingId) || null;
+    if (bookingId) {
+      await Booking.findByIdAndUpdate(bookingId, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
+    }
+    try {
+      await session.abortTransaction();
+      session.endSession();
+    } catch {}
     console.error('Razorpay Order Error', error?.stack || error);
     return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(error?.message || error) });
   }

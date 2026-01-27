@@ -37,6 +37,9 @@ const __dirname = path.dirname(__filename);
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*", credentials: true } });
 
+// Attach io to app for use in routes
+app.set('io', io);
+
 connectDB();
 
 app.use(cookieParser());

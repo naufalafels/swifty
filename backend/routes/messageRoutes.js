@@ -1,5 +1,7 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Message from '../models/Message.js';
+import User from '../models/userModel.js'; // Add this import
 import authenticateToken from '../middlewares/auth.js';
 
 const router = express.Router();
@@ -8,7 +10,7 @@ const router = express.Router();
 router.get('/car/:carId', authenticateToken, async (req, res) => {
   try {
     const { carId } = req.params;
-    const userId = req.user.id;
+    const userId = new mongoose.Types.ObjectId(req.user.id);
     const messages = await Message.find({
       carId,
       $or: [{ fromUserId: userId }, { toUserId: userId }],
@@ -19,10 +21,10 @@ router.get('/car/:carId', authenticateToken, async (req, res) => {
   }
 });
 
-// NEW: Get all messages for the logged-in host (for HostDashboard)
+// Get all messages for the logged-in host
 router.get('/host', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = new mongoose.Types.ObjectId(req.user.id);
     const messages = await Message.find({
       $or: [{ fromUserId: userId }, { toUserId: userId }],
     }).sort({ timestamp: 1 });
@@ -35,7 +37,12 @@ router.get('/host', authenticateToken, async (req, res) => {
 // Send message
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { toUserId, carId, message } = req.body;
+    const { toUserId: companyId, carId, message } = req.body;
+    // Find the host user for this company
+    const hostUser = await User.findOne({ companyId, roles: { $in: ["host"] } });
+    if (!hostUser) return res.status(404).json({ message: 'Host not found for this company' });
+
+    const toUserId = hostUser._id;
     const newMessage = new Message({
       fromUserId: req.user.id,
       toUserId,
@@ -43,6 +50,25 @@ router.post('/', authenticateToken, async (req, res) => {
       message,
     });
     await newMessage.save();
+
+    // Emit to the host's room
+    const io = req.app.get('io');
+    io.to(`user-${toUserId}`).emit('privateMessage', {
+      fromUserId: req.user.id,
+      toUserId,
+      carId,
+      message,
+      timestamp: newMessage.timestamp,
+    });
+    // Also emit to sender for UI update
+    io.to(`user-${req.user.id}`).emit('privateMessage', {
+      fromUserId: req.user.id,
+      toUserId,
+      carId,
+      message,
+      timestamp: newMessage.timestamp,
+    });
+
     res.status(201).json(newMessage);
   } catch (err) {
     res.status(500).json({ message: 'Server error' });

@@ -13,10 +13,7 @@ import {
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
-import { GoogleMap, LoadScript, InfoWindow } from "@react-google-maps/api";
-
-// Move libraries outside component to prevent re-renders
-const GOOGLE_MAPS_LIBRARIES = ['marker'];
+import { GoogleMap, LoadScript, Marker, InfoWindow } from "@react-google-maps/api";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const startOfDay = (d) => {
@@ -65,8 +62,6 @@ const Cars = () => {
   const [selectedMarker, setSelectedMarker] = useState(null);
   const [mapError, setMapError] = useState(""); // New: For map load errors
   const mapCenter = { lat: 3.1390, lng: 101.6869 }; // KL default
-  const [map, setMap] = useState(null); // New: Reference to the map instance
-  const markersRef = useRef([]); // New: To manage markers
 
   useEffect(() => {
     fetchCars();
@@ -304,9 +299,9 @@ const Cars = () => {
     }
   };
 
-  // location helpers: prefer company.location
+  // location helpers: prefer car.location
   const getCarCoordinates = (car) => {
-    const loc = car.company?.location ?? car.location ?? null;
+    const loc = car.location ?? car.company?.location ?? null;
     if (loc && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
       return [Number(loc.coordinates[1]), Number(loc.coordinates[0])];
     }
@@ -356,7 +351,7 @@ const Cars = () => {
     const candidates = [
       car.company?.address?.city,
       car.company?.address?.cityName,
-      car.company?.city,
+      car.city,
       car.city,
       car.pickupLocation,
       car.locationName,
@@ -487,6 +482,10 @@ const Cars = () => {
     });
     return Object.values(companies).filter((comp) => comp.location); // Only with valid locations
   }, [filteredCars]);
+
+  console.log("Number of company markers:", companyMarkers.length);
+  console.log("Sample cars data (first 2):", cars.slice(0, 2));
+  console.log("Company markers details:", companyMarkers.map(c => ({ name: c.company?.name, location: c.location })));
 
   // availability badge rendering (re-used)
   const computeAvailableMeta = (untilIso) => {
@@ -634,34 +633,6 @@ const Cars = () => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   console.log("API Key loaded:", apiKey ? "Present" : "Missing"); // Debug: Check if key is loaded
 
-  // New: Create AdvancedMarkerElement markers when map loads
-  const createMarkers = useCallback(async () => {
-    if (!map || !window.google) return;
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
-
-    try {
-      const { AdvancedMarkerElement } = await window.google.maps.importLibrary("marker");
-      companyMarkers.forEach((companyData) => {
-        const marker = new AdvancedMarkerElement({
-          map,
-          position: { lat: companyData.location[0], lng: companyData.location[1] },
-          title: companyData.company?.name || 'Company',
-        });
-        marker.addListener('click', () => setSelectedMarker(companyData));
-        markersRef.current.push(marker);
-      });
-    } catch (err) {
-      console.error("Error creating AdvancedMarkerElement:", err);
-      setMapError("Failed to create map markers.");
-    }
-  }, [map, companyMarkers]);
-
-  useEffect(() => {
-    createMarkers();
-  }, [createMarkers]);
-
   return (
     <div className={carPageStyles.pageContainer}>
       <div className={carPageStyles.contentContainer}>
@@ -778,18 +749,30 @@ const Cars = () => {
           {apiKey ? (
             <LoadScript
               googleMapsApiKey={apiKey}
-              libraries={GOOGLE_MAPS_LIBRARIES} // Use static constant
               onError={() => setMapError("Failed to load Google Maps. Check your API key and billing.")}
             >
               <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '400px' }}
                 center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
                 zoom={12}
-                mapId={import.meta.env.VITE_GOOGLE_MAP_ID}
-                onLoad={(mapInstance) => { setMap(mapInstance); setMapError(""); }}
+                onLoad={() => setMapError("")}
                 onError={() => setMapError("Map failed to load.")}
               >
-                {/* Markers created in createMarkers */}
+                {userCoords && (
+                  <Marker
+                    position={{ lat: userCoords[0], lng: userCoords[1] }}
+                    title="Your Location"
+                    icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }}
+                  />
+                )}
+                {companyMarkers.map((companyData) => (
+                  <Marker
+                    key={companyData.company?.name || 'unknown'}
+                    position={{ lat: companyData.location[0], lng: companyData.location[1] }}
+                    onClick={() => setSelectedMarker(companyData)}
+                    title={companyData.company?.name || 'Company'}
+                  />
+                ))}
                 {selectedMarker && (
                   <InfoWindow position={{ lat: selectedMarker.location[0], lng: selectedMarker.location[1] }} onCloseClick={() => setSelectedMarker(null)}>
                     <div>

@@ -121,8 +121,17 @@ const HostDashboard = () => {
       carId: selectedConversation.carId,
       message: newMessage,
     };
-    socket.emit('privateMessage', msgData);
-    setNewMessage('');
+    console.log('Emitting msgData:', msgData);
+    // NEW: Save to DB via POST
+    api.post('/api/messages', msgData).then(() => {
+      console.log('Message saved to DB');
+      // Then emit for real-time
+      socket.emit('privateMessage', msgData);
+      setNewMessage('');
+    }).catch((err) => {
+      console.error('Failed to save message:', err);
+      setError('Failed to send message');
+    });
   };
 
   const loadCars = async () => {

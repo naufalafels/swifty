@@ -244,9 +244,17 @@ const CarDetail = () => {
       message: newMessage,
     };
     console.log('Emitting msgData:', msgData);
-    socket.emit('privateMessage', msgData);
-    setNewMessage('');
-    setMessagingError('');
+    // NEW: Save to DB via POST first
+    api.post('/api/messages', msgData).then(() => {
+      console.log('Message saved to DB');
+      // Then emit for real-time
+      socket.emit('privateMessage', msgData);
+      setNewMessage('');
+      setMessagingError('');
+    }).catch((err) => {
+      console.error('Failed to save message:', err);
+      setMessagingError('Failed to send message');
+    });
   };
 
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;

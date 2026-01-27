@@ -10,6 +10,7 @@ import {
   FaMapMarkerAlt,
   FaSyncAlt,
   FaBuilding,
+  FaCheck,
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
@@ -26,6 +27,8 @@ const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
 const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury"];
+// Seat options for filtering
+const DEFAULT_SEATS = [2, 4, 5, 7];
 
 const Cars = () => {
   const navigate = useNavigate();
@@ -38,20 +41,23 @@ const Cars = () => {
   const [selectedTypes, setSelectedTypes] = useState(() =>
     DEFAULT_TYPES.reduce((acc, t) => ({ ...acc, [t]: false }), {})
   );
+  const [selectedSeats, setSelectedSeats] = useState(() =>
+    DEFAULT_SEATS.reduce((acc, s) => ({ ...acc, [s]: false }), {})
+  );
   const [pickupDate, setPickupDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
 
-  // Malaysia-first: state & city selectors, plus area text
+  // Malaysia-first: state & city selectors
   const [malaysiaStates, setMalaysiaStates] = useState([]);
   const [stateSelected, setStateSelected] = useState("");
   const [citiesForState, setCitiesForState] = useState([]);
   const [citySelected, setCitySelected] = useState("");
-  const [areaQuery, setAreaQuery] = useState("");
 
   // geolocation
   const [useMyLocation, setUseMyLocation] = useState(false);
   const [userCoords, setUserCoords] = useState(null);
   const [geoError, setGeoError] = useState("");
+  const [locationRequested, setLocationRequested] = useState(false); // New: Track if location permission has been requested
 
   const abortControllerRef = useRef(null);
   const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
@@ -60,12 +66,37 @@ const Cars = () => {
 
   // Map state
   const [selectedMarker, setSelectedMarker] = useState(null);
-  const [mapError, setMapError] = useState(""); // New: For map load errors
+  const [mapError, setMapError] = useState(""); // For map load errors
   const mapCenter = { lat: 3.1390, lng: 101.6869 }; // KL default
+
+  // Function to reverse geocode coordinates to state and city
+  const reverseGeocode = useCallback(async (lat, lng) => {
+    if (!window.google || !window.google.maps) return;
+    const geocoder = new window.google.maps.Geocoder();
+    const latlng = { lat, lng };
+    geocoder.geocode({ location: latlng }, (results, status) => {
+      if (status === "OK" && results[0]) {
+        const addressComponents = results[0].address_components;
+        let state = "";
+        let city = "";
+        for (const component of addressComponents) {
+          if (component.types.includes("administrative_area_level_1")) {
+            state = component.long_name;
+          }
+          if (component.types.includes("locality") || component.types.includes("administrative_area_level_2")) {
+            city = component.long_name;
+          }
+        }
+        if (state) setStateSelected(state);
+        if (city) setCitySelected(city);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     fetchCars();
     fetchMalaysiaStates();
+    // Removed automatic location request; now user-initiated
     return () => {
       if (abortControllerRef.current) {
         try {
@@ -329,7 +360,7 @@ const Cars = () => {
     return R * c;
   };
 
-  // city / area matching
+  // city / area matching (area removed)
   const matchesState = (car, state) => {
     if (!state) return true;
     const q = state.trim().toLowerCase();
@@ -361,40 +392,28 @@ const Cars = () => {
     return candidates.some((t) => t.includes(c));
   };
 
-  const matchesArea = (car, area) => {
-    if (!area) return true;
-    const q = area.trim().toLowerCase();
-    const candidates = [
-      car.company?.address?.street,
-      car.company?.address?.city,
-      car.address,
-      car.pickupLocation,
-      car.description,
-      `${car.make} ${car.model}`,
-    ]
-      .filter(Boolean)
-      .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
-    return candidates.some((t) => t.includes(q));
-  };
-
-  // detect user location
+  // detect user location (now user-initiated)
   const obtainUserLocation = useCallback(() => {
     setGeoError("");
+    setLocationRequested(true); // Mark as requested
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUserCoords([pos.coords.latitude, pos.coords.longitude]);
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setUserCoords(coords);
         setUseMyLocation(true);
+        // Automatically reverse geocode to fill state and city
+        reverseGeocode(coords[0], coords[1]);
       },
       (err) => {
         setGeoError(err?.message || "Failed to obtain location");
       },
       { timeout: 10000 }
     );
-  }, []);
+  }, [reverseGeocode]);
 
   // toggle locate off if unchecked
   useEffect(() => {
@@ -407,6 +426,11 @@ const Cars = () => {
   const activeTypes = useMemo(
     () => Object.keys(selectedTypes).filter((t) => selectedTypes[t]),
     [selectedTypes]
+  );
+
+  const activeSeats = useMemo(
+    () => Object.keys(selectedSeats).filter((s) => selectedSeats[s]).map(Number),
+    [selectedSeats]
   );
 
   // final filtered list
@@ -424,6 +448,11 @@ const Cars = () => {
       });
     }
 
+    // seats filter
+    if (activeSeats.length > 0) {
+      list = list.filter((car) => activeSeats.includes(Number(car.seats ?? 4)));
+    }
+
     // state filter (Malaysia-focused)
     if (stateSelected) {
       list = list.filter((car) => matchesState(car, stateSelected));
@@ -432,11 +461,6 @@ const Cars = () => {
     // city filter (narrow within state)
     if (citySelected) {
       list = list.filter((car) => matchesCity(car, citySelected));
-    }
-
-    // area filter optional
-    if (areaQuery && areaQuery.trim()) {
-      list = list.filter((car) => matchesArea(car, areaQuery));
     }
 
     // dates filter
@@ -464,9 +488,9 @@ const Cars = () => {
     }
 
     return list;
-  }, [cars, activeTypes, stateSelected, citySelected, areaQuery, pickupDate, returnDate, userCoords]);
+  }, [cars, activeTypes, activeSeats, stateSelected, citySelected, pickupDate, returnDate, userCoords]);
 
-  // New: Group cars by company
+  // Group cars by company
   const companyMarkers = useMemo(() => {
     const companies = {};
     filteredCars.forEach((car) => {
@@ -483,11 +507,7 @@ const Cars = () => {
     return Object.values(companies).filter((comp) => comp.location); // Only with valid locations
   }, [filteredCars]);
 
-  console.log("Number of company markers:", companyMarkers.length);
-  console.log("Sample cars data (first 2):", cars.slice(0, 2));
-  console.log("Company markers details:", companyMarkers.map(c => ({ name: c.company?.name, location: c.location })));
-
-  // availability badge rendering (re-used)
+  // availability badge rendering (same as before)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
     try {
@@ -503,7 +523,7 @@ const Cars = () => {
     }
   };
 
-  const renderAvailabilityBadge = (rawAvailability, car) => {
+  const renderAvailabilityBadge = (car) => {
     const effective = computeEffectiveAvailability(car);
 
     if (!effective) {
@@ -618,20 +638,24 @@ const Cars = () => {
     setSelectedTypes((prev) => ({ ...prev, [type]: !prev[type] }));
   };
 
+  const toggleSeat = (seat) => {
+    setSelectedSeats((prev) => ({ ...prev, [seat]: false ? prev[seat] : !prev[seat] }));
+  };
+
   const resetFilters = () => {
     setSelectedTypes(DEFAULT_TYPES.reduce((acc, t) => ({ ...acc, [t]: false }), {}));
+    setSelectedSeats(DEFAULT_SEATS.reduce((acc, s) => ({ ...acc, [s]: false }), {}));
     setPickupDate("");
     setReturnDate("");
     setStateSelected("");
     setCitySelected("");
-    setAreaQuery("");
     setUseMyLocation(false);
     setUserCoords(null);
     setGeoError("");
+    setLocationRequested(false); // Reset location request
   };
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  console.log("API Key loaded:", apiKey ? "Present" : "Missing"); // Debug: Check if key is loaded
 
   return (
     <div className={carPageStyles.pageContainer}>
@@ -646,14 +670,15 @@ const Cars = () => {
 
         {/* Filters */}
         <div className="w-full max-w-7xl mx-auto mb-6">
-          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 flex flex-col lg:flex-row gap-4 items-start">
-            <div className="flex-1 min-w-[220px]">
+          {/* Main grid: State, City, Dates */}
+          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div className="flex-1 min-w-[200px]">
               <label className="text-sm text-gray-300 block mb-2">State</label>
               {malaysiaStates && malaysiaStates.length > 0 ? (
                 <select
                   value={stateSelected}
                   onChange={(e) => setStateSelected(e.target.value)}
-                  className="w-full p-2 rounded bg-gray-800 text-white"
+                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
                 >
                   <option value="">Choose a state</option>
                   {malaysiaStates.map((s) => (
@@ -667,18 +692,18 @@ const Cars = () => {
                   value={stateSelected}
                   onChange={(e) => setStateSelected(e.target.value)}
                   placeholder="State / Region"
-                  className="w-full p-2 rounded bg-gray-700 text-white"
+                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
                 />
               )}
             </div>
 
-            <div className="flex-1 min-w-[220px]">
+            <div className="flex-1 min-w-[200px]">
               <label className="text-sm text-gray-300 block mb-2">City</label>
               {citiesForState && citiesForState.length > 0 ? (
                 <select
                   value={citySelected}
                   onChange={(e) => setCitySelected(e.target.value)}
-                  className="w-full p-2 rounded bg-gray-800 text-white"
+                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
                 >
                   <option value="">Choose a city</option>
                   {citiesForState.map((c) => (
@@ -692,55 +717,96 @@ const Cars = () => {
                   value={citySelected}
                   onChange={(e) => setCitySelected(e.target.value)}
                   placeholder="City"
-                  className="w-full p-2 rounded bg-gray-700 text-white"
+                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
                 />
               )}
             </div>
 
-            <div className="flex-1 min-w-[220px]">
-              <label className="text-sm text-gray-300 block mb-2">Area (optional)</label>
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm text-gray-300 block mb-2">Pickup Date</label>
               <input
-                value={areaQuery}
-                onChange={(e) => setAreaQuery(e.target.value)}
-                placeholder="Neighborhood / area name"
-                className="w-full p-2 rounded bg-gray-700 text-white"
+                type="date"
+                value={pickupDate}
+                onChange={(e) => setPickupDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
               />
             </div>
 
-            <div className="min-w-[240px] flex flex-col items-end gap-2">
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={() => { setUseMyLocation((v) => !v); if (!useMyLocation) obtainUserLocation(); else { setUserCoords(null); setGeoError(''); } }}
-                  className={`px-3 py-2 rounded flex items-center gap-2 text-white ${useMyLocation ? 'bg-amber-600' : 'bg-orange-600'}`}
-                  title="Locate and sort by nearest cars"
-                >
-                  <FaMapMarkerAlt /> {useMyLocation ? 'Using my location' : 'Locate'}
-                </button>
-                <button onClick={resetFilters} className="px-3 py-2 rounded bg-gray-700 text-white flex items-center gap-2">
-                  <FaSyncAlt /> Reset
-                </button>
-              </div>
-              <small className="text-xs text-gray-400 self-end">
-                {useMyLocation && userCoords ? `Sorting by distance — ${userCoords[0].toFixed(4)},${userCoords[1].toFixed(4)}` : geoError ? geoError : 'Filtering by Malaysian state & city (manual or select state→city).'}
-              </small>
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm text-gray-300 block mb-2">Return Date</label>
+              <input
+                type="date"
+                value={returnDate}
+                onChange={(e) => setReturnDate(e.target.value)}
+                min={pickupDate || new Date().toISOString().split("T")[0]}
+                className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+              />
             </div>
           </div>
 
-          {/* Car types + dates */}
-          <div className="mt-3 bg-gray-900/50 border border-gray-800 rounded-xl p-3 flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-3 flex-wrap">
-              {DEFAULT_TYPES.map((t) => (
-                <label key={t} className="inline-flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => toggleType(t)} className="w-4 h-4" />
-                  <span className="text-gray-200">{t}</span>
-                </label>
-              ))}
+          {/* Location Consent Prompt */}
+          {!locationRequested && (
+            <div className="mt-4 bg-blue-900/50 border border-blue-800 rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FaMapMarkerAlt className="text-blue-400" />
+                <div>
+                  <p className="text-white font-semibold">Auto-fill Location</p>
+                  <p className="text-sm text-gray-300">Allow location access to automatically fill your state and city for easier car discovery.</p>
+                </div>
+              </div>
+              <button
+                onClick={obtainUserLocation}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <FaCheck /> Allow
+              </button>
             </div>
+          )}
 
-            <div className="ml-auto flex items-center gap-2">
-              <input type="date" value={pickupDate} onChange={(e) => setPickupDate(e.target.value)} min={new Date().toISOString().split("T")[0]} className="p-2 rounded bg-gray-800 text-white" />
-              <input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} min={pickupDate || new Date().toISOString().split("T")[0]} className="p-2 rounded bg-gray-800 text-white" />
+          {/* Location Error or Status */}
+          {geoError && (
+            <div className="mt-4 bg-red-900/50 border border-red-800 rounded-xl p-4">
+              <p className="text-red-300 text-sm">{geoError}</p>
             </div>
+          )}
+
+          {/* Separate Car Types and Seat Numbers Boxes */}
+          <div className="mt-4 bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Box: Car Types */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-3">Car Types</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {DEFAULT_TYPES.map((t) => (
+                    <label key={t} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
+                      <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => toggleType(t)} className="w-4 h-4 accent-orange-500" />
+                      <span className="text-gray-200">{t}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Right Box: Seat Numbers */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-3">Seat Numbers</h4>
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {DEFAULT_SEATS.map((s) => (
+                    <label key={s} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
+                      <input type="checkbox" checked={!!selectedSeats[s]} onChange={() => toggleSeat(s)} className="w-4 h-4 accent-orange-500" />
+                      <span className="text-gray-200">{s} Seats</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Reset Button */}
+          <div className="mt-4 flex justify-end">
+            <button onClick={resetFilters} className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors flex items-center gap-2">
+              <FaSyncAlt /> Reset Filters
+            </button>
           </div>
         </div>
 
@@ -754,7 +820,7 @@ const Cars = () => {
               <GoogleMap
                 mapContainerStyle={{ width: '100%', height: '400px' }}
                 center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
-                zoom={12}
+                zoom={15}
                 onLoad={() => setMapError("")}
                 onError={() => setMapError("Map failed to load.")}
               >
@@ -863,7 +929,7 @@ const Cars = () => {
                     />
 
                     <div className="absolute right-4 top-4 z-20">
-                      {renderAvailabilityBadge(car.availability, car)}
+                      {renderAvailabilityBadge(car)}
                     </div>
 
                     <div className={carPageStyles.priceBadge}>

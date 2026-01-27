@@ -38,8 +38,9 @@ router.get('/host', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { toUserId: companyId, carId, message } = req.body;
-    // Find the host user for this company
-    const hostUser = await User.findOne({ companyId, roles: { $in: ["host"] } });
+    // Convert companyId to ObjectId
+    const companyIdObj = new mongoose.Types.ObjectId(companyId);
+    const hostUser = await User.findOne({ companyId: companyIdObj, roles: { $in: ["host"] } });
     if (!hostUser) return res.status(404).json({ message: 'Host not found for this company' });
 
     const toUserId = hostUser._id;

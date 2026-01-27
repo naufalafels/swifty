@@ -19,7 +19,11 @@ import {
   FaPassport,
   FaShieldAlt,
   FaInfoCircle,
-  FaImage
+  FaImage,
+  // NEW: Add icons for messaging
+  FaComments,
+  FaPaperPlane,
+  FaTimes // For close button
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -28,6 +32,8 @@ import * as authService from "../utils/authService";
 import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
 import { createRazorpayOrder, verifyRazorpayPayment } from "../services/paymentService";
+// NEW: Import Socket.io client
+import io from 'socket.io-client';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
 
@@ -129,6 +135,13 @@ const CarDetail = () => {
   const submitControllerRef = useRef(null);
   const [today, setToday] = useState(todayISO());
 
+  // NEW: State for messaging and floating chat
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [socket, setSocket] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [messagingError, setMessagingError] = useState(''); // NEW: For errors
+
   useEffect(() => setToday(todayISO()), []);
 
   useEffect(() => {
@@ -170,6 +183,71 @@ const CarDetail = () => {
       fetchControllerRef.current = null;
     };
   }, [id]);
+
+  // NEW: Initialize Socket.io and load messages
+  useEffect(() => {
+    if (currentUser && car) {
+      console.log('Initializing socket for user:', currentUser.id, 'and car:', car._id);
+      const newSocket = io(API_BASE);
+      setSocket(newSocket);
+      newSocket.on('connect', () => console.log('Socket connected'));
+      newSocket.on('disconnect', () => console.log('Socket disconnected'));
+      newSocket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err);
+        setMessagingError('Failed to connect to messaging server');
+      });
+
+      newSocket.emit('joinUserRoom', currentUser.id);
+      newSocket.on('privateMessage', (data) => {
+        console.log('Received message:', data);
+        setMessages((prev) => [...prev, data]);
+      });
+
+      // Load message history (optional: comment out if route not ready)
+      api.get(`/api/messages/car/${car._id}`).then((res) => {
+        console.log('Loaded messages:', res.data);
+        setMessages(res.data);
+      }).catch((err) => {
+        console.error('Failed to load messages:', err);
+        setMessagingError('Failed to load message history');
+      });
+
+      return () => {
+        console.log('Disconnecting socket');
+        newSocket.disconnect();
+      };
+    }
+  }, [currentUser, car]);
+
+  // NEW: Handle sending message
+  const sendMessage = () => {
+    console.log('sendMessage called');
+    if (!socket?.connected) {
+      setMessagingError('Messaging not connected');
+      return;
+    }
+    if (!newMessage.trim()) {
+      setMessagingError('Message cannot be empty');
+      return;
+    }
+    // FIX: Use correct host ID. Adjust based on console log of 'car'
+    const hostId = car?.ownerId || car?.companyId; // Example: adjust to your field
+    if (!hostId) {
+      console.error('Host ID not found in car:', car);
+      setMessagingError('Cannot find host ID. Check car data.');
+      return;
+    }
+    const msgData = {
+      toUserId: hostId,
+      fromUserId: currentUser.id,
+      carId: car._id,
+      message: newMessage,
+    };
+    console.log('Emitting msgData:', msgData);
+    socket.emit('privateMessage', msgData);
+    setNewMessage('');
+    setMessagingError('');
+  };
 
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
   if (!car && carError) return <div className="p-6 text-red-400">{carError}</div>;
@@ -740,6 +818,73 @@ const CarDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* NEW: Floating Chat Widget */}
+        {currentUser && (
+          <div className="fixed bottom-4 left-4 z-50">
+            {/* Chat Toggle Button */}
+            <button
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className="bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 transition md:p-4"
+              aria-label="Toggle chat"
+            >
+              <FaComments className="text-lg md:text-xl" />
+            </button>
+
+            {/* Chat Window */}
+            {isChatOpen && (
+              <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
+                {/* Chat Header */}
+                <div className="flex items-center justify-between p-3 border-b border-gray-700">
+                  <h3 className="text-sm font-semibold text-white">Message Host</h3>
+                  <button
+                    onClick={() => setIsChatOpen(false)}
+                    className="text-gray-400 hover:text-white"
+                    aria-label="Close chat"
+                  >
+                    <FaTimes className="text-lg" />
+                  </button>
+                </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
+                  {messages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`mb-2 text-sm ${
+                        msg.fromUserId === currentUser.id ? 'text-right' : 'text-left'
+                      }`}
+                    >
+                      <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">
+                        {msg.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input Area */}
+                <div className="p-3 border-t border-gray-700 bg-gray-900">
+                  {messagingError && <div className="text-red-400 text-xs mb-2">{messagingError}</div>}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      className="bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
+                    >
+                      <FaPaperPlane className="text-sm" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -19,6 +19,10 @@ import adminRouter from './routes/adminRoutes.js';
 import companyRouter from './routes/companyRoutes.js';
 import hostRouter from './routes/hostRoutes.js';
 
+// NEW: Import new routes for messages and reviews
+import messageRouter from './routes/messageRoutes.js';
+import reviewRouter from './routes/reviewRoutes.js';
+
 // New: general API rate limiter
 import { generalLimiter } from './middlewares/rateLimit.js';
 
@@ -72,11 +76,22 @@ app.use('/api/admin', adminRouter);
 app.use('/api/companies', companyRouter);
 app.use('/api/host', hostRouter);
 
+// NEW: Add routes for messages and reviews
+app.use('/api/messages', messageRouter);
+app.use('/api/reviews', reviewRouter);
+
 // socket.io
 io.on('connection', (socket) => {
   socket.on('join', (room) => socket.join(room));
-  socket.on('message', (data) => socket.to(data.room).emit('message', data));
+  // NEW: Handle private messaging between users and hosts
+  socket.on('privateMessage', (data) => {
+    io.to(`user-${data.toUserId}`).emit('privateMessage', data);
+    socket.emit('privateMessage', data); // Echo to sender for UI update
+  });
+  socket.on('joinUserRoom', (userId) => socket.join(`user-${userId}`));
+  socket.on('message', (data) => socket.to(data.room).emit('message', data)); // Keep for backward compatibility
 });
+
 server.listen(PORT, () => console.log(`Server with Socket.io on ${PORT}`));
 
 // health / ping route

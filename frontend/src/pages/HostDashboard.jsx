@@ -13,9 +13,15 @@ import {
   FaChevronDown,
   FaChevronUp,
   FaImage,
+  // NEW: Add icons for messaging
+  FaComments,
+  FaPaperPlane,
+  FaTimes // For close button
 } from "react-icons/fa";
 import { getHostCars, createHostCar, getHostBookings, updateHostBookingStatus } from "../services/hostService";
 import * as authService from "../utils/authService";
+// NEW: Import Socket.io client
+import io from 'socket.io-client';
 
 const Pill = ({ children, tone = "slate" }) => {
   const tones = {
@@ -66,6 +72,13 @@ const HostDashboard = () => {
     category: "Sedan",
   });
 
+  // NEW: State for messaging and floating chat
+  const [messages, setMessages] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [socket, setSocket] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
   const navigate = useNavigate();
 
   // Gate: only approved hosts should see Host Centre (frontend guard)
@@ -74,6 +87,38 @@ const HostDashboard = () => {
     const allowed = Array.isArray(user?.roles) && user.roles.includes("host");
     setIsHost(allowed);
   }, []);
+
+  // NEW: Initialize Socket.io for messaging
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      const newSocket = io('http://localhost:7889'); // Adjust to env if needed
+      setSocket(newSocket);
+      newSocket.emit('joinUserRoom', user.id);
+      newSocket.on('privateMessage', (data) => {
+        setMessages((prev) => [...prev, data]);
+      });
+      // Assume a new route for host messages
+      // NOTE: This assumes you have /api/messages/host implemented on the backend
+      // If not, replace with appropriate API call or remove
+      // For now, using a placeholder; implement as needed
+      // api.get('/api/messages/host').then((res) => setMessages(res.data)).catch(() => {});
+    }
+    return () => socket?.disconnect();
+  }, []);
+
+  // NEW: Handle sending message
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedConversation) return;
+    const msgData = {
+      toUserId: selectedConversation.userId,
+      fromUserId: authService.getCurrentUser().id,
+      carId: selectedConversation.carId,
+      message: newMessage,
+    };
+    socket.emit('privateMessage', msgData);
+    setNewMessage('');
+  };
 
   const loadCars = async () => {
     setLoadingCars(true);
@@ -526,6 +571,90 @@ const HostDashboard = () => {
           </div>
         )}
       </section>
+
+      {/* NEW: Floating Chat Widget */}
+      {isHost && (
+        <div className="fixed bottom-4 left-4 z-50">
+          {/* Chat Toggle Button */}
+          <button
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className="bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 transition md:p-4"
+            aria-label="Toggle chat"
+          >
+            <FaComments className="text-lg md:text-xl" />
+          </button>
+
+          {/* Chat Window */}
+          {isChatOpen && (
+            <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
+              {/* Chat Header */}
+              <div className="flex items-center justify-between p-3 border-b border-gray-700">
+                <h3 className="text-sm font-semibold text-white">Messages</h3>
+                <button
+                  onClick={() => setIsChatOpen(false)}
+                  className="text-gray-400 hover:text-white"
+                  aria-label="Close chat"
+                >
+                  <FaTimes className="text-lg" />
+                </button>
+              </div>
+
+              {/* Conversations List (for hosts) */}
+              <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
+                <div className="mb-3 text-xs text-gray-400">Select a conversation:</div>
+                {Object.values(messages.reduce((acc, msg) => {
+                  const key = `${msg.carId}-${msg.fromUserId}`;
+                  if (!acc[key]) acc[key] = { carId: msg.carId, userId: msg.fromUserId, lastMsg: msg };
+                  return acc;
+                }, {})).map((conv) => (
+                  <div
+                    key={conv.carId}
+                    onClick={() => setSelectedConversation(conv)}
+                    className={`p-2 mb-2 rounded cursor-pointer ${
+                      selectedConversation?.carId === conv.carId ? 'bg-orange-600' : 'bg-gray-700'
+                    }`}
+                  >
+                    Conversation for Car {conv.carId}
+                  </div>
+                ))}
+                {selectedConversation && (
+                  <div className="mt-3">
+                    <div className="text-xs text-gray-400 mb-2">Messages:</div>
+                    {messages
+                      .filter((msg) => msg.carId === selectedConversation.carId && msg.fromUserId === selectedConversation.userId)
+                      .map((msg, idx) => (
+                        <div key={idx} className="mb-2 text-sm">
+                          <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">
+                            {msg.message}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Input Area */}
+              <div className="p-3 border-t border-gray-700 bg-gray-900">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Reply..."
+                    className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    className="bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
+                  >
+                    <FaPaperPlane className="text-sm" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && <div className="text-red-400 text-sm">{error}</div>}
     </div>

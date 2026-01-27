@@ -647,12 +647,6 @@ const Cars = () => {
     setSelectedSeats(DEFAULT_SEATS.reduce((acc, s) => ({ ...acc, [s]: false }), {}));
     setPickupDate("");
     setReturnDate("");
-    setStateSelected("");
-    setCitySelected("");
-    setUseMyLocation(false);
-    setUserCoords(null);
-    setGeoError("");
-    setLocationRequested(false); // Reset location request
   };
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;

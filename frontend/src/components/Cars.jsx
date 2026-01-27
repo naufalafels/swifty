@@ -785,7 +785,7 @@ const Cars = () => {
                 mapContainerStyle={{ width: '100%', height: '400px' }}
                 center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
                 zoom={12}
-                mapId="DEMO_MAP_ID" // Replace with real Map ID
+                mapId={import.meta.env.VITE_GOOGLE_MAP_ID}
                 onLoad={(mapInstance) => { setMap(mapInstance); setMapError(""); }}
                 onError={() => setMapError("Map failed to load.")}
               >

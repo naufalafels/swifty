@@ -1,6 +1,6 @@
 import express from 'express';
 import Message from '../models/Message.js';
-import authenticateToken from '../middlewares/auth.js'; // Assume this exists
+import authenticateToken from '../middlewares/auth.js';
 
 const router = express.Router();
 
@@ -11,6 +11,19 @@ router.get('/car/:carId', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const messages = await Message.find({
       carId,
+      $or: [{ fromUserId: userId }, { toUserId: userId }],
+    }).sort({ timestamp: 1 });
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// NEW: Get all messages for the logged-in host (for HostDashboard)
+router.get('/host', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const messages = await Message.find({
       $or: [{ fromUserId: userId }, { toUserId: userId }],
     }).sort({ timestamp: 1 });
     res.json(messages);

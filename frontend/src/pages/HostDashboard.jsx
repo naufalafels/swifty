@@ -20,6 +20,8 @@ import {
 } from "react-icons/fa";
 import { getHostCars, createHostCar, getHostBookings, updateHostBookingStatus } from "../services/hostService";
 import * as authService from "../utils/authService";
+// NEW: Import api for HTTP requests
+import api from "../utils/api";
 // NEW: Import Socket.io client
 import io from 'socket.io-client';
 
@@ -98,11 +100,14 @@ const HostDashboard = () => {
       newSocket.on('privateMessage', (data) => {
         setMessages((prev) => [...prev, data]);
       });
-      // Assume a new route for host messages
-      // NOTE: This assumes you have /api/messages/host implemented on the backend
-      // If not, replace with appropriate API call or remove
-      // For now, using a placeholder; implement as needed
-      // api.get('/api/messages/host').then((res) => setMessages(res.data)).catch(() => {});
+      // NEW: Load message history
+      api.get('/api/messages/host').then((res) => {
+        console.log('Loaded host messages:', res.data);
+        setMessages(res.data);
+      }).catch((err) => {
+        console.error('Failed to load host messages:', err);
+        setError('Failed to load messages');
+      });
     }
     return () => socket?.disconnect();
   }, []);

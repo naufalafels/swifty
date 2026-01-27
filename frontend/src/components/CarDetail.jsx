@@ -230,10 +230,10 @@ const CarDetail = () => {
       setMessagingError('Message cannot be empty');
       return;
     }
-    // FIX: Use correct host ID. Adjust based on console log of 'car'
-    const hostId = car?.ownerId || car?.companyId; // Example: adjust to your field
+    // FIX: Use the company's ID as the host ID (from your car data: car.company.id)
+    const hostId = car?.company?.id;
     if (!hostId) {
-      console.error('Host ID not found in car:', car);
+      console.error('Host ID not found in car.company.id. Car data:', car);
       setMessagingError('Cannot find host ID. Check car data.');
       return;
     }

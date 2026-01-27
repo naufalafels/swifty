@@ -37,34 +37,40 @@ router.get('/host', authenticateToken, async (req, res) => {
 // Send message
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { toUserId: companyId, carId, message } = req.body;
-    // Convert companyId to ObjectId
-    const companyIdObj = new mongoose.Types.ObjectId(companyId);
-    const hostUser = await User.findOne({ companyId: companyIdObj, roles: { $in: ["host"] } });
-    if (!hostUser) return res.status(404).json({ message: 'Host not found for this company' });
+    const { toUserId, carId, message } = req.body;
+    let finalToUserId = toUserId;
 
-    const toUserId = hostUser._id;
+    if (req.user.roles && req.user.roles.includes("host")) {
+      // Host sending to user: toUserId is already the user's ID
+    } else {
+      // User sending to host: toUserId is company ID, find the host user
+      const companyIdObj = new mongoose.Types.ObjectId(toUserId);
+      const hostUser = await User.findOne({ companyId: companyIdObj, roles: { $in: ["host"] } });
+      if (!hostUser) return res.status(404).json({ message: 'Host not found for this company' });
+      finalToUserId = hostUser._id;
+    }
+
     const newMessage = new Message({
       fromUserId: req.user.id,
-      toUserId,
+      toUserId: finalToUserId,
       carId,
       message,
     });
     await newMessage.save();
 
-    // Emit to the host's room
+    // Emit to recipient
     const io = req.app.get('io');
-    io.to(`user-${toUserId}`).emit('privateMessage', {
+    io.to(`user-${finalToUserId}`).emit('privateMessage', {
       fromUserId: req.user.id,
-      toUserId,
+      toUserId: finalToUserId,
       carId,
       message,
       timestamp: newMessage.timestamp,
     });
-    // Also emit to sender for UI update
+    // Emit to sender for UI update
     io.to(`user-${req.user.id}`).emit('privateMessage', {
       fromUserId: req.user.id,
-      toUserId,
+      toUserId: finalToUserId,
       carId,
       message,
       timestamp: newMessage.timestamp,

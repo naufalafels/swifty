@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
 import { BarChart3, ShieldCheck, FileText, ClipboardList, Receipt, FileSignature, Menu, X, LogOut, User, Settings, ChevronLeft, ChevronRight } from "lucide-react"; // UPDATED: Added ChevronLeft, ChevronRight for collapse toggle
@@ -9,8 +9,6 @@ import {
   adminLogout,
   ensureAuth,
 } from "../utils/auth.js";
-import CompanyProfileModal from "./CompanyProfileModal.jsx";
-import api from "../utils/api";
 
 const navLinks = [
   { path: "/analytics", icon: BarChart3, label: "Analytics" }, // NEW: Analytics as first
@@ -25,7 +23,6 @@ const navLinks = [
 const Sidebar = () => {
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(true); // UPDATED: Default to collapsed
-  const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [company, setCompany] = useState(null);
 
   const [adminUser, setAdminUser] = useState(() => getAdminUser());
@@ -130,11 +127,6 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
-
-      {/* Company Profile Modal */}
-      {showCompanyModal && (
-        <CompanyProfileModal onClose={() => setShowCompanyModal(false)} onSaved={(c) => setCompany(c)} />
-      )}
     </>
   );
 };

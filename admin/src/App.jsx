@@ -7,8 +7,8 @@ import AuditLogs from "./pages/AuditLogs.jsx"; // NEW: Audit logs page
 import Reports from "./pages/Reports.jsx"; // NEW: Reports page
 import LegalDocs from "./pages/LegalDocs.jsx"; // NEW: Legal documents page
 import Refunds from "./pages/Refunds.jsx"; // NEW: Refunds page
+import CompanyProfile from "./pages/CompanyProfile.jsx"; // UPDATED: Now a full page
 import AuthPage from "./pages/Auth.jsx";
-import CompanyProfile from "./pages/CompanyProfile.jsx";
 import { useState, useEffect } from "react";
 import { ensureAuth } from "./utils/auth.js";
 import CookieConsent from "./components/CookiesConsent.jsx";
@@ -70,7 +70,7 @@ const App = () => {
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} /> {/* NEW */}
           <Route path="/legal-docs" element={<ProtectedRoute><LegalDocs /></ProtectedRoute>} /> {/* NEW */}
           <Route path="/refunds" element={<ProtectedRoute><Refunds /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/company" element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} />
+          <Route path="/company" element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} /> {/* UPDATED: Full page */}
           <Route path="*" element={<Navigate to="/analytics" replace />} /> {/* UPDATED: Redirect unknown to analytics */}
         </Routes>
         <CookieConsent />

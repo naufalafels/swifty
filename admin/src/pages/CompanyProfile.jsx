@@ -2,11 +2,11 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { getAdminToken } from '../utils/auth.js';
 import { ToastContainer, toast } from 'react-toastify';
-import { X } from 'lucide-react';
+import { Save, Upload } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
-const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
+const CompanyProfile = () => {
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(false);
   const [logoFile, setLogoFile] = useState(null);
@@ -31,6 +31,8 @@ const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
   const updateField = (k, v) => setCompany(c => ({ ...c, [k]: v }));
   const updateAddress = (k, v) => setCompany(c => ({ ...c, address: { ...(c?.address || {}), [k]: v } }));
   const updateContact = (k, v) => setCompany(c => ({ ...c, contact: { ...(c?.contact || {}), [k]: v } }));
+  const updateSocial = (k, v) => setCompany(c => ({ ...c, social: { ...(c?.social || {}), [k]: v } }));
+  const updateBusiness = (k, v) => setCompany(c => ({ ...c, business: { ...(c?.business || {}), [k]: v } }));
   const handleFileChange = (e) => setLogoFile(e.target.files?.[0] || null);
 
   const handleSave = async () => {
@@ -38,12 +40,24 @@ const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
     try {
       const form = new FormData();
       form.append('name', company.name || '');
+      form.append('description', company.description || '');
+      form.append('website', company.website || '');
+      form.append('industry', company.industry || '');
+      form.append('founded', company.founded || '');
+      form.append('employees', company.employees || '');
       form.append('contact_email', company.contact?.email || '');
       form.append('contact_phone', company.contact?.phone || '');
+      form.append('contact_fax', company.contact?.fax || '');
       form.append('address_street', company.address?.street || '');
       form.append('address_city', company.address?.city || '');
       form.append('address_state', company.address?.state || '');
       form.append('address_zipCode', company.address?.zipCode || '');
+      form.append('address_country', company.address?.country || '');
+      form.append('social_facebook', company.social?.facebook || '');
+      form.append('social_twitter', company.social?.twitter || '');
+      form.append('social_linkedin', company.social?.linkedin || '');
+      form.append('business_registration', company.business?.registration || '');
+      form.append('business_taxId', company.business?.taxId || '');
       if (logoFile) form.append('logo', logoFile);
       if (company.location?.coordinates) {
         form.append('location_lat', company.location.coordinates[1]);
@@ -57,8 +71,6 @@ const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
       if (res.data?.success) {
         setCompany(res.data.company);
         toast.success('Company updated');
-        if (typeof onSaved === 'function') onSaved(res.data.company);
-        onClose();
       } else {
         toast.error(res.data?.message || 'Update failed');
       }
@@ -68,47 +80,229 @@ const CompanyProfileModal = ({ onClose = () => {}, onSaved = null }) => {
     } finally { setLoading(false); }
   };
 
-  if (!company && loading) return null;
+  if (!company && loading) return <div className="p-6">Loading company profile...</div>;
 
   return (
-    <>
+    <div className="flex-1 p-6 bg-gray-100 min-h-screen">
       <ToastContainer />
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-        <div className="bg-gray-900 rounded-lg w-full max-w-3xl p-6 relative">
-          <button onClick={onClose} className="absolute right-3 top-3 p-1 rounded hover:bg-gray-800"><X className="w-5 h-5" /></button>
-          <h2 className="text-xl font-semibold mb-4">Company Profile</h2>
-          {!company ? <div className="text-gray-300">Loading...</div> : (
-            <div className="space-y-4">
-              <div><label className="block mb-1 text-sm text-gray-300">Name</label><input className="w-full p-2 rounded bg-gray-800" value={company.name || ''} onChange={e => updateField('name', e.target.value)} /></div>
+      <h1 className="text-3xl font-bold mb-6">Company Profile</h1>
+      <div className="bg-white p-6 rounded-lg shadow-lg space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Company Name</label>
+            <input
+              type="text"
+              value={company?.name || ''}
+              onChange={(e) => updateField('name', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Website</label>
+            <input
+              type="url"
+              value={company?.website || ''}
+              onChange={(e) => updateField('website', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Industry</label>
+            <input
+              type="text"
+              value={company?.industry || ''}
+              onChange={(e) => updateField('industry', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Founded Year</label>
+            <input
+              type="number"
+              value={company?.founded || ''}
+              onChange={(e) => updateField('founded', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Number of Employees</label>
+            <input
+              type="number"
+              value={company?.employees || ''}
+              onChange={(e) => updateField('employees', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block mb-2 text-sm font-medium">Description</label>
+            <textarea
+              value={company?.description || ''}
+              onChange={(e) => updateField('description', e.target.value)}
+              className="w-full p-3 border rounded"
+              rows="4"
+            />
+          </div>
+        </div>
 
-              <div>
-                <label className="block mb-1 text-sm text-gray-300">Logo (upload)</label>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="w-full mb-2 p-2 rounded bg-gray-800" />
-                {company.logo && !logoFile && <div className="mt-2"><img src={company.logo} alt="logo preview" className="h-16 object-contain" /></div>}
-                {logoFile && <div className="mt-2"><img src={URL.createObjectURL(logoFile)} alt="preview" className="h-16 object-contain" /></div>}
-              </div>
-
-              <div><label className="block mb-1 text-sm text-gray-300">Contact Email</label><input className="w-full p-2 rounded bg-gray-800" value={company.contact?.email || ''} onChange={e => updateContact('email', e.target.value)} /></div>
-              <div><label className="block mb-1 text-sm text-gray-300">Phone</label><input className="w-full p-2 rounded bg-gray-800" value={company.contact?.phone || ''} onChange={e => updateContact('phone', e.target.value)} /></div>
-              <div><label className="block mb-1 text-sm text-gray-300">Street</label><input className="w-full p-2 rounded bg-gray-800" value={company.address?.street || ''} onChange={e => updateAddress('street', e.target.value)} /></div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <input placeholder="City" className="p-2 rounded bg-gray-800" value={company.address?.city || ''} onChange={e => updateAddress('city', e.target.value)} />
-                <input placeholder="State" className="p-2 rounded bg-gray-800" value={company.address?.state || ''} onChange={e => updateAddress('state', e.target.value)} />
-              </div>
-
-              <div><label className="block mb-1 text-sm text-gray-300">Zip Code</label><input className="w-full p-2 rounded bg-gray-800" value={company.address?.zipCode || ''} onChange={e => updateAddress('zipCode', e.target.value)} /></div>
-
-              <div className="flex gap-3 mt-4">
-                <button onClick={handleSave} disabled={loading} className="px-4 py-2 bg-orange-600 rounded">{loading ? 'Saving...' : 'Save'}</button>
-                <button onClick={onClose} className="px-4 py-2 bg-gray-700 rounded">Cancel</button>
-              </div>
-            </div>
+        <div>
+          <label className="block mb-2 text-sm font-medium">Logo</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="w-full p-3 border rounded"
+          />
+          {(company?.logo || logoFile) && (
+            <img
+              src={logoFile ? URL.createObjectURL(logoFile) : company.logo}
+              alt="Company Logo"
+              className="mt-4 h-20 object-contain"
+            />
           )}
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Contact Email</label>
+            <input
+              type="email"
+              value={company?.contact?.email || ''}
+              onChange={(e) => updateContact('email', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Phone</label>
+            <input
+              type="tel"
+              value={company?.contact?.phone || ''}
+              onChange={(e) => updateContact('phone', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Fax</label>
+            <input
+              type="tel"
+              value={company?.contact?.fax || ''}
+              onChange={(e) => updateContact('fax', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Street Address</label>
+            <input
+              type="text"
+              value={company?.address?.street || ''}
+              onChange={(e) => updateAddress('street', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">City</label>
+            <input
+              type="text"
+              value={company?.address?.city || ''}
+              onChange={(e) => updateAddress('city', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">State</label>
+            <input
+              type="text"
+              value={company?.address?.state || ''}
+              onChange={(e) => updateAddress('state', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Zip Code</label>
+            <input
+              type="text"
+              value={company?.address?.zipCode || ''}
+              onChange={(e) => updateAddress('zipCode', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block mb-2 text-sm font-medium">Country</label>
+            <input
+              type="text"
+              value={company?.address?.country || ''}
+              onChange={(e) => updateAddress('country', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Facebook</label>
+            <input
+              type="url"
+              value={company?.social?.facebook || ''}
+              onChange={(e) => updateSocial('facebook', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Twitter</label>
+            <input
+              type="url"
+              value={company?.social?.twitter || ''}
+              onChange={(e) => updateSocial('twitter', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">LinkedIn</label>
+            <input
+              type="url"
+              value={company?.social?.linkedin || ''}
+              onChange={(e) => updateSocial('linkedin', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block mb-2 text-sm font-medium">Business Registration Number</label>
+            <input
+              type="text"
+              value={company?.business?.registration || ''}
+              onChange={(e) => updateBusiness('registration', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+          <div>
+            <label className="block mb-2 text-sm font-medium">Tax ID</label>
+            <input
+              type="text"
+              value={company?.business?.taxId || ''}
+              onChange={(e) => updateBusiness('taxId', e.target.value)}
+              className="w-full p-3 border rounded"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Save size={20} className="mr-2" />
+            {loading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 
-export default CompanyProfileModal;
+export default CompanyProfile;

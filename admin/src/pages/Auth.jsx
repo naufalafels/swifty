@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Loader2, MapPin, Globe2 } from 'lucide-react';
+import { ShieldCheck, Loader2, MapPin, Globe2, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { adminLogin, saveAdminSession } from '../utils/auth.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
@@ -12,12 +12,12 @@ const AuthPage = () => {
   const [geoError, setGeoError] = useState('');
   const [error, setError] = useState('');
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Admin-only: just email/password; hosts/companies cannot self-signup here.
+  // Admin-only: email/password; hosts/users cannot sign in here.
   const [values, setValues] = useState({
     email: '',
     password: '',
-    // optional: capture admin login geo for audit
     location_lat: '',
     location_lng: '',
   });
@@ -59,7 +59,6 @@ const AuthPage = () => {
       const data = await adminLogin({
         email: values.email.trim(),
         password: values.password,
-        // optionally send coords for audit if backend supports it
         location_lat: values.location_lat,
         location_lng: values.location_lng,
       });
@@ -67,6 +66,15 @@ const AuthPage = () => {
       const token = data?.accessToken || data?.token || null;
       const user = data?.user || null;
       if (!token) throw new Error('No token returned from admin login');
+
+      // Enforce admin role client-side as a second gate (backend must also enforce).
+      const role = user?.role || user?.type || user?.userType;
+      const isAdmin = role === 'admin' || role === 'ADMIN' || role === 'superadmin';
+      if (!isAdmin) {
+        setError('Access denied: Only Admins may sign in.');
+        setLoading(false);
+        return;
+      }
 
       saveAdminSession(token, user);
 
@@ -123,16 +131,26 @@ const AuthPage = () => {
 
           <div className="space-y-2">
             <label className="text-sm text-slate-300">Password</label>
-            <input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={values.password}
-              onChange={onChange}
-              required
-              className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={values.password}
+                onChange={onChange}
+                required
+                className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 pr-11 text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-200"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -160,8 +178,9 @@ const AuthPage = () => {
           </div>
 
           {error && (
-            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {error}
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-red-300" />
+              <span>{error}</span>
             </div>
           )}
 
@@ -181,8 +200,7 @@ const AuthPage = () => {
           </button>
 
           <p className="text-xs text-slate-500 leading-relaxed">
-            This console is restricted to Swifty corporate administrators. Host/company self-signup is disabled.
-            Contact platform operations if you need access.
+            Admin-only access. If you’re a Host or User, please sign in through the main Swifty app.
           </p>
         </form>
       </div>

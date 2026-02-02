@@ -13,17 +13,27 @@ import {
   FaChevronDown,
   FaChevronUp,
   FaImage,
-  // NEW: Add icons for messaging
   FaComments,
   FaPaperPlane,
-  FaTimes // For close button
+  FaTimes
 } from "react-icons/fa";
 import { getHostCars, createHostCar, getHostBookings, updateHostBookingStatus } from "../services/hostService";
 import * as authService from "../utils/authService";
-// NEW: Import api for HTTP requests
 import api from "../utils/api";
-// NEW: Import Socket.io client
-import io from 'socket.io-client';
+import io from "socket.io-client";
+
+// Vite-safe Socket URL resolution
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
+
+// Helper to pick a small image for car cards/thumbnails
+const getCarThumb = (car) => {
+  if (!car) return null;
+  const images = Array.isArray(car.images) ? car.images : car?.image ? [car.image] : [];
+  return images[0] || null;
+};
 
 const Pill = ({ children, tone = "slate" }) => {
   const tones = {
@@ -57,7 +67,7 @@ const HostDashboard = () => {
   const [error, setError] = useState("");
   const [isHost, setIsHost] = useState(true);
   const [statusNote, setStatusNote] = useState("");
-  const [carFormOpen, setCarFormOpen] = useState(false); // start collapsed
+  const [carFormOpen, setCarFormOpen] = useState(false);
   const [carFormError, setCarFormError] = useState("");
   const [imagePreview, setImagePreview] = useState("");
 
@@ -70,68 +80,106 @@ const HostDashboard = () => {
     transmission: "Automatic",
     fuelType: "Gasoline",
     mileage: "",
-    image: null, // File
+    image: null,
     category: "Sedan",
   });
 
-  // NEW: State for messaging and floating chat
+  // Messaging state
   const [messages, setMessages] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [msgError, setMsgError] = useState("");
 
   const navigate = useNavigate();
 
-  // Gate: only approved hosts should see Host Centre (frontend guard)
   useEffect(() => {
     const user = authService.getCurrentUser?.();
     const allowed = Array.isArray(user?.roles) && user.roles.includes("host");
     setIsHost(allowed);
   }, []);
 
-  // NEW: Initialize Socket.io for messaging
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      const newSocket = io('http://localhost:7889'); // Adjust to env if needed
-      setSocket(newSocket);
-      newSocket.emit('joinUserRoom', user.id);
-      newSocket.on('privateMessage', (data) => {
-        setMessages((prev) => [...prev, data]);
-      });
-      // NEW: Load message history
-      api.get('/api/messages/host').then((res) => {
-        console.log('Loaded host messages:', res.data);
-        setMessages(res.data);
-      }).catch((err) => {
-        console.error('Failed to load host messages:', err);
-        setError('Failed to load messages');
-      });
-    }
-    return () => socket?.disconnect();
+    let active = true;
+    const user = authService.getCurrentUser?.();
+    if (!user) return;
+
+    const s = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+    });
+
+    setSocket(s);
+    s.emit("joinUserRoom", user.id);
+
+    s.on("privateMessage", (data) => {
+      if (!active) return;
+      setMessages((prev) => [...prev, data]);
+    });
+
+    api
+      .get("/api/messages/host")
+      .then((res) => {
+        if (!active) return;
+        setMessages(res.data || []);
+      })
+      .catch(() => setMsgError("Failed to load messages"));
+
+    return () => {
+      active = false;
+      s.disconnect();
+    };
   }, []);
 
-  // NEW: Handle sending message
-  const sendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
-    const msgData = {
-      toUserId: selectedConversation.userId,
-      fromUserId: authService.getCurrentUser().id,
-      carId: selectedConversation.carId,
-      message: newMessage,
-    };
-    console.log('Emitting msgData:', msgData);
-    // NEW: Save to DB via POST
-    api.post('/api/messages', msgData).then(() => {
-      console.log('Message saved to DB');
-      // Then emit for real-time
-      socket.emit('privateMessage', msgData);
-      setNewMessage('');
-    }).catch((err) => {
-      console.error('Failed to save message:', err);
-      setError('Failed to send message');
+  const me = authService.getCurrentUser?.()?.id;
+
+  const conversations = useMemo(() => {
+    const carMap = new Map(cars.map((c) => [String(c._id || c.id), c]));
+    const map = {};
+    messages.forEach((msg) => {
+      const counterpartId = msg.fromUserId === me ? msg.toUserId : msg.fromUserId;
+      const key = `${msg.carId}-${counterpartId}`;
+      const car = carMap.get(String(msg.carId));
+      const userLabel = msg.userName || msg.userEmail || counterpartId;
+      const carModel = car?.model || car?.make || "Car";
+      const carThumb = getCarThumb(car);
+      const latest = map[key]?.lastMsg;
+      if (!latest || new Date(msg.timestamp || msg.createdAt) > new Date(latest.timestamp || latest.createdAt)) {
+        map[key] = { carId: msg.carId, userId: counterpartId, userLabel, carModel, carThumb, lastMsg: msg };
+      }
     });
+    return Object.values(map);
+  }, [messages, me, cars]);
+
+  const activeThread = useMemo(() => {
+    if (!selectedConversation || !me) return [];
+    return messages
+      .filter(
+        (msg) =>
+          msg.carId === selectedConversation.carId &&
+          ((msg.fromUserId === me && msg.toUserId === selectedConversation.userId) ||
+            (msg.toUserId === me && msg.fromUserId === selectedConversation.userId))
+      )
+      .sort((a, b) => new Date(a.timestamp || a.createdAt) - new Date(b.timestamp || b.createdAt));
+  }, [messages, selectedConversation, me]);
+
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedConversation || !socket) return;
+    const payload = {
+      toUserId: selectedConversation.userId,
+      fromUserId: me,
+      carId: selectedConversation.carId,
+      message: newMessage.trim(),
+    };
+    api
+      .post("/api/messages", payload)
+      .then(() => {
+        socket.emit("privateMessage", payload);
+        setNewMessage("");
+        setMsgError("");
+      })
+      .catch(() => setMsgError("Failed to send message"));
   };
 
   const loadCars = async () => {
@@ -219,7 +267,6 @@ const HostDashboard = () => {
       });
       setImagePreview("");
       await loadCars();
-      // Do NOT auto-collapse; user controls it
     } catch (err) {
       setCarFormError(err?.response?.data?.message || "Failed to create car");
     } finally {
@@ -406,7 +453,6 @@ const HostDashboard = () => {
                 <option>Electric</option>
               </select>
 
-              {/* Image upload with full-width preview */}
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-sm text-slate-200 flex items-center gap-2">
                   <FaImage /> Upload image (jpg/png, max 5MB)
@@ -586,69 +632,72 @@ const HostDashboard = () => {
         )}
       </section>
 
-      {/* NEW: Floating Chat Widget */}
+      {/* Messaging widget */}
       {isHost && (
         <div className="fixed bottom-4 left-4 z-50">
-          {/* Chat Toggle Button */}
           <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
+            onClick={() => setIsChatOpen((p) => !p)}
             className="bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 transition md:p-4"
             aria-label="Toggle chat"
           >
             <FaComments className="text-lg md:text-xl" />
           </button>
 
-          {/* Chat Window */}
           {isChatOpen && (
             <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
-              {/* Chat Header */}
               <div className="flex items-center justify-between p-3 border-b border-gray-700">
                 <h3 className="text-sm font-semibold text-white">Messages</h3>
-                <button
-                  onClick={() => setIsChatOpen(false)}
-                  className="text-gray-400 hover:text-white"
-                  aria-label="Close chat"
-                >
+                <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white" aria-label="Close chat">
                   <FaTimes className="text-lg" />
                 </button>
               </div>
 
-              {/* Conversations List (for hosts) */}
               <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
                 <div className="mb-3 text-xs text-gray-400">Select a conversation:</div>
-                {Object.values(messages.reduce((acc, msg) => {
-                  const key = `${msg.carId}-${msg.fromUserId}`;
-                  if (!acc[key]) acc[key] = { carId: msg.carId, userId: msg.fromUserId, lastMsg: msg };
-                  return acc;
-                }, {})).map((conv) => (
+                {conversations.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
+                {conversations.map((conv) => (
                   <div
-                    key={conv.carId}
+                    key={`${conv.carId}-${conv.userId}`}
                     onClick={() => setSelectedConversation(conv)}
                     className={`p-2 mb-2 rounded cursor-pointer ${
-                      selectedConversation?.carId === conv.carId ? 'bg-orange-600' : 'bg-gray-700'
+                      selectedConversation?.carId === conv.carId && selectedConversation?.userId === conv.userId ? "bg-orange-600" : "bg-gray-700"
                     }`}
                   >
-                    Conversation for Car {conv.carId}
+                    <div className="flex items-center gap-2">
+                      {conv.carThumb ? (
+                        <img
+                          src={conv.carThumb}
+                          alt="car"
+                          className="w-10 h-10 object-cover rounded border border-gray-700"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-gray-700" />
+                      )}
+                      <div className="flex-1">
+                        <div className="text-sm text-white line-clamp-1">{conv.userLabel}</div>
+                        <div className="text-xs text-gray-300 line-clamp-1">{conv.carModel} · {conv.carId}</div>
+                        <div className="text-xs text-gray-400 line-clamp-1">{conv.lastMsg?.message}</div>
+                      </div>
+                    </div>
                   </div>
                 ))}
                 {selectedConversation && (
                   <div className="mt-3">
                     <div className="text-xs text-gray-400 mb-2">Messages:</div>
-                    {messages
-                      .filter((msg) => msg.carId === selectedConversation.carId && msg.fromUserId === selectedConversation.userId)
-                      .map((msg, idx) => (
-                        <div key={idx} className="mb-2 text-sm">
-                          <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">
-                            {msg.message}
-                          </span>
+                    {activeThread.map((msg, idx) => {
+                      const mine = msg.fromUserId === me;
+                      return (
+                        <div key={idx} className={`mb-2 text-sm ${mine ? "text-right" : "text-left"}`}>
+                          <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">{msg.message}</span>
                         </div>
-                      ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
-              {/* Input Area */}
               <div className="p-3 border-t border-gray-700 bg-gray-900">
+                {msgError && <div className="text-red-400 text-xs mb-2">{msgError}</div>}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -657,10 +706,7 @@ const HostDashboard = () => {
                     placeholder="Reply..."
                     className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm"
                   />
-                  <button
-                    onClick={sendMessage}
-                    className="bg-orange-500 text-white p-2 rounded hover:bg-orange-600"
-                  >
+                  <button onClick={sendMessage} className="bg-orange-500 text-white p-2 rounded hover:bg-orange-600">
                     <FaPaperPlane className="text-sm" />
                   </button>
                 </div>

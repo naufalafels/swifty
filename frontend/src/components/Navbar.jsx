@@ -1,20 +1,29 @@
 // src/components/Navbar.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FaBars, FaTimes, FaUser, FaSignOutAlt } from "react-icons/fa";
+import { FaBars, FaTimes, FaUser, FaSignOutAlt, FaBell } from "react-icons/fa";
 import logo from "../assets/swifty-logo.png";
 import { navbarStyles as styles } from "../assets/dummyStyles.js";
 import api from "../utils/api";
 import * as authService from "../utils/authService";
+import io from "socket.io-client";
 
 const ME_ENDPOINT = "/api/auth/me";
 const LOGOUT_ENDPOINT = "/api/auth/logout";
+
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+  const [socket, setSocket] = useState(null);
+
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef(null);
@@ -26,7 +35,7 @@ const Navbar = () => {
     { to: "/cars", label: "Cars" },
     { to: "/contact", label: "Contact" },
     { to: "/bookings", label: "My Bookings" },
-    { to: "/profile", label: "Profile" }, // added
+    { to: "/profile", label: "Profile" },
   ];
 
   useEffect(() => {
@@ -158,7 +167,7 @@ const Navbar = () => {
 
   const isHost = Array.isArray(user?.roles) && user.roles.includes("host");
 
-  // If host -> host dashboard, if logged-in non-host -> onboard, if guest -> login then dashboard
+  // Host navigation helper
   const goHost = () => {
     if (!isLoggedIn) {
       navigate("/login", { replace: false, state: { from: "/host/dashboard" } });
@@ -168,6 +177,37 @@ const Navbar = () => {
       navigate("/host/onboard");
     }
   };
+
+  // Notifications (message-driven)
+  useEffect(() => {
+    const u = authService.getCurrentUser?.();
+    if (!u) return;
+
+    let mounted = true;
+
+    // Seed from host history if host
+    if (Array.isArray(u.roles) && u.roles.includes("host")) {
+      api.get("/api/messages/host").then((res) => {
+        if (mounted && Array.isArray(res.data)) {
+          setNotifCount(res.data.length);
+        }
+      }).catch(() => {
+        if (mounted) setNotifCount(0);
+      });
+    }
+
+    const s = io(SOCKET_URL, { transports: ["websocket", "polling"], withCredentials: true });
+    setSocket(s);
+    s.emit("joinUserRoom", u.id);
+    s.on("privateMessage", () => {
+      setNotifCount((n) => n + 1);
+    });
+
+    return () => {
+      mounted = false;
+      s.disconnect();
+    };
+  }, []);
 
   return (
     <nav
@@ -222,7 +262,16 @@ const Navbar = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <FaBell className="text-lg text-gray-200" />
+                  {notifCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-semibold rounded-full px-2 py-0.5">
+                      {notifCount > 99 ? "99+" : notifCount}
+                    </span>
+                  )}
+                </div>
+
                 <button
                   onClick={goHost}
                   className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 transition"

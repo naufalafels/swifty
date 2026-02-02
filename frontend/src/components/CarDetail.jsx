@@ -20,10 +20,9 @@ import {
   FaShieldAlt,
   FaInfoCircle,
   FaImage,
-  // NEW: Add icons for messaging
   FaComments,
   FaPaperPlane,
-  FaTimes // For close button
+  FaTimes
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -32,10 +31,13 @@ import * as authService from "../utils/authService";
 import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
 import { createRazorpayOrder, verifyRazorpayPayment } from "../services/paymentService";
-// NEW: Import Socket.io client
-import io from 'socket.io-client';
+import io from "socket.io-client";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
 
 const todayISO = () => new Date().toISOString().split("T")[0];
 
@@ -69,7 +71,6 @@ const calculateDays = (from, to) => {
   return Math.max(1, days);
 };
 
-// Insurance plans (clean labels; fees per day)
 const insuranceOptions = [
   { value: "full_excess", label: "Full Excess", feePerDay: 0, info: "You keep the standard excess; no extra daily fee." },
   { value: "half_excess", label: "Half Excess", feePerDay: 15, info: "Reduce your excess liability by half for a small daily fee." },
@@ -126,7 +127,7 @@ const CarDetail = () => {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
 
-  const deposit = 500; // MYR deposit paid at rental counter (not charged online)
+  const deposit = 500;
   const emailReadOnly = !!emailPrefill;
 
   const [activeField, setActiveField] = useState(null);
@@ -135,12 +136,12 @@ const CarDetail = () => {
   const submitControllerRef = useRef(null);
   const [today, setToday] = useState(todayISO());
 
-  // NEW: State for messaging and floating chat
+  // Messaging state
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messagingError, setMessagingError] = useState(''); // NEW: For errors
+  const [messagingError, setMessagingError] = useState("");
 
   useEffect(() => setToday(todayISO()), []);
 
@@ -184,77 +185,68 @@ const CarDetail = () => {
     };
   }, [id]);
 
-  // NEW: Initialize Socket.io and load messages
   useEffect(() => {
     if (currentUser && car) {
-      console.log('Initializing socket for user:', currentUser.id, 'and car:', car._id);
-      const newSocket = io(API_BASE);
+      const newSocket = io(SOCKET_URL, {
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+      });
       setSocket(newSocket);
-      newSocket.on('connect', () => console.log('Socket connected'));
-      newSocket.on('disconnect', () => console.log('Socket disconnected'));
-      newSocket.on('connect_error', (err) => {
-        console.error('Socket connection error:', err);
-        setMessagingError('Failed to connect to messaging server');
+      newSocket.on("connect_error", (err) => {
+        console.error("Socket connection error:", err);
+        setMessagingError("Failed to connect to messaging server");
       });
 
-      newSocket.emit('joinUserRoom', currentUser.id);
-      newSocket.on('privateMessage', (data) => {
-        console.log('Received message:', data);
+      newSocket.emit("joinUserRoom", currentUser.id);
+      newSocket.on("privateMessage", (data) => {
         setMessages((prev) => [...prev, data]);
       });
 
-      // Load message history (optional: comment out if route not ready)
-      api.get(`/api/messages/car/${car._id}`).then((res) => {
-        console.log('Loaded messages:', res.data);
-        setMessages(res.data);
-      }).catch((err) => {
-        console.error('Failed to load messages:', err);
-        setMessagingError('Failed to load message history');
-      });
+      api
+        .get(`/api/messages/car/${car._id}`)
+        .then((res) => {
+          setMessages(res.data || []);
+        })
+        .catch(() => {
+          setMessagingError("Failed to load message history");
+        });
 
       return () => {
-        console.log('Disconnecting socket');
         newSocket.disconnect();
       };
     }
   }, [currentUser, car]);
 
-  // NEW: Handle sending message
   const sendMessage = () => {
-    console.log('sendMessage called');
     if (!socket?.connected) {
-      setMessagingError('Messaging not connected');
+      setMessagingError("Messaging not connected");
       return;
     }
     if (!newMessage.trim()) {
-      setMessagingError('Message cannot be empty');
+      setMessagingError("Message cannot be empty");
       return;
     }
-    // FIX: Use the company's ID as the host ID (from your car data: car.company.id)
     const hostId = car?.company?.id;
     if (!hostId) {
-      console.error('Host ID not found in car.company.id. Car data:', car);
-      setMessagingError('Cannot find host ID. Check car data.');
+      setMessagingError("Cannot find host ID. Check car data.");
       return;
     }
     const msgData = {
       toUserId: hostId,
       fromUserId: currentUser.id,
       carId: car._id,
-      message: newMessage,
+      message: newMessage.trim(),
     };
-    console.log('Emitting msgData:', msgData);
-    // NEW: Save to DB via POST first
-    api.post('/api/messages', msgData).then(() => {
-      console.log('Message saved to DB');
-      // Then emit for real-time
-      socket.emit('privateMessage', msgData);
-      setNewMessage('');
-      setMessagingError('');
-    }).catch((err) => {
-      console.error('Failed to save message:', err);
-      setMessagingError('Failed to send message');
-    });
+    api
+      .post("/api/messages", msgData)
+      .then(() => {
+        socket.emit("privateMessage", msgData);
+        setNewMessage("");
+        setMessagingError("");
+      })
+      .catch(() => {
+        setMessagingError("Failed to send message");
+      });
   };
 
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
@@ -313,14 +305,14 @@ const CarDetail = () => {
     submitControllerRef.current = controller;
 
     try {
-      const user = await authService.ensureAuth(); // non-blocking; if null, we proceed as guest
+      const user = await authService.ensureAuth();
       const emailToUse = user?.email || formData.email;
 
       const paymentBreakdown = {
         rent: days * price,
         insurance: insuranceCost,
         insurancePlan: formData.insurancePlan,
-        deposit // shown to user, paid at counter (not charged online)
+        deposit
       };
 
       const countryCode = formData.idCountry === "Malaysia"
@@ -681,7 +673,6 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* KYC Section with uploads */}
                 <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
                   <div className="flex items-center gap-2 mb-2">
                     <FaPassport className="text-orange-400" />
@@ -773,7 +764,6 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* Insurance selection */}
                 <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
                   <div className="flex items-center gap-2 mb-2">
                     <FaShieldAlt className="text-orange-400" />
@@ -827,10 +817,8 @@ const CarDetail = () => {
           </div>
         </div>
 
-        {/* NEW: Floating Chat Widget */}
         {currentUser && (
           <div className="fixed bottom-4 left-4 z-50">
-            {/* Chat Toggle Button */}
             <button
               onClick={() => setIsChatOpen(!isChatOpen)}
               className="bg-orange-500 text-white p-3 rounded-full shadow-lg hover:bg-orange-600 transition md:p-4"
@@ -839,10 +827,8 @@ const CarDetail = () => {
               <FaComments className="text-lg md:text-xl" />
             </button>
 
-            {/* Chat Window */}
             {isChatOpen && (
               <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
-                {/* Chat Header */}
                 <div className="flex items-center justify-between p-3 border-b border-gray-700">
                   <h3 className="text-sm font-semibold text-white">Message Host</h3>
                   <button
@@ -854,13 +840,13 @@ const CarDetail = () => {
                   </button>
                 </div>
 
-                {/* Messages Area */}
                 <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
+                  {messages.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
                   {messages.map((msg, idx) => (
                     <div
                       key={idx}
                       className={`mb-2 text-sm ${
-                        msg.fromUserId === currentUser.id ? 'text-right' : 'text-left'
+                        msg.fromUserId === currentUser.id ? "text-right" : "text-left"
                       }`}
                     >
                       <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">
@@ -870,7 +856,6 @@ const CarDetail = () => {
                   ))}
                 </div>
 
-                {/* Input Area */}
                 <div className="p-3 border-t border-gray-700 bg-gray-900">
                   {messagingError && <div className="text-red-400 text-xs mb-2">{messagingError}</div>}
                   <div className="flex gap-2">

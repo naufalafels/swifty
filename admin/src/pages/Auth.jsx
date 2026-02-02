@@ -69,7 +69,7 @@ const AuthPage = () => {
 
       // Enforce admin role client-side as a second gate (backend must also enforce).
       const role = user?.role || user?.type || user?.userType;
-      const isAdmin = role === 'admin' || role === 'ADMIN' || role === 'superadmin';
+      const isAdmin = role === 'admin' || role === 'ADMIN' || role === 'superadmin' || role === 'company_admin';
       if (!isAdmin) {
         setError('Access denied: Only Admins may sign in.');
         setLoading(false);

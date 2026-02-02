@@ -188,21 +188,23 @@ const Navbar = () => {
     }
   };
 
-  // Notifications (message-driven) with dropdown
+  // Notifications (message-driven) with dropdown; exclude self-sent
   useEffect(() => {
     const u = authService.getCurrentUser?.();
     if (!u) return;
 
     let mounted = true;
+    const myId = u.id;
 
-    // Seed from host history if host
+    // Seed from host history if host, inbound only
     if (Array.isArray(u.roles) && u.roles.includes("host")) {
       api.get("/api/messages/host").then((res) => {
         if (mounted && Array.isArray(res.data)) {
-          const seed = res.data.slice(-10).map((m) => ({
+          const inbound = res.data.filter((m) => m.fromUserId !== myId);
+          const seed = inbound.slice(-10).reverse().map((m) => ({
             type: "message",
             text: m.message,
-            from: m.userEmail || m.userName || m.fromUserId,
+            from: m.userName || m.userEmail || m.fromUserId,
             ts: m.timestamp || m.createdAt || new Date().toISOString(),
           }));
           setNotifItems(seed);
@@ -217,9 +219,10 @@ const Navbar = () => {
     setSocket(s);
     s.emit("joinUserRoom", u.id);
     s.on("privateMessage", (data) => {
+      if (data?.fromUserId === myId) return; // ignore self outbound
       setNotifItems((prev) => {
         const next = [
-          { type: "message", text: data.message, from: data.userEmail || data.userName || data.fromUserId, ts: data.timestamp || new Date().toISOString() },
+          { type: "message", text: data.message, from: data.userName || data.userEmail || data.fromUserId, ts: data.timestamp || new Date().toISOString() },
           ...prev,
         ].slice(0, 10);
         return next;
@@ -292,7 +295,7 @@ const Navbar = () => {
                   className="relative"
                   aria-label="Notifications"
                 >
-                  <FaBell className="text-lg text-gray-200" />
+                  <FaBell className="text-lg text-gray-500" />
                   {notifCount > 0 && (
                     <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-semibold rounded-full px-2 py-0.5">
                       {notifCount > 99 ? "99+" : notifCount}
@@ -302,7 +305,15 @@ const Navbar = () => {
 
                 {showNotif && (
                   <div className="absolute right-0 top-10 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50">
-                    <div className="p-3 border-b border-gray-800 text-sm text-white font-semibold">Notifications</div>
+                    <div className="p-3 border-b border-gray-800 text-sm text-white font-semibold flex items-center justify-between">
+                      <span>Notifications</span>
+                      <button
+                        className="text-xs text-orange-300 hover:text-orange-200"
+                        onClick={() => { setNotifCount(0); }}
+                      >
+                        Clear badge
+                      </button>
+                    </div>
                     <div className="max-h-64 overflow-y-auto divide-y divide-gray-800">
                       {notifItems.length === 0 ? (
                         <div className="p-3 text-xs text-gray-400">No notifications yet.</div>

@@ -140,14 +140,22 @@ const HostDashboard = () => {
     const map = {};
     messages.forEach((msg) => {
       const counterpartId = msg.fromUserId === me ? msg.toUserId : msg.fromUserId;
-      const key = `${msg.carId}-${counterpartId}`;
+      const carKey = msg.carId || "no-car";
+      const key = `${carKey}-${counterpartId}`;
       const car = carMap.get(String(msg.carId));
-      const userEmail = msg.userEmail || msg.email || msg.userName || counterpartId;
+      const userName =
+        msg.userName ||
+        msg.fromName ||
+        msg.toName ||
+        msg.userEmail ||
+        msg.email ||
+        counterpartId;
+      const userEmail = msg.userEmail || msg.email || msg.toEmail || msg.fromEmail || userName;
       const carModel = car?.model || car?.make || "Car";
       const carThumb = getCarThumb(car);
       const latest = map[key]?.lastMsg;
       if (!latest || new Date(msg.timestamp || msg.createdAt) > new Date(latest.timestamp || latest.createdAt)) {
-        map[key] = { carId: msg.carId, userId: counterpartId, userEmail, carModel, carThumb, lastMsg: msg };
+        map[key] = { carId: msg.carId, userId: counterpartId, userName, userEmail, carModel, carThumb, lastMsg: msg };
       }
     });
     return Object.values(map);
@@ -173,6 +181,8 @@ const HostDashboard = () => {
       fromUserId: me,
       carId: selectedConversation.carId,
       message: newMessage.trim(),
+      userName: selectedConversation.userName,
+      userEmail: selectedConversation.userEmail,
     };
     api
       .post("/api/messages", payload)
@@ -670,7 +680,7 @@ const HostDashboard = () => {
                     {conversations.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
                     {conversations.map((conv) => (
                       <div
-                        key={`${conv.carId}-${conv.userId}`}
+                        key={`${conv.carId || 'no-car'}-${conv.userId}`}
                         onClick={() => setSelectedConversation(conv)}
                         className={`p-2 mb-2 rounded cursor-pointer ${
                           selectedConversation?.carId === conv.carId && selectedConversation?.userId === conv.userId ? "bg-orange-600" : "bg-gray-700"
@@ -687,8 +697,8 @@ const HostDashboard = () => {
                             <div className="w-10 h-10 rounded bg-gray-700" />
                           )}
                           <div className="flex-1">
-                            <div className="text-sm text-white line-clamp-1">{conv.userEmail}</div>
-                            <div className="text-xs text-gray-300 line-clamp-1">{conv.carModel} · {conv.carId}</div>
+                            <div className="text-sm text-white line-clamp-1">{conv.userName || conv.userEmail}</div>
+                            <div className="text-xs text-gray-300 line-clamp-1">{conv.carModel} · {conv.carId || "N/A"}</div>
                             <div className="text-xs text-gray-400 line-clamp-1">{conv.lastMsg?.message}</div>
                           </div>
                         </div>

@@ -10,7 +10,7 @@ export const processRefund = async (req, res) => {
     const booking = await Booking.findOne({ _id: bookingId, companyId: req.user.companyId });
     if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
 
-    // TODO: integrate with PSP (Stripe/Razorpay). Here we just record the refund.
+    // TODO: integrate Razorpay Curlec refund API. Currently records refund only.
     const refund = await Refund.create({
       bookingId,
       companyId: req.user.companyId,
@@ -20,7 +20,6 @@ export const processRefund = async (req, res) => {
       processedBy: req.user.id,
     });
 
-    // Optionally mark booking as refunded
     booking.refundedAmount = (booking.refundedAmount || 0) + amount;
     await booking.save();
 

@@ -22,7 +22,8 @@ import {
   FaImage,
   FaComments,
   FaPaperPlane,
-  FaTimes
+  FaTimes,
+  FaFileContract
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -143,6 +144,13 @@ const CarDetail = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messagingError, setMessagingError] = useState("");
 
+  // Terms & Conditions state
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termsLoading, setTermsLoading] = useState(false);
+  const [termsError, setTermsError] = useState("");
+  const [termsText, setTermsText] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
+
   useEffect(() => setToday(todayISO()), []);
 
   useEffect(() => {
@@ -249,6 +257,23 @@ const CarDetail = () => {
       });
   };
 
+  const openTerms = async () => {
+    setTermsOpen(true);
+    if (termsText || termsLoading) return;
+    setTermsLoading(true);
+    setTermsError("");
+    try {
+      const res = await api.get("/api/admin/legal/terms");
+      setTermsText(res.data?.terms || "Terms & Conditions are not available at the moment.");
+    } catch (err) {
+      console.error(err);
+      setTermsError("Failed to load Terms & Conditions.");
+    } finally {
+      setTermsLoading(false);
+    }
+  };
+  const closeTerms = () => setTermsOpen(false);
+
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
   if (!car && carError) return <div className="p-6 text-red-400">{carError}</div>;
   if (!car) return <div className="p-6 text-white">Car not found.</div>;
@@ -272,6 +297,10 @@ const CarDetail = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!acceptTerms) {
+      toast.error("Please accept the Terms & Conditions to proceed.");
+      return;
+    }
     if (!formData.pickupDate || !formData.returnDate) {
       toast.error("Please select pickup and return dates.");
       return;
@@ -474,7 +503,7 @@ const CarDetail = () => {
                   <div>
                     <div className="text-sm font-semibold text-gray-100">{companyName}</div>
                     {companyAddress ? (
-                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                      <div className="text-xs text-gray-400 mt-1 flex itemscenter gap-2">
                         <FaMapMarkerAlt className="text-gray-500" />
                         <span>{companyAddress}</span>
                       </div>
@@ -513,6 +542,34 @@ const CarDetail = () => {
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
+              </div>
+
+              <div className="mt-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3 shadow-lg">
+                <div className="flex items-center gap-2 text-white font-semibold">
+                  <FaFileContract className="text-orange-400" /> Terms & Conditions
+                </div>
+                <p className="text-sm text-gray-300">
+                  By booking, you agree to our{" "}
+                  <button
+                    type="button"
+                    onClick={openTerms}
+                    className="text-orange-400 underline hover:text-orange-300"
+                  >
+                    Terms & Conditions
+                  </button>.
+                </p>
+                <p className="text-xs text-gray-500">
+                  The T&C link appears on every car detail page for compliance and transparency.
+                </p>
+                <label className="flex items-start gap-2 text-sm text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-1 accent-orange-500"
+                  />
+                  <span>I have read and accept the Terms & Conditions.</span>
+                </label>
               </div>
             </div>
           </div>
@@ -879,6 +936,36 @@ const CarDetail = () => {
           </div>
         )}
       </div>
+
+      {termsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <div className="flex items-center gap-2 text-white font-semibold">
+                <FaFileContract className="text-orange-400" /> Terms & Conditions
+              </div>
+              <button
+                onClick={closeTerms}
+                className="text-gray-400 hover:text-white"
+                aria-label="Close terms"
+              >
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[65vh] text-gray-200 leading-relaxed whitespace-pre-wrap">
+              {termsLoading ? "Loading..." : termsError ? termsError : termsText || "No terms available."}
+            </div>
+            <div className="px-5 py-4 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={closeTerms}
+                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

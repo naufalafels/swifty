@@ -22,7 +22,7 @@ export const getAuditLogs = async (req, res) => {
   }
 };
 
-// Optional geo login log called from admin Auth page
+// Called from admin Auth page (optional geo log)
 export const logAdminGeoLogin = async (req, res) => {
   try {
     const companyId = req.user.companyId || null;

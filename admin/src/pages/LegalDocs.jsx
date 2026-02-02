@@ -1,30 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Save } from 'lucide-react';
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
+import api from '../utils/api'; // uses admin auth token via interceptor
 
 const LegalDocs = () => {
   const [terms, setTerms] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchTerms = async () => {
+      setLoading(true);
+      setError('');
       try {
-        const res = await axios.get(`${API_BASE}/api/admin/legal/terms`, { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
-        setTerms(res.data.terms || `Terms & Conditions for Swifty P2P Car Rental
-
-1. Introduction: This service allows peer-to-peer car sharing. Users rent from hosts.
-
-2. Liability: Hosts are responsible for vehicle condition. Users must return vehicles undamaged.
-
-3. Payments: Processed securely via Stripe/Razorpay. Refunds per policy.
-
-4. Verification: All users/hosts must verify identity.
-
-5. Disputes: Handled via admin review.`);
+        const res = await api.get('/api/admin/legal/terms');
+        setTerms(res.data?.terms || '');
       } catch (err) {
         console.error('Failed to fetch terms', err);
+        setError('Failed to fetch terms');
+      } finally {
+        setLoading(false);
       }
     };
     fetchTerms();
@@ -32,11 +26,13 @@ const LegalDocs = () => {
 
   const saveTerms = async () => {
     setLoading(true);
+    setError('');
     try {
-      await axios.put(`${API_BASE}/api/admin/legal/terms`, { terms }, { headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` } });
+      await api.put('/api/admin/legal/terms', { terms });
       alert('Saved successfully');
     } catch (err) {
       console.error('Failed to save', err);
+      setError(err?.response?.data?.message || 'Failed to save');
     } finally {
       setLoading(false);
     }
@@ -47,13 +43,18 @@ const LegalDocs = () => {
       <h1 className="text-3xl font-bold mb-6">Legal Documents</h1>
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Terms & Conditions</h2>
+        {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
         <textarea
           value={terms}
           onChange={(e) => setTerms(e.target.value)}
           className="w-full h-96 p-4 border rounded"
           placeholder="Edit terms here..."
         />
-        <button onClick={saveTerms} disabled={loading} className="mt-4 bg-green-500 text-white px-4 py-2 rounded flex items-center">
+        <button
+          onClick={saveTerms}
+          disabled={loading}
+          className="mt-4 bg-green-500 text-white px-4 py-2 rounded flex items-center"
+        >
           <Save size={16} className="mr-2" />
           {loading ? 'Saving...' : 'Save'}
         </button>

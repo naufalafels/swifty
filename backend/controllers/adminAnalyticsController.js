@@ -27,7 +27,7 @@ export const getAnalytics = async (req, res) => {
     const usageValues = bookingAgg.map((b) => b.count);
 
     const totalRevenue = revenueValues.reduce((a, b) => a + b, 0);
-    const avgResponseTime = 180; // placeholder metric (seconds); replace with real SRE metric if available
+    const avgResponseTime = 180; // placeholder; swap with real SRE metric if available
 
     return res.json({
       success: true,

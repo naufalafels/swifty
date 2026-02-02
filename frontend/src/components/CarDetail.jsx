@@ -263,11 +263,16 @@ const CarDetail = () => {
     setTermsLoading(true);
     setTermsError("");
     try {
-      const res = await api.get("/api/admin/legal/terms");
+      const res = await api.get("/api/admin/public/legal/terms");
       setTermsText(res.data?.terms || "Terms & Conditions are not available at the moment.");
     } catch (err) {
       console.error(err);
-      setTermsError("Failed to load Terms & Conditions.");
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        setTermsError("Terms are unavailable. Please try again later.");
+      } else {
+        setTermsError("Failed to load Terms & Conditions.");
+      }
     } finally {
       setTermsLoading(false);
     }
@@ -503,7 +508,7 @@ const CarDetail = () => {
                   <div>
                     <div className="text-sm font-semibold text-gray-100">{companyName}</div>
                     {companyAddress ? (
-                      <div className="text-xs text-gray-400 mt-1 flex itemscenter gap-2">
+                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
                         <FaMapMarkerAlt className="text-gray-500" />
                         <span>{companyAddress}</span>
                       </div>
@@ -542,34 +547,6 @@ const CarDetail = () => {
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
                 <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
-              </div>
-
-              <div className="mt-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-5 space-y-3 shadow-lg">
-                <div className="flex items-center gap-2 text-white font-semibold">
-                  <FaFileContract className="text-orange-400" /> Terms & Conditions
-                </div>
-                <p className="text-sm text-gray-300">
-                  By booking, you agree to our{" "}
-                  <button
-                    type="button"
-                    onClick={openTerms}
-                    className="text-orange-400 underline hover:text-orange-300"
-                  >
-                    Terms & Conditions
-                  </button>.
-                </p>
-                <p className="text-xs text-gray-500">
-                  The T&C link appears on every car detail page for compliance and transparency.
-                </p>
-                <label className="flex items-start gap-2 text-sm text-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={acceptTerms}
-                    onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="mt-1 accent-orange-500"
-                  />
-                  <span>I have read and accept the Terms & Conditions.</span>
-                </label>
               </div>
             </div>
           </div>
@@ -817,7 +794,7 @@ const CarDetail = () => {
                   </div>
                   <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
                     <FaShieldAlt className="mt-0.5" />
-                    <span>Reminder: Please bring your valid driving license (domestic or international) as required by Malaysian law. Host will verify ID in person.</span>
+                    <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
                   </div>
                 </div>
 
@@ -852,6 +829,33 @@ const CarDetail = () => {
                       </label>
                     ))}
                   </div>
+                </div>
+
+                {/* T&C block INSIDE booking card */}
+                <div className="mb-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-white font-semibold">
+                    <FaFileContract className="text-orange-400" /> Terms & Conditions
+                  </div>
+                  <p className="text-sm text-gray-300">
+                    By booking, you agree to our{" "}
+                    <button
+                      type="button"
+                      onClick={openTerms}
+                      className="text-orange-400 underline hover:text-orange-300"
+                    >
+                      Terms & Conditions
+                    </button>.
+                  </p>
+                  <label className="flex items-start gap-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={acceptTerms}
+                      onChange={(e) => setAcceptTerms(e.target.checked)}
+                      className="mt-1 accent-orange-500"
+                    />
+                    <span>I have read and accept the Terms & Conditions.</span>
+                  </label>
+                  {termsError && <p className="text-xs text-red-400">{termsError}</p>}
                 </div>
 
                 <div className={carDetailStyles.priceBreakdown + " mt-4"}>

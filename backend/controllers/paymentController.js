@@ -17,10 +17,16 @@ const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toUpperCase();
 const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
 const BLOCKING_STATUSES = ['pending', 'active', 'upcoming'];
 
-const getRazorpay = () => {
+const ensureRazorpayConfig = () => {
   const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
   const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
-  if (!keyId || !keySecret) throw new Error('Razorpay keys are not configured');
+  const ok = Boolean(keyId && keySecret);
+  return { ok, keyId, keySecret };
+};
+
+const getRazorpay = () => {
+  const { ok, keyId, keySecret } = ensureRazorpayConfig();
+  if (!ok) throw new Error('Razorpay keys are not configured');
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
@@ -62,6 +68,14 @@ const getOrCreateGuestUser = async ({ name, email, phone }) => {
 export const createRazorpayOrder = async (req, res) => {
   const session = await mongoose.startSession();
   try {
+    const { ok } = ensureRazorpayConfig();
+    if (!ok) {
+      return res.status(503).json({
+        success: false,
+        message: 'Razorpay keys are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend environment.'
+      });
+    }
+
     if (!req.body) return res.status(400).json({ success: false, message: 'Request body is missing' });
 
     session.startTransaction();
@@ -86,31 +100,26 @@ export const createRazorpayOrder = async (req, res) => {
 
     const total = Number(amount);
     if (!total || Number.isNaN(total) || total <= 0) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "Invalid amount" });
     }
     if (!email) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "Email required" });
     }
     if (!pickupDate || !returnDate) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
     }
 
     const pd = new Date(pickupDate);
     const rd = new Date(returnDate);
     if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "Invalid dates" });
     }
     if (rd < pd) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
     }
 
@@ -123,8 +132,7 @@ export const createRazorpayOrder = async (req, res) => {
     const carRef = carField && (carField.id || carField._id);
     const carIdStr = carRef ? String(carRef) : null;
     if (!carIdStr || !mongoose.Types.ObjectId.isValid(carIdStr)) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "Valid car id is required" });
     }
 
@@ -134,8 +142,7 @@ export const createRazorpayOrder = async (req, res) => {
       finalUserId = await getOrCreateGuestUser({ name: customer, email, phone });
     }
     if (!mongoose.Types.ObjectId.isValid(finalUserId)) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: 'Invalid userId format' });
     }
 
@@ -169,15 +176,14 @@ export const createRazorpayOrder = async (req, res) => {
 
     // Conflict check inside the transaction to prevent double booking
     const conflict = await Booking.findOne({
-      "car.id": mongoose.Types.ObjectId(carIdStr),
+      "car.id": new mongoose.Types.ObjectId(carIdStr),
       status: { $in: BLOCKING_STATUSES },
       pickupDate: { $lte: rd },
       returnDate: { $gte: pd },
     }).session(session).lean();
 
     if (conflict) {
-      await session.abortTransaction();
-      session.endSession();
+      await session.abortTransaction(); session.endSession();
       return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
     }
 
@@ -213,8 +219,6 @@ export const createRazorpayOrder = async (req, res) => {
 
     const createdArr = await Booking.create([bookingInput], { session });
     const booking = createdArr[0];
-
-    // remember bookingId for cleanup in failure cases
     const bookingIdForCleanup = booking._id && String(booking._id);
 
     await session.commitTransaction();
@@ -237,7 +241,6 @@ export const createRazorpayOrder = async (req, res) => {
         }
       });
     } catch (e) {
-      // If Razorpay order creation fails, mark booking as cancelled/failed to free up the slot
       if (bookingIdForCleanup) {
         await Booking.findByIdAndUpdate(bookingIdForCleanup, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
       }
@@ -250,7 +253,6 @@ export const createRazorpayOrder = async (req, res) => {
       await Booking.findByIdAndUpdate(booking._id, { razorpayOrderId: order.id }).exec();
     } catch (err) {
       console.warn('Failed to persist razorpayOrderId on booking', err);
-      // Not fatal: continue to return order info to client, webhook matching uses notes.bookingId as fallback
     }
 
     return res.json({
@@ -269,15 +271,10 @@ export const createRazorpayOrder = async (req, res) => {
       }
     });
   } catch (error) {
-    // If we created a booking but something failed, attempt to free the slot
-    const bookingId = (error?.bookingId) || null;
-    if (bookingId) {
-      await Booking.findByIdAndUpdate(bookingId, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
+    if (session.inTransaction()) {
+      try { await session.abortTransaction(); } catch {}
     }
-    try {
-      await session.abortTransaction();
-      session.endSession();
-    } catch {}
+    session.endSession();
     console.error('Razorpay Order Error', error?.stack || error);
     return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(error?.message || error) });
   }
@@ -300,7 +297,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid payment signature' });
     }
 
-    // Atomic update: only mark as paid if booking doesn't already have this payment id or is already paid.
     const filter = {
       _id: bookingId,
       $or: [

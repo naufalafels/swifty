@@ -21,7 +21,7 @@ import {
   updateVerification,
   savePayoutReference
 } from '../controllers/adminVerificationController.js';
-import { getTerms, updateTerms } from '../controllers/adminLegalController.js';
+import { getTerms, updateTerms, getPublicTerms } from '../controllers/adminLegalController.js';
 import { processRefund } from '../controllers/adminRefundController.js';
 import { downloadReport } from '../controllers/adminReportsController.js';
 import authMiddleware from '../middlewares/auth.js';
@@ -62,13 +62,16 @@ const uploadCarImage = multer({ storage: carStorage, limits: { fileSize: 5 * 102
 // Public signup (accepts logo file)
 router.post('/signup', uploadLogo.single('logo'), signupCompany);
 
+// Public Terms for frontend
+router.get('/public/legal/terms', getPublicTerms);
+
 // Admin routes (protected)
 router.use(authMiddleware);
 router.use(requireCompanyAdmin);
 
 // Cars
 router.get('/cars', getAdminCars);
-router.post('/cars', uploadCarImage.single('image'), createAdminCar); // accept image upload
+router.post('/cars', uploadCarImage.single('image'), createAdminCar);
 router.put('/cars/:id', uploadCarImage.single('image'), updateAdminCar);
 router.delete('/cars/:id', deleteAdminCar);
 
@@ -90,7 +93,7 @@ router.post('/audit/login-geo', logAdminGeoLogin);
 // Reports
 router.get('/reports/:type', downloadReport);
 
-// Legal docs
+// Legal docs (admin)
 router.get('/legal/terms', getTerms);
 router.put('/legal/terms', updateTerms);
 

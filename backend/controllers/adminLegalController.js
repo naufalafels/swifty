@@ -23,3 +23,14 @@ export const updateTerms = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// Public (no auth) Terms for frontend
+export const getPublicTerms = async (_req, res) => {
+  try {
+    const latest = await LegalDoc.findOne().sort({ updatedAt: -1 }).lean();
+    return res.json({ success: true, terms: latest?.terms || '' });
+  } catch (err) {
+    console.error('getPublicTerms error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};

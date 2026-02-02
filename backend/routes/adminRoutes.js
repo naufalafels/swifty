@@ -13,6 +13,17 @@ import {
   getCompanyProfile,
   updateCompanyProfile
 } from '../controllers/adminController.js';
+import { getAnalytics } from '../controllers/adminAnalyticsController.js';
+import { getAuditLogs, logAdminGeoLogin } from '../controllers/adminAuditController.js';
+import {
+  listUsers,
+  listHosts,
+  updateVerification,
+  savePayoutReference
+} from '../controllers/adminVerificationController.js';
+import { getTerms, updateTerms } from '../controllers/adminLegalController.js';
+import { processRefund } from '../controllers/adminRefundController.js';
+import { downloadReport } from '../controllers/adminReportsController.js';
 import authMiddleware from '../middlewares/auth.js';
 import requireCompanyAdmin from '../middlewares/requireCompanyAdmin.js';
 
@@ -68,5 +79,28 @@ router.patch('/bookings/:id/status', updateAdminBookingStatus);
 // Company profile
 router.get('/company', getCompanyProfile);
 router.put('/company', uploadLogo.single('logo'), updateCompanyProfile);
+
+// Analytics
+router.get('/analytics', getAnalytics);
+
+// Audit
+router.get('/audit-logs', getAuditLogs);
+router.post('/audit/login-geo', logAdminGeoLogin);
+
+// Reports
+router.get('/reports/:type', downloadReport);
+
+// Legal docs
+router.get('/legal/terms', getTerms);
+router.put('/legal/terms', updateTerms);
+
+// Verifications
+router.get('/verifications/users', listUsers);
+router.get('/verifications/hosts', listHosts);
+router.post('/verifications/:type/:id/:action', updateVerification);
+router.post('/verifications/hosts/:id/payout-reference', savePayoutReference);
+
+// Refunds
+router.post('/refunds', processRefund);
 
 export default router;

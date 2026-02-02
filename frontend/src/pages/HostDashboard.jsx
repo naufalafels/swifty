@@ -91,6 +91,7 @@ const HostDashboard = () => {
   const [socket, setSocket] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [msgError, setMsgError] = useState("");
+  const [showConversations, setShowConversations] = useState(true);
 
   const navigate = useNavigate();
 
@@ -141,12 +142,12 @@ const HostDashboard = () => {
       const counterpartId = msg.fromUserId === me ? msg.toUserId : msg.fromUserId;
       const key = `${msg.carId}-${counterpartId}`;
       const car = carMap.get(String(msg.carId));
-      const userLabel = msg.userName || msg.userEmail || counterpartId;
+      const userEmail = msg.userEmail || msg.email || msg.userName || counterpartId;
       const carModel = car?.model || car?.make || "Car";
       const carThumb = getCarThumb(car);
       const latest = map[key]?.lastMsg;
       if (!latest || new Date(msg.timestamp || msg.createdAt) > new Date(latest.timestamp || latest.createdAt)) {
-        map[key] = { carId: msg.carId, userId: counterpartId, userLabel, carModel, carThumb, lastMsg: msg };
+        map[key] = { carId: msg.carId, userId: counterpartId, userEmail, carModel, carThumb, lastMsg: msg };
       }
     });
     return Object.values(map);
@@ -154,6 +155,7 @@ const HostDashboard = () => {
 
   const activeThread = useMemo(() => {
     if (!selectedConversation || !me) return [];
+    // FIFO: oldest -> newest
     return messages
       .filter(
         (msg) =>
@@ -653,37 +655,51 @@ const HostDashboard = () => {
               </div>
 
               <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
-                <div className="mb-3 text-xs text-gray-400">Select a conversation:</div>
-                {conversations.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
-                {conversations.map((conv) => (
-                  <div
-                    key={`${conv.carId}-${conv.userId}`}
-                    onClick={() => setSelectedConversation(conv)}
-                    className={`p-2 mb-2 rounded cursor-pointer ${
-                      selectedConversation?.carId === conv.carId && selectedConversation?.userId === conv.userId ? "bg-orange-600" : "bg-gray-700"
-                    }`}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs text-gray-400">Conversations</div>
+                  <button
+                    onClick={() => setShowConversations((p) => !p)}
+                    className="text-xs text-orange-300 hover:text-orange-200"
                   >
-                    <div className="flex items-center gap-2">
-                      {conv.carThumb ? (
-                        <img
-                          src={conv.carThumb}
-                          alt="car"
-                          className="w-10 h-10 object-cover rounded border border-gray-700"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded bg-gray-700" />
-                      )}
-                      <div className="flex-1">
-                        <div className="text-sm text-white line-clamp-1">{conv.userLabel}</div>
-                        <div className="text-xs text-gray-300 line-clamp-1">{conv.carModel} · {conv.carId}</div>
-                        <div className="text-xs text-gray-400 line-clamp-1">{conv.lastMsg?.message}</div>
+                    {showConversations ? "Hide" : "Show"}
+                  </button>
+                </div>
+
+                {showConversations && (
+                  <>
+                    {conversations.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
+                    {conversations.map((conv) => (
+                      <div
+                        key={`${conv.carId}-${conv.userId}`}
+                        onClick={() => setSelectedConversation(conv)}
+                        className={`p-2 mb-2 rounded cursor-pointer ${
+                          selectedConversation?.carId === conv.carId && selectedConversation?.userId === conv.userId ? "bg-orange-600" : "bg-gray-700"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {conv.carThumb ? (
+                            <img
+                              src={conv.carThumb}
+                              alt="car"
+                              className="w-10 h-10 object-cover rounded border border-gray-700"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-gray-700" />
+                          )}
+                          <div className="flex-1">
+                            <div className="text-sm text-white line-clamp-1">{conv.userEmail}</div>
+                            <div className="text-xs text-gray-300 line-clamp-1">{conv.carModel} · {conv.carId}</div>
+                            <div className="text-xs text-gray-400 line-clamp-1">{conv.lastMsg?.message}</div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    ))}
+                  </>
+                )}
+
                 {selectedConversation && (
                   <div className="mt-3">
-                    <div className="text-xs text-gray-400 mb-2">Messages:</div>
+                    <div className="text-xs text-gray-400 mb-2">Messages (oldest first):</div>
                     {activeThread.map((msg, idx) => {
                       const mine = msg.fromUserId === me;
                       return (

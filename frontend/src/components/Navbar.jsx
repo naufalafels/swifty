@@ -22,6 +22,8 @@ const Navbar = () => {
   const [user, setUser] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
+  const [notifItems, setNotifItems] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
   const [socket, setSocket] = useState(null);
 
   const navigate = useNavigate();
@@ -139,18 +141,27 @@ const Navbar = () => {
       ) {
         setIsOpen(false);
       }
+      if (
+        showNotif &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target) &&
+        !buttonRef.current?.contains(event.target)
+      ) {
+        setShowNotif(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, showNotif]);
 
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "Escape" && isOpen) setIsOpen(false);
+      if (e.key === "Escape" && showNotif) setShowNotif(false);
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isOpen]);
+  }, [isOpen, showNotif]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -167,7 +178,6 @@ const Navbar = () => {
 
   const isHost = Array.isArray(user?.roles) && user.roles.includes("host");
 
-  // Host navigation helper
   const goHost = () => {
     if (!isLoggedIn) {
       navigate("/login", { replace: false, state: { from: "/host/dashboard" } });
@@ -178,7 +188,7 @@ const Navbar = () => {
     }
   };
 
-  // Notifications (message-driven)
+  // Notifications (message-driven) with dropdown
   useEffect(() => {
     const u = authService.getCurrentUser?.();
     if (!u) return;
@@ -189,7 +199,14 @@ const Navbar = () => {
     if (Array.isArray(u.roles) && u.roles.includes("host")) {
       api.get("/api/messages/host").then((res) => {
         if (mounted && Array.isArray(res.data)) {
-          setNotifCount(res.data.length);
+          const seed = res.data.slice(-10).map((m) => ({
+            type: "message",
+            text: m.message,
+            from: m.userEmail || m.userName || m.fromUserId,
+            ts: m.timestamp || m.createdAt || new Date().toISOString(),
+          }));
+          setNotifItems(seed);
+          setNotifCount(seed.length);
         }
       }).catch(() => {
         if (mounted) setNotifCount(0);
@@ -199,7 +216,14 @@ const Navbar = () => {
     const s = io(SOCKET_URL, { transports: ["websocket", "polling"], withCredentials: true });
     setSocket(s);
     s.emit("joinUserRoom", u.id);
-    s.on("privateMessage", () => {
+    s.on("privateMessage", (data) => {
+      setNotifItems((prev) => {
+        const next = [
+          { type: "message", text: data.message, from: data.userEmail || data.userName || data.fromUserId, ts: data.timestamp || new Date().toISOString() },
+          ...prev,
+        ].slice(0, 10);
+        return next;
+      });
       setNotifCount((n) => n + 1);
     });
 
@@ -262,15 +286,40 @@ const Navbar = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="relative">
+              <div className="flex items-center gap-3 relative">
+                <button
+                  onClick={() => setShowNotif((p) => !p)}
+                  className="relative"
+                  aria-label="Notifications"
+                >
                   <FaBell className="text-lg text-gray-200" />
                   {notifCount > 0 && (
                     <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs font-semibold rounded-full px-2 py-0.5">
                       {notifCount > 99 ? "99+" : notifCount}
                     </span>
                   )}
-                </div>
+                </button>
+
+                {showNotif && (
+                  <div className="absolute right-0 top-10 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50">
+                    <div className="p-3 border-b border-gray-800 text-sm text-white font-semibold">Notifications</div>
+                    <div className="max-h-64 overflow-y-auto divide-y divide-gray-800">
+                      {notifItems.length === 0 ? (
+                        <div className="p-3 text-xs text-gray-400">No notifications yet.</div>
+                      ) : (
+                        notifItems.map((n, idx) => (
+                          <div key={idx} className="p-3 text-xs text-gray-200">
+                            <div className="font-semibold text-orange-200">{n.from || "Activity"}</div>
+                            <div className="text-gray-300 line-clamp-2">{n.text}</div>
+                            <div className="text-[10px] text-gray-500 mt-1">
+                              {new Date(n.ts).toLocaleString()}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={goHost}

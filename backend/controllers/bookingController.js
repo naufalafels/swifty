@@ -148,6 +148,18 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid pickup or return date" });
     }
 
+    // Block guest checkout using a registered (non-guest) email unless authenticated
+    if (!req.user) {
+      const existingUser = await User.findOne({ email: normalizeEmail(email) }).select("role").lean();
+      if (existingUser && existingUser.role !== "guest") {
+        await session.abortTransaction();
+        session.endSession();
+        return res
+          .status(400)
+          .json({ success: false, message: "User Email is Registered. Please log in to continue." });
+      }
+    }
+
     let carSummary = null;
     if (typeof car === "string" && /^[0-9a-fA-F]{24}$/.test(car)) {
       const carDoc = await Car.findById(car).session(session).lean();
@@ -197,6 +209,24 @@ export const createBooking = async (req, res) => {
       } catch (e) {
         console.warn("createBooking: failed to fetch canonical car for companyId:", e);
       }
+    }
+
+    // Prevent overlapping bookings for the same car across blocking statuses
+    const overlapping = await Booking.findOne({
+      "car.id": carId,
+      status: { $in: BLOCKING_STATUSES },
+      pickupDate: { $lte: ret },
+      returnDate: { $gte: pickup },
+    })
+      .session(session)
+      .lean();
+
+    if (overlapping) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(409)
+        .json({ success: false, message: "Selected dates overlap an existing booking for this car." });
     }
 
     let userId = null;

@@ -635,7 +635,7 @@ const CarDetail = () => {
                     minDate={new Date()}
                     rangeColors={["#f97316"]}
                     direction="horizontal"
-                    months={2}
+                    months={1}           // single-month view
                     showDateDisplay={false}
                     disabledDates={disabledDates}
                   />

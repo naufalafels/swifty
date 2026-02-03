@@ -36,7 +36,7 @@ import io from "socket.io-client";
 
 // Airbnb-style date range picker
 import { DateRange } from "react-date-range";
-import { addDays, eachDayOfInterval } from "date-fns";
+import { addDays, eachDayOfInterval, format } from "date-fns";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
@@ -46,21 +46,23 @@ const SOCKET_URL =
   import.meta.env.VITE_API_URL ||
   (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
 
-const todayISO = () => new Date().toISOString().split("T")[0];
-const formatISODate = (d) => d.toISOString().split("T")[0];
+const todayISO = () => format(new Date(), "yyyy-MM-dd");
+const formatISODate = (d) => format(d, "yyyy-MM-dd");
 
-// Normalize an ISO date string to local mid-day to avoid timezone edge cases
-const toLocalMidday = (iso) => {
-  const d = new Date(iso);
+// Normalize to date-only (ignore timezone) and set to local midday to avoid TZ edge cases
+const toLocalDateOnlyMidday = (value) => {
+  if (!value) return null;
+  const datePart = String(value).split("T")[0]; // keep only calendar day
+  if (!datePart) return null;
+  const d = new Date(`${datePart}T12:00:00`);
   if (Number.isNaN(d.getTime())) return null;
-  d.setHours(12, 0, 0, 0);
   return d;
 };
 
 // Build an inclusive list of days for a booking (start through end)
 const bookingDaysInclusive = (pickupIso, returnIso) => {
-  const start = toLocalMidday(pickupIso);
-  const end = toLocalMidday(returnIso);
+  const start = toLocalDateOnlyMidday(pickupIso);
+  const end = toLocalDateOnlyMidday(returnIso);
   if (!start || !end) return [];
   return eachDayOfInterval({ start, end });
 };
@@ -228,7 +230,7 @@ const CarDetail = () => {
     };
   }, [id]);
 
-  // Load availability and build disabled dates for the date-range picker
+  // Load availability and build disabled dates for the date-range picker (inclusive of return day)
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
@@ -346,7 +348,7 @@ const CarDetail = () => {
   };
   const closeTerms = () => setTermsOpen(false);
 
-  // Sync form dates when range changes
+  // Sync form dates when range changes (use format to avoid TZ drift)
   const onRangeChange = (ranges) => {
     const sel = ranges.selection;
     setRange([sel]);
@@ -948,7 +950,7 @@ const CarDetail = () => {
 
             {isChatOpen && (
               <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
-                <div className="flex items-center justify-between p-3 border-b border-gray-700">
+                <div className="flex itemscenter justify-between p-3 border-b border-gray-700">
                   <h3 className="text-sm font-semibold text-white">Message Host</h3>
                   <button
                     onClick={() => setIsChatOpen(false)}

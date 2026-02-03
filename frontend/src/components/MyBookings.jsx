@@ -428,9 +428,10 @@ const BookingCard = ({ booking, onViewDetails }) => {
   );
 };
 
-const BookingModal = ({ booking, onClose, onCancel, canManage, onRequireAuth }) => {
+const BookingModal = ({ booking, onClose, onCancel, canManage, onRequireAuth, cancelingId }) => {
   const days = daysBetween(booking.dates.pickup, booking.dates.return);
   const pricePerDay = days > 0 ? booking.price / days : booking.price;
+  const isCancelling = cancelingId === booking.id;
 
   return (
     <div className={s.modalOverlay}>
@@ -445,9 +446,10 @@ const BookingModal = ({ booking, onClose, onCancel, canManage, onRequireAuth }) 
                 <button
                   type="button"
                   onClick={() => (canManage ? onCancel(booking.id) : onRequireAuth("login"))}
-                  className={`${s.cancelButton} ${!canManage ? "opacity-60 cursor-not-allowed" : ""}`}
+                  disabled={!canManage || isCancelling}
+                  className={`${s.cancelButton} ${(!canManage || isCancelling) ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
-                  Cancel Booking
+                  {isCancelling ? "Cancelling..." : "Cancel Booking"}
                 </button>
               )}
               <button
@@ -657,6 +659,7 @@ const MyBookings = () => {
   const [guestError, setGuestError] = useState("");
 
   const [isAuthed, setIsAuthed] = useState(false);
+  const [cancelingId, setCancelingId] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -819,7 +822,6 @@ const MyBookings = () => {
 
   const cancelBooking = useCallback(
     async (bookingId) => {
-      // Refresh auth state to ensure token exists
       const ok = await authService.ensureAuth().catch(() => false);
       if (!ok) {
         handleRequireAuth("login");
@@ -828,6 +830,7 @@ const MyBookings = () => {
       if (!window.confirm("Are you sure you want to cancel this booking?"))
         return;
       try {
+        setCancelingId(bookingId);
         const responseData = await serviceCancelBooking(bookingId);
         const updated = normalizeBooking(
           responseData ||
@@ -843,6 +846,8 @@ const MyBookings = () => {
             err.message ||
             "Failed to cancel booking"
         );
+      } finally {
+        setCancelingId(null);
       }
     },
     [selectedBooking]
@@ -1017,6 +1022,7 @@ const MyBookings = () => {
           onCancel={cancelBooking}
           canManage={isAuthed}
           onRequireAuth={handleRequireAuth}
+          cancelingId={cancelingId}
         />
       )}
     </div>

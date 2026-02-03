@@ -29,18 +29,11 @@ export async function createBooking(payload, isFormData = false) {
 
 /**
  * cancelBooking(bookingId)
- * Attach Authorization if a user token is present.
+ * Ensure a fresh access token (refresh-on-demand) before hitting the protected endpoint.
  */
 export async function cancelBooking(bookingId) {
-  const user = authService.getCurrentUser();
-  const headers = {};
-  if (user?.token) headers.Authorization = `Bearer ${user.token}`;
-
-  const res = await api.patch(
-    `/api/bookings/${bookingId}/status`,
-    { status: "cancelled" },
-    { headers }
-  );
+  await authService.ensureAuth(); // refresh token if needed; api will attach it
+  const res = await api.patch(`/api/bookings/${bookingId}/status`, { status: "cancelled" });
   return res.data;
 }
 

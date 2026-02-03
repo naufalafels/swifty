@@ -36,7 +36,7 @@ import io from "socket.io-client";
 
 // Airbnb-style date range picker
 import { DateRange } from "react-date-range";
-import { addDays, eachDayOfInterval, parseISO } from "date-fns";
+import { addDays, eachDayOfInterval } from "date-fns";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
@@ -49,28 +49,20 @@ const SOCKET_URL =
 const todayISO = () => new Date().toISOString().split("T")[0];
 const formatISODate = (d) => d.toISOString().split("T")[0];
 
-const buildImageSrc = (image) => {
-  if (!image) return `${API_BASE}/uploads/default-car.png`;
-  if (Array.isArray(image)) image = image[0];
-  if (!image || typeof image !== "string") return `${API_BASE}/uploads/default-car.png`;
-  const t = image.trim();
-  if (!t) return `${API_BASE}/uploads/default-car.png`;
-  if (t.startsWith("http://") || t.startsWith("https://")) return t;
-  if (t.startsWith("/")) return `${API_BASE}${t}`;
-  return `${API_BASE}/uploads/${t}`;
+// Normalize an ISO date string to local mid-day to avoid timezone edge cases
+const toLocalMidday = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(12, 0, 0, 0);
+  return d;
 };
 
-const handleImageError = (e, fallback = `${API_BASE}/uploads/default-car.png`) => {
-  const img = e?.target;
-  if (!img) return;
-  img.onerror = null;
-  img.src = fallback;
-  img.onerror = () => {
-    img.onerror = null;
-    img.src = "https://via.placeholder.com/800x500.png?text=No+Image";
-  };
-  img.alt = img.alt || "Image not available";
-  img.style.objectFit = img.style.objectFit || "cover";
+// Build an inclusive list of days for a booking (start through end)
+const bookingDaysInclusive = (pickupIso, returnIso) => {
+  const start = toLocalMidday(pickupIso);
+  const end = toLocalMidday(returnIso);
+  if (!start || !end) return [];
+  return eachDayOfInterval({ start, end });
 };
 
 const calculateDays = (from, to) => {
@@ -99,6 +91,30 @@ const loadRazorpayScript = () =>
     script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
     document.body.appendChild(script);
   });
+
+const buildImageSrc = (image) => {
+  if (!image) return `${API_BASE}/uploads/default-car.png`;
+  if (Array.isArray(image)) image = image[0];
+  if (!image || typeof image !== "string") return `${API_BASE}/uploads/default-car.png`;
+  const t = image.trim();
+  if (!t) return `${API_BASE}/uploads/default-car.png`;
+  if (t.startsWith("http://") || t.startsWith("https://")) return t;
+  if (t.startsWith("/")) return `${API_BASE}${t}`;
+  return `${API_BASE}/uploads/${t}`;
+};
+
+const handleImageError = (e, fallback = `${API_BASE}/uploads/default-car.png`) => {
+  const img = e?.target;
+  if (!img) return;
+  img.onerror = null;
+  img.src = fallback;
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = "https://via.placeholder.com/800x500.png?text=No+Image";
+  };
+  img.alt = img.alt || "Image not available";
+  img.style.objectFit = img.style.objectFit || "cover";
+};
 
 const BLOCKING_STATUSES = ["pending", "active", "upcoming"];
 
@@ -227,13 +243,13 @@ const CarDetail = () => {
         bookings
           .filter((b) => BLOCKING_STATUSES.includes(b.status))
           .forEach((b) => {
-            const start = parseISO(b.pickupDate);
-            const end = parseISO(b.returnDate);
-            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
-            const days = eachDayOfInterval({ start, end });
-            disabled.push(...days);
+            disabled.push(...bookingDaysInclusive(b.pickupDate, b.returnDate));
           });
-        setDisabledDates(disabled);
+        // de-duplicate to keep the picker stable
+        const deduped = Array.from(
+          new Map(disabled.map((d) => [d.toDateString(), d])).values()
+        );
+        setDisabledDates(deduped);
       } catch (err) {
         const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
         if (!canceled) console.warn("Failed to load availability", err);
@@ -590,7 +606,7 @@ const CarDetail = () => {
                 { Icon: FaTachometerAlt, label: "Mileage", value: car.mileage ? `${car.mileage} kmpl` : "—", color: "text-yellow-400" },
                 { Icon: FaCheckCircle, label: "Transmission", value: transmissionLabel, color: "text-purple-400" },
               ].map((spec, i) => (
-                <div key={i} className={carDetailStyles.specCard}>
+                <div key= {i} className={carDetailStyles.specCard}>
                   <spec.Icon className={`${spec.color} ${carDetailStyles.specIcon}`} />
                   <p className={carDetailStyles.aboutText + " " + carDetailStyles.specLabel}>{spec.label}</p>
                   <p className={carDetailStyles.specValue}>{spec.value}</p>
@@ -981,37 +997,37 @@ const CarDetail = () => {
             )}
           </div>
         )}
-      </div>
 
-      {termsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-              <div className="flex items-center gap-2 text-white font-semibold">
-                <FaFileContract className="text-orange-400" /> Terms & Conditions
+        {termsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+                <div className="flex items-center gap-2 text-white font-semibold">
+                  <FaFileContract className="text-orange-400" /> Terms & Conditions
+                </div>
+                <button
+                  onClick={closeTerms}
+                  className="text-gray-400 hover:text-white"
+                  aria-label="Close terms"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              <button
-                onClick={closeTerms}
-                className="text-gray-400 hover:text-white"
-                aria-label="Close terms"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto max-h-[65vh] text-gray-200 leading-relaxed whitespace-pre-wrap">
-              {termsLoading ? "Loading..." : termsError ? termsError : termsText || "No terms available."}
-            </div>
-            <div className="px-5 py-4 border-t border-gray-800 flex justify-end">
-              <button
-                onClick={closeTerms}
-                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
-              >
-                Close
-              </button>
+              <div className="p-5 overflow-y-auto max-h-[65vh] text-gray-200 leading-relaxed whitespace-pre-wrap">
+                {termsLoading ? "Loading..." : termsError ? termsError : termsText || "No terms available."}
+              </div>
+              <div className="px-5 py-4 border-t border-gray-800 flex justify-end">
+                <button
+                  onClick={closeTerms}
+                  className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

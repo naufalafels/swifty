@@ -1,4 +1,5 @@
 import api from "../utils/api";
+import * as authService from "../utils/authService";
 
 /**
  * fetchMyBookings(options)
@@ -7,7 +8,6 @@ import api from "../utils/api";
  */
 export async function fetchMyBookings(options = {}) {
   const res = await api.get("/api/bookings/mybooking", { signal: options.signal });
-  // backend returns an array for this route
   return res.data;
 }
 
@@ -17,7 +17,6 @@ export async function fetchMyBookings(options = {}) {
  */
 export async function createBooking(payload, isFormData = false) {
   if (isFormData) {
-    // Do not set Content-Type manually with FormData
     const res = await api.post("/api/bookings", payload);
     return res.data;
   } else {
@@ -30,9 +29,18 @@ export async function createBooking(payload, isFormData = false) {
 
 /**
  * cancelBooking(bookingId)
+ * Attach Authorization if a user token is present.
  */
 export async function cancelBooking(bookingId) {
-  const res = await api.patch(`/api/bookings/${bookingId}/status`, { status: "cancelled" });
+  const user = authService.getCurrentUser();
+  const headers = {};
+  if (user?.token) headers.Authorization = `Bearer ${user.token}`;
+
+  const res = await api.patch(
+    `/api/bookings/${bookingId}/status`,
+    { status: "cancelled" },
+    { headers }
+  );
   return res.data;
 }
 

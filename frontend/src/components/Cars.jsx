@@ -22,12 +22,10 @@ const startOfDay = (d) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
-// ceil so partial days count as next day
 const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
 const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury"];
-// Seat options for filtering
 const DEFAULT_SEATS = [2, 4, 5, 7];
 
 const Cars = () => {
@@ -37,7 +35,6 @@ const Cars = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // --- filters ---
   const [selectedTypes, setSelectedTypes] = useState(() =>
     DEFAULT_TYPES.reduce((acc, t) => ({ ...acc, [t]: false }), {})
   );
@@ -47,29 +44,25 @@ const Cars = () => {
   const [pickupDate, setPickupDate] = useState("");
   const [returnDate, setReturnDate] = useState("");
 
-  // Malaysia-first: state & city selectors
   const [malaysiaStates, setMalaysiaStates] = useState([]);
   const [stateSelected, setStateSelected] = useState("");
   const [citiesForState, setCitiesForState] = useState([]);
   const [citySelected, setCitySelected] = useState("");
 
-  // geolocation
   const [useMyLocation, setUseMyLocation] = useState(false);
   const [userCoords, setUserCoords] = useState(null);
   const [geoError, setGeoError] = useState("");
-  const [locationRequested, setLocationRequested] = useState(false); // New: Track if location permission has been requested
+  const [locationRequested, setLocationRequested] = useState(false);
 
   const abortControllerRef = useRef(null);
   const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
   const limit = 12;
   const fallbackImage = `${base}/uploads/default-car.png`;
 
-  // Map state
   const [selectedMarker, setSelectedMarker] = useState(null);
-  const [mapError, setMapError] = useState(""); // For map load errors
-  const mapCenter = { lat: 3.1390, lng: 101.6869 }; // KL default
+  const [mapError, setMapError] = useState("");
+  const mapCenter = { lat: 3.139, lng: 101.6869 };
 
-  // Function to reverse geocode coordinates to state and city
   const reverseGeocode = useCallback(async (lat, lng) => {
     if (!window.google || !window.google.maps) return;
     const geocoder = new window.google.maps.Geocoder();
@@ -80,12 +73,9 @@ const Cars = () => {
         let state = "";
         let city = "";
         for (const component of addressComponents) {
-          if (component.types.includes("administrative_area_level_1")) {
-            state = component.long_name;
-          }
-          if (component.types.includes("locality") || component.types.includes("administrative_area_level_2")) {
+          if (component.types.includes("administrative_area_level_1")) state = component.long_name;
+          if (component.types.includes("locality") || component.types.includes("administrative_area_level_2"))
             city = component.long_name;
-          }
         }
         if (state) setStateSelected(state);
         if (city) setCitySelected(city);
@@ -96,12 +86,11 @@ const Cars = () => {
   useEffect(() => {
     fetchCars();
     fetchMalaysiaStates();
-    // Removed automatic location request; now user-initiated
     return () => {
       if (abortControllerRef.current) {
         try {
           abortControllerRef.current.abort();
-        } catch (e) {}
+        } catch {}
       }
     };
   }, []);
@@ -112,7 +101,7 @@ const Cars = () => {
     if (abortControllerRef.current) {
       try {
         abortControllerRef.current.abort();
-      } catch (e) {}
+      } catch {}
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -123,7 +112,6 @@ const Cars = () => {
         signal: controller.signal,
         headers: { Accept: "application/json" },
       });
-
       const json = res.data;
       setCars(Array.isArray(json.data) ? json.data : json.data ?? json);
     } catch (err) {
@@ -132,11 +120,8 @@ const Cars = () => {
         (axios.isCancel && axios.isCancel(err)) ||
         err?.name === "CanceledError";
       if (isCanceled) return;
-
       console.error("Failed to fetch cars:", err);
-      setError(
-        err?.response?.data?.message || err.message || "Failed to load cars"
-      );
+      setError(err?.response?.data?.message || err.message || "Failed to load cars");
     } finally {
       setLoading(false);
     }
@@ -171,8 +156,7 @@ const Cars = () => {
         { country: "Malaysia", state: stateName },
         { timeout: 10000 }
       );
-      const ct =
-        resp?.data?.data?.map((c) => ({ name: c })) || [];
+      const ct = resp?.data?.data?.map((c) => ({ name: c })) || [];
       setCitiesForState(ct);
     } catch (err) {
       console.warn("Failed to load cities for state", err);
@@ -194,14 +178,9 @@ const Cars = () => {
     if (!image) return "";
     if (Array.isArray(image)) image = image[0];
     if (typeof image !== "string") return "";
-
     const trimmed = image.trim();
-    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-      return trimmed;
-    }
-    if (trimmed.startsWith("/")) {
-      return `${base}${trimmed}`;
-    }
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+    if (trimmed.startsWith("/")) return `${base}${trimmed}`;
     return `${base}/uploads/${trimmed}`;
   };
 
@@ -234,7 +213,7 @@ const Cars = () => {
     return `${n} ${pluralForm ?? singular + "s"}`;
   };
 
-  // availability helpers (same as before)
+  // availability helpers
   const computeEffectiveAvailability = (car) => {
     const today = new Date();
 
@@ -244,7 +223,7 @@ const Cars = () => {
           const pickup = b.pickupDate ?? b.startDate ?? b.start ?? b.from;
           const ret = b.returnDate ?? b.endDate ?? b.end ?? b.to;
           if (!pickup || !ret) return null;
-          return { pickup: new Date(pickup), return: new Date(ret), raw: b };
+          return { pickup: new Date(pickup), return: new Date(ret) };
         })
         .filter(Boolean)
         .filter(
@@ -290,7 +269,6 @@ const Cars = () => {
     return { state: "fully_available", source: "none" };
   };
 
-  // overlap utilities for date filter
   const doesBookingOverlapRange = (booking, reqPickup, reqReturn) => {
     const pickup = booking.pickupDate ?? booking.startDate ?? booking.start ?? booking.from;
     const ret = booking.returnDate ?? booking.endDate ?? booking.end ?? booking.to;
@@ -330,7 +308,6 @@ const Cars = () => {
     }
   };
 
-  // location helpers: prefer car.location
   const getCarCoordinates = (car) => {
     const loc = car.location ?? car.company?.location ?? null;
     if (loc && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
@@ -360,7 +337,6 @@ const Cars = () => {
     return R * c;
   };
 
-  // city / area matching (area removed)
   const matchesState = (car, state) => {
     if (!state) return true;
     const q = state.trim().toLowerCase();
@@ -392,10 +368,9 @@ const Cars = () => {
     return candidates.some((t) => t.includes(c));
   };
 
-  // detect user location (now user-initiated)
   const obtainUserLocation = useCallback(() => {
     setGeoError("");
-    setLocationRequested(true); // Mark as requested
+    setLocationRequested(true);
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
       return;
@@ -405,7 +380,6 @@ const Cars = () => {
         const coords = [pos.coords.latitude, pos.coords.longitude];
         setUserCoords(coords);
         setUseMyLocation(true);
-        // Automatically reverse geocode to fill state and city
         reverseGeocode(coords[0], coords[1]);
       },
       (err) => {
@@ -415,7 +389,6 @@ const Cars = () => {
     );
   }, [reverseGeocode]);
 
-  // toggle locate off if unchecked
   useEffect(() => {
     if (!useMyLocation) {
       setUserCoords(null);
@@ -433,42 +406,40 @@ const Cars = () => {
     [selectedSeats]
   );
 
-  // final filtered list
+  // True if user selected both dates in filter
+  const hasDateFilter = Boolean(pickupDate && returnDate);
+
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
     const reqReturn = returnDate ? startOfDay(new Date(returnDate)) : null;
 
     let list = Array.isArray(cars) ? cars.slice() : [];
 
-    // type filter
     if (activeTypes.length > 0) {
       list = list.filter((car) => {
         const cat = (car.category ?? car.type ?? "").toString();
-        return activeTypes.some((t) => cat.toLowerCase() === t.toLowerCase() || cat.toLowerCase().includes(t.toLowerCase()));
+        return activeTypes.some(
+          (t) => cat.toLowerCase() === t.toLowerCase() || cat.toLowerCase().includes(t.toLowerCase())
+        );
       });
     }
 
-    // seats filter
     if (activeSeats.length > 0) {
       list = list.filter((car) => activeSeats.includes(Number(car.seats ?? 4)));
     }
 
-    // state filter (Malaysia-focused)
     if (stateSelected) {
       list = list.filter((car) => matchesState(car, stateSelected));
     }
 
-    // city filter (narrow within state)
     if (citySelected) {
       list = list.filter((car) => matchesCity(car, citySelected));
     }
 
-    // dates filter
     if (reqPickup && reqReturn) {
       list = list.filter((car) => isAvailableForRange(car, reqPickup.toISOString(), reqReturn.toISOString()));
     }
 
-    // if user coords available, compute distance and sort by it
     if (userCoords) {
       const [uLat, uLng] = userCoords;
       const withDist = list.map((car) => {
@@ -480,34 +451,32 @@ const Cars = () => {
         }
         return { car, _distKm: Infinity };
       });
-      withDist.sort((a, b) => {
-        if (a._distKm === b._distKm) return 0;
-        return a._distKm - b._distKm;
-      });
-      return withDist.map((x) => ({ ...(x.car || {}), _distanceKm: Number.isFinite(x._distKm) && x._distKm !== Infinity ? Number(x._distKm.toFixed(2)) : null }));
+      withDist.sort((a, b) => (a._distKm === b._distKm ? 0 : a._distKm - b._distKm));
+      return withDist.map((x) => ({
+        ...(x.car || {}),
+        _distanceKm: Number.isFinite(x._distKm) && x._distKm !== Infinity ? Number(x._distKm.toFixed(2)) : null,
+      }));
     }
 
     return list;
   }, [cars, activeTypes, activeSeats, stateSelected, citySelected, pickupDate, returnDate, userCoords]);
 
-  // Group cars by company
   const companyMarkers = useMemo(() => {
     const companies = {};
     filteredCars.forEach((car) => {
-      const companyKey = car.company?.name || car.company?.id || 'Unknown';
+      const companyKey = car.company?.name || car.company?.id || "Unknown";
       if (!companies[companyKey]) {
         companies[companyKey] = {
           company: car.company,
-          location: getCarCoordinates(car), // Use first car's location
+          location: getCarCoordinates(car),
           cars: [],
         };
       }
       companies[companyKey].cars.push(car);
     });
-    return Object.values(companies).filter((comp) => comp.location); // Only with valid locations
+    return Object.values(companies).filter((comp) => comp.location);
   }, [filteredCars]);
 
-  // availability badge rendering (same as before)
   const computeAvailableMeta = (untilIso) => {
     if (!untilIso) return null;
     try {
@@ -543,9 +512,7 @@ const Cars = () => {
               <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
                 Booked — available on {formatDate(meta.availableIso)}
               </span>
-              <small className="text-xs text-gray-400 mt-1">
-                until {formatDate(effective.until)}
-              </small>
+              <small className="text-xs text-gray-400 mt-1">until {formatDate(effective.until)}</small>
             </div>
           );
         }
@@ -554,17 +521,13 @@ const Cars = () => {
             <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
               Booked
             </span>
-            <small className="text-xs text-gray-400 mt-1">
-              until {formatDate(effective.until)}
-            </small>
+            <small className="text-xs text-gray-400 mt-1">until {formatDate(effective.until)}</small>
           </div>
         );
       }
       return (
         <div className="flex flex-col items-end">
-          <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-            Booked
-          </span>
+          <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">Booked</span>
         </div>
       );
     }
@@ -574,13 +537,9 @@ const Cars = () => {
       if (!Number.isFinite(days) || days < 0) {
         return (
           <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-amber-50 text-amber-800 font-semibold">
-              Available
-            </span>
+            <span className="px-2 py-1 text-xs rounded-md bg-amber-50 text-amber-800 font-semibold">Available</span>
             {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
-              </small>
+              <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
             )}
           </div>
         );
@@ -588,13 +547,9 @@ const Cars = () => {
       if (days === 0) {
         return (
           <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-              Booked — starts today
-            </span>
+            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">Booked — starts today</span>
             {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">
-                from {formatDate(effective.nextBookingStarts)}
-              </small>
+              <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
             )}
           </div>
         );
@@ -605,9 +560,7 @@ const Cars = () => {
             Available — reserved in {plural(days, "day")}
           </span>
           {effective.nextBookingStarts && (
-            <small className="text-xs text-gray-400 mt-1">
-              from {formatDate(effective.nextBookingStarts)}
-            </small>
+            <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
           )}
         </div>
       );
@@ -620,13 +573,12 @@ const Cars = () => {
     );
   };
 
+  // Disable only when user selected dates AND those dates overlap a booking
   const isBookDisabled = (car) => {
-    const effective = computeEffectiveAvailability(car);
-    // Only block if it's currently booked (today overlap). Ignore car.status to avoid stale "rented".
-    return effective?.state === "booked";
+    if (!hasDateFilter) return false;
+    return !isAvailableForRange(car, pickupDate, returnDate);
   };
 
-  // When booking from the cards, pass selected dates so CarDetail pre-fills the booking form
   const handleBook = (car, id) => {
     const disabled = isBookDisabled(car);
     if (disabled) return;
@@ -638,7 +590,7 @@ const Cars = () => {
   };
 
   const toggleSeat = (seat) => {
-    setSelectedSeats((prev) => ({ ...prev, [seat]: false ? prev[seat] : !prev[seat] }));
+    setSelectedSeats((prev) => ({ ...prev, [seat]: !prev[seat] }));
   };
 
   const resetFilters = () => {
@@ -738,7 +690,6 @@ const Cars = () => {
             </div>
           </div>
 
-          {/* Location Consent Prompt */}
           {!locationRequested && (
             <div className="mt-4 bg-blue-900/50 border border-blue-800 rounded-xl p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -757,36 +708,32 @@ const Cars = () => {
             </div>
           )}
 
-          {/* Location Error or Status */}
           {geoError && (
             <div className="mt-4 bg-red-900/50 border border-red-800 rounded-xl p-4">
               <p className="text-red-300 text-sm">{geoError}</p>
             </div>
           )}
 
-          {/* Separate Car Types and Seat Numbers Boxes */}
           <div className="mt-4 bg-gray-900/50 border border-gray-800 rounded-xl p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Box: Car Types */}
               <div>
                 <h4 className="text-lg font-semibold text-white mb-3">Car Types</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {DEFAULT_TYPES.map((t) => (
                     <label key={t} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
-                      <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => toggleType(t)} className="w-4 h-4 accent-orange-500" />
+                      <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[t] }))} className="w-4 h-4 accent-orange-500" />
                       <span className="text-gray-200">{t}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              {/* Right Box: Seat Numbers */}
               <div>
                 <h4 className="text-lg font-semibold text-white mb-3">Seat Numbers</h4>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg/grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {DEFAULT_SEATS.map((s) => (
                     <label key={s} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
-                      <input type="checkbox" checked={!!selectedSeats[s]} onChange={() => toggleSeat(s)} className="w-4 h-4 accent-orange-500" />
+                      <input type="checkbox" checked={!!selectedSeats[s]} onChange={() => setSelectedSeats((prev) => ({ ...prev, [s]: !prev[s] }))} className="w-4 h-4 accent-orange-500" />
                       <span className="text-gray-200">{s} Seats</span>
                     </label>
                   ))}
@@ -795,7 +742,6 @@ const Cars = () => {
             </div>
           </div>
 
-          {/* Reset Button */}
           <div className="mt-4 flex justify-end">
             <button onClick={resetFilters} className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors flex items-center gap-2">
               <FaSyncAlt /> Reset Filters
@@ -803,7 +749,6 @@ const Cars = () => {
           </div>
         </div>
 
-        {/* Map View (above list) with Error Handling */}
         <div className="w-full mb-6">
           {apiKey ? (
             <LoadScript
@@ -811,7 +756,7 @@ const Cars = () => {
               onError={() => setMapError("Failed to load Google Maps. Check your API key and billing.")}
             >
               <GoogleMap
-                mapContainerStyle={{ width: '100%', height: '400px' }}
+                mapContainerStyle={{ width: "100%", height: "400px" }}
                 center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
                 zoom={15}
                 onLoad={() => setMapError("")}
@@ -821,28 +766,33 @@ const Cars = () => {
                   <Marker
                     position={{ lat: userCoords[0], lng: userCoords[1] }}
                     title="Your Location"
-                    icon={{ url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' }}
+                    icon={{ url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }}
                   />
                 )}
                 {companyMarkers.map((companyData) => (
                   <Marker
-                    key={companyData.company?.name || 'unknown'}
+                    key={companyData.company?.name || "unknown"}
                     position={{ lat: companyData.location[0], lng: companyData.location[1] }}
                     onClick={() => setSelectedMarker(companyData)}
-                    title={companyData.company?.name || 'Company'}
+                    title={companyData.company?.name || "Company"}
                   />
                 ))}
                 {selectedMarker && (
-                  <InfoWindow position={{ lat: selectedMarker.location[0], lng: selectedMarker.location[1] }} onCloseClick={() => setSelectedMarker(null)}>
+                  <InfoWindow
+                    position={{ lat: selectedMarker.location[0], lng: selectedMarker.location[1] }}
+                    onCloseClick={() => setSelectedMarker(null)}
+                  >
                     <div>
-                      <h3>{selectedMarker.company?.name || 'Company'}</h3>
-                      <p>{selectedMarker.company?.address?.city || ''}</p>
+                      <h3>{selectedMarker.company?.name || "Company"}</h3>
+                      <p>{selectedMarker.company?.address?.city || ""}</p>
                       <h4>Cars Available:</h4>
                       <ul>
                         {selectedMarker.cars.map((car) => (
                           <li key={car._id}>
                             {car.make} {car.model} - MYR {car.dailyRate}/day
-                            <button onClick={() => handleBook(car, car._id)} className="ml-2 bg-blue-600 text-white px-2 py-1 rounded">Book</button>
+                            <button onClick={() => handleBook(car, car._id)} className="ml-2 bg-blue-600 text-white px-2 py-1 rounded">
+                              Book
+                            </button>
                           </li>
                         ))}
                       </ul>
@@ -863,7 +813,6 @@ const Cars = () => {
           )}
         </div>
 
-        {/* List View (below map) */}
         <div className={carPageStyles.gridContainer}>
           {loading &&
             Array.from({ length: limit }).map((_, i) => (
@@ -942,7 +891,10 @@ const Cars = () => {
                         {companyName ? (
                           <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
                             <FaBuilding className="text-gray-400" />
-                            <span className="truncate">{companyName}{companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ''}</span>
+                            <span className="truncate">
+                              {companyName}
+                              {companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ""}
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -985,19 +937,19 @@ const Cars = () => {
 
                     <button
                       onClick={() => handleBook(car, id)}
-                      className={`${carPageStyles.bookButton} ${
-                        disabled ? "opacity-60 cursor-not-allowed" : ""
-                      }`}
+                      className={`${carPageStyles.bookButton} ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
                       aria-label={`Book ${carName}`}
                       title={
                         disabled
-                          ? "This car is currently booked or unavailable"
-                          : `Book ${carName}`
+                          ? "The selected dates overlap an existing booking"
+                          : hasDateFilter
+                          ? `Book ${carName}`
+                          : "Pick your dates inside"
                       }
                       disabled={disabled}
                     >
                       <span className={carPageStyles.buttonText}>
-                        {disabled ? "Unavailable" : "Book Now"}
+                        {disabled ? "Overlaps selected dates" : hasDateFilter ? "Book Now" : "Book Now"}
                       </span>
                       <FaArrowRight className={carPageStyles.buttonIcon} />
                     </button>

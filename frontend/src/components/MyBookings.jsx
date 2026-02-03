@@ -819,7 +819,9 @@ const MyBookings = () => {
 
   const cancelBooking = useCallback(
     async (bookingId) => {
-      if (!isAuthed) {
+      // Refresh auth state to ensure token exists
+      const ok = await authService.ensureAuth().catch(() => false);
+      if (!ok) {
         handleRequireAuth("login");
         return;
       }
@@ -843,7 +845,7 @@ const MyBookings = () => {
         );
       }
     },
-    [isAuthed, selectedBooking]
+    [selectedBooking]
   );
 
   const filteredBookings = useMemo(

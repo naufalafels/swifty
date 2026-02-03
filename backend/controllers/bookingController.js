@@ -336,19 +336,24 @@ export const getBookings = async (req, res, next) => {
   }
 };
 
-// GET MY BOOKINGS (user) — also claim guest bookings by matching email
+// GET MY BOOKINGS (user) — also claim guest bookings by matching email (fetch email from DB if missing in token)
 export const getMyBookings = async (req, res, next) => {
   try {
     if (!req.user || (!(req.user.id || req.user._id))) return res.status(401).json({ success: false, message: "Unauthorized" });
     const userId = req.user.id || req.user._id;
-    const userEmail = normalizeEmail(req.user.email);
+
+    let userEmail = normalizeEmail(req.user.email);
+    if (!userEmail) {
+      const dbUser = await User.findById(userId).select("email").lean();
+      userEmail = normalizeEmail(dbUser?.email);
+    }
+
     const query = [{ userId }];
     if (userEmail) {
       query.push({ email: { $regex: `^${escapeRegex(userEmail)}$`, $options: "i" } });
     }
     const bookings = await Booking.find({ $or: query }).sort({ bookingDate: -1 }).lean();
 
-    // Claim guest bookings to this user if emails match
     if (userEmail) {
       const claimableIds = bookings
         .filter((b) => normalizeEmail(b.email) === userEmail && String(b.userId) !== String(userId))
@@ -392,7 +397,7 @@ export const lookupBooking = async (req, res, next) => {
   }
 };
 
-// UPDATE BOOKING
+// UPDATE BOOKING (unchanged)
 export const updateBooking = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -537,8 +542,7 @@ export const updateBooking = async (req, res, next) => {
         if (newCarId) {
           await Car.findByIdAndUpdate(newCarId, { $set: { "bookings.$[elem].status": updated.status, "bookings.$[elem].pickupDate": updated.pickupDate, "bookings.$[elem].returnDate": updated.returnDate } }, { arrayFilters: [{ "elem.bookingId": updated._id }], session });
         }
-      } catch (e) {
-      }
+      } catch (e) {}
       await updateCarStatusBasedOnBookings(newCarId, session);
     }
 
@@ -553,7 +557,7 @@ export const updateBooking = async (req, res, next) => {
   }
 };
 
-// UPDATE STATUS (auth required & must own booking, or email match -> claim)
+// UPDATE STATUS (auth required & must own booking, or email match -> claim; email fetched from DB if missing)
 export const updateBookingStatus = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -579,7 +583,17 @@ export const updateBookingStatus = async (req, res, next) => {
 
     const bookingUserId = booking.userId ? String(booking.userId) : null;
     const requesterId = String(req.user.id || req.user._id || "");
-    const emailsMatch = normalizeEmail(booking.email) && normalizeEmail(req.user.email) && normalizeEmail(booking.email) === normalizeEmail(req.user.email);
+
+    let requesterEmail = normalizeEmail(req.user.email);
+    if (!requesterEmail) {
+      const dbUser = await User.findById(requesterId).select("email").lean();
+      requesterEmail = normalizeEmail(dbUser?.email);
+    }
+
+    const emailsMatch =
+      normalizeEmail(booking.email) &&
+      requesterEmail &&
+      normalizeEmail(booking.email) === requesterEmail;
 
     if (!bookingUserId || bookingUserId !== requesterId) {
       if (!emailsMatch) {
@@ -587,7 +601,6 @@ export const updateBookingStatus = async (req, res, next) => {
         session.endSession();
         return res.status(403).json({ message: "Forbidden: not your booking" });
       }
-      // Claim the booking to this user by email match
       booking.userId = req.user.id || req.user._id;
     }
 
@@ -603,8 +616,7 @@ export const updateBookingStatus = async (req, res, next) => {
           await Car.findByIdAndUpdate(carId, { $set: { "bookings.$[elem].status": status } }, { arrayFilters: [{ "elem.bookingId": booking._id }], session });
         }
       }
-    } catch (e) {
-    }
+    } catch (e) {}
 
     const carId = booking.car && booking.car.id ? idToString(booking.car.id) : null;
     await updateCarStatusBasedOnBookings(carId, session);

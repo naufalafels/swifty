@@ -27,7 +27,7 @@ bookingRouter.get('/mybooking', authMiddleWare, getMyBookings);
 
 // Updates (kept as-is)
 bookingRouter.put('/:id', uploads.single('carImage'), updateBooking);
-bookingRouter.patch('/:id/status', updateBookingStatus);
+bookingRouter.patch('/:id/status', authMiddleWare, updateBookingStatus); // add auth here
 bookingRouter.delete('/:id', deleteBooking);
 
 export default bookingRouter;

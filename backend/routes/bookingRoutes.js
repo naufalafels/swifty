@@ -7,7 +7,8 @@ import {
   getMyBookings,
   updateBooking,
   updateBookingStatus,
-  lookupBooking
+  lookupBooking,
+  getBookingById
 } from '../controllers/bookingController.js';
 import { uploads } from '../middlewares/uploads.js';
 
@@ -22,12 +23,15 @@ bookingRouter.get('/lookup', lookupBooking);
 // Public list
 bookingRouter.get('/', getBookings);
 
+// Public: get single booking by id (used for payment result pages)
+bookingRouter.get('/:id', getBookingById);
+
 // Authenticated: my bookings (for logged-in users)
 bookingRouter.get('/mybooking', authMiddleWare, getMyBookings);
 
 // Updates (kept as-is)
 bookingRouter.put('/:id', uploads.single('carImage'), updateBooking);
-bookingRouter.patch('/:id/status', authMiddleWare, updateBookingStatus); // add auth here
+bookingRouter.patch('/:id/status', authMiddleWare, updateBookingStatus);
 bookingRouter.delete('/:id', deleteBooking);
 
 export default bookingRouter;

@@ -13,6 +13,7 @@ import KycPage from './pages/KycPage';
 import HostOnboardPage from './pages/HostOnboardPage';
 import HostDashboard from './pages/HostDashboard';
 import ProfilePage from './pages/ProfilePage';
+import PaymentResultPage from './pages/PaymentResultPage'; // NEW
 import * as authService from './utils/authService';
 import CookieConsent from './components/CookieConsent';
 
@@ -144,6 +145,10 @@ const App = () => {
         />
 
         <Route path='/verify-payment' element={<VerifyPaymentPage />} />
+
+        {/* Payment result pages */}
+        <Route path='/success' element={<PaymentResultPage />} />
+        <Route path='/cancel' element={<PaymentResultPage />} />
 
         <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>

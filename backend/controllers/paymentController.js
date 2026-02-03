@@ -134,6 +134,16 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "pickupDate and returnDate required" });
     }
 
+    // Guest email guard: block guest checkout with registered (non-guest) email
+    if (!tokenUserId && !providedUserId) {
+      const existing = await User.findOne({ email: normalizeEmail(email) }).select('role').lean();
+      if (existing && existing.role !== 'guest') {
+        await session.abortTransaction().catch(() => {});
+        session.endSession();
+        return res.status(400).json({ success: false, message: 'User Email is Registered. Please log in to continue.' });
+      }
+    }
+
     const pd = new Date(pickupDate);
     const rd = new Date(returnDate);
     if (Number.isNaN(pd.getTime()) || Number.isNaN(rd.getTime())) {
@@ -155,6 +165,19 @@ export const createRazorpayOrder = async (req, res) => {
     if (!carIdStr || !mongoose.Types.ObjectId.isValid(carIdStr)) {
       await session.abortTransaction(); session.endSession();
       return res.status(400).json({ success: false, message: "Valid car id is required" });
+    }
+
+    // Overlap guard
+    const conflict = await Booking.findOne({
+      "car.id": new mongoose.Types.ObjectId(carIdStr),
+      status: { $in: BLOCKING_STATUSES },
+      pickupDate: { $lte: rd },
+      returnDate: { $gte: pd },
+    }).session(session).lean();
+
+    if (conflict) {
+      await session.abortTransaction(); session.endSession();
+      return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
     }
 
     let finalUserId = tokenUserId || providedUserId || null;
@@ -191,18 +214,6 @@ export const createRazorpayOrder = async (req, res) => {
       frontImageUrl: kycFront ? toUrl(kycFront) : (kyc?.frontImageUrl || ''),
       backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
     };
-
-    const conflict = await Booking.findOne({
-      "car.id": new mongoose.Types.ObjectId(carIdStr),
-      status: { $in: BLOCKING_STATUSES },
-      pickupDate: { $lte: rd },
-      returnDate: { $gte: pd },
-    }).session(session).lean();
-
-    if (conflict) {
-      await session.abortTransaction(); session.endSession();
-      return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
-    }
 
     const bookingInput = {
       userId: finalUserId,

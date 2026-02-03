@@ -366,6 +366,22 @@ export const getBookings = async (req, res, next) => {
   }
 };
 
+// GET BOOKING BY ID (public)
+export const getBookingById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid booking id" });
+    }
+    const booking = await Booking.findById(id).lean();
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+    return res.json({ success: true, data: booking });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET MY BOOKINGS (user) — also claim guest bookings by matching email (fetch email from DB if missing in token)
 export const getMyBookings = async (req, res, next) => {
   try {

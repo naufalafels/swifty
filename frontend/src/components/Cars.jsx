@@ -622,9 +622,8 @@ const Cars = () => {
 
   const isBookDisabled = (car) => {
     const effective = computeEffectiveAvailability(car);
-    if (car?.status && car.status !== "available") return true;
-    if (!effective) return false;
-    return effective.state === "booked";
+    // Only block if it's currently booked (today overlap). Ignore car.status to avoid stale "rented".
+    return effective?.state === "booked";
   };
 
   // When booking from the cards, pass selected dates so CarDetail pre-fills the booking form
@@ -784,7 +783,7 @@ const Cars = () => {
               {/* Right Box: Seat Numbers */}
               <div>
                 <h4 className="text-lg font-semibold text-white mb-3">Seat Numbers</h4>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-2 lg/grid-cols-4 gap-4">
                   {DEFAULT_SEATS.map((s) => (
                     <label key={s} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
                       <input type="checkbox" checked={!!selectedSeats[s]} onChange={() => toggleSeat(s)} className="w-4 h-4 accent-orange-500" />

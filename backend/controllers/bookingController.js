@@ -348,6 +348,7 @@ export const getMyBookings = async (req, res, next) => {
     }
     const bookings = await Booking.find({ $or: query }).sort({ bookingDate: -1 }).lean();
 
+    // Claim guest bookings to this user if emails match
     if (userEmail) {
       const claimableIds = bookings
         .filter((b) => normalizeEmail(b.email) === userEmail && String(b.userId) !== String(userId))
@@ -586,6 +587,7 @@ export const updateBookingStatus = async (req, res, next) => {
         session.endSession();
         return res.status(403).json({ message: "Forbidden: not your booking" });
       }
+      // Claim the booking to this user by email match
       booking.userId = req.user.id || req.user._id;
     }
 

@@ -45,6 +45,30 @@ const getUserIdFromRequest = (req) => {
   }
 };
 
+// Normalize email helper (aligned with bookingController)
+const normalizeEmail = (email) => (typeof email === 'string' ? email.trim().toLowerCase() : '');
+
+// Compute whether a paid booking is active now or upcoming
+const computePostPaymentStatus = (pickupDate) => {
+  const now = new Date();
+  const pd = new Date(pickupDate);
+  if (!Number.isNaN(pd.getTime()) && pd > now) return 'upcoming';
+  return 'active';
+};
+
+// Recompute car.status depending on blocking bookings (local copy to avoid circular deps)
+const updateCarStatusBasedOnBookings = async (carId, session = null) => {
+  if (!carId) return;
+  const now = new Date();
+  const count = await Booking.countDocuments({
+    "car.id": carId,
+    status: { $in: BLOCKING_STATUSES },
+    returnDate: { $gte: now },
+  }).session(session);
+  const newStatus = count > 0 ? "rented" : "available";
+  await Car.findByIdAndUpdate(carId, { status: newStatus }, { session });
+};
+
 // Create or reuse a guest user so bookings always have a userId
 const getOrCreateGuestUser = async ({ name, email, phone }) => {
   if (!email) throw new Error('Email is required for guest booking');
@@ -306,10 +330,17 @@ export const verifyRazorpayPayment = async (req, res) => {
       ]
     };
 
+    // Decide status (upcoming vs active) based on pickup date
+    const bookingDoc = await Booking.findById(bookingId).lean();
+    if (!bookingDoc) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    const postStatus = computePostPaymentStatus(bookingDoc.pickupDate);
+
     const update = {
       $set: {
         paymentStatus: 'paid',
-        status: 'active',
+        status: postStatus,
         razorpayOrderId: razorpay_order_id,
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature
@@ -325,9 +356,54 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.json({ success: true, message: 'Payment already recorded' });
     }
 
+    // Ensure the car's embedded bookings list is updated so availability is blocked
+    const carId = updated?.car?.id;
+    if (carId) {
+      await Car.updateOne(
+        { _id: carId, "bookings.bookingId": { $ne: updated._id } },
+        { $push: { bookings: { bookingId: updated._id, pickupDate: updated.pickupDate, returnDate: updated.returnDate, status: postStatus } } }
+      ).catch(() => {});
+      await Car.updateOne(
+        { _id: carId, "bookings.bookingId": updated._id },
+        { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": updated.pickupDate, "bookings.$.returnDate": updated.returnDate } }
+      ).catch(() => {});
+      await updateCarStatusBasedOnBookings(carId);
+    }
+
     return res.json({ success: true });
   } catch (error) {
     console.error('verifyRazorpayPayment error', error?.stack || error);
     return res.status(500).json({ success: false, message: 'Payment verification failed', error: String(error?.message || error) });
+  }
+};
+
+// Mark payment failure explicitly to unblock availability
+export const markPaymentFailed = async (req, res) => {
+  try {
+    const { bookingId } = req.body || {};
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ success: false, message: 'Invalid bookingId' });
+    }
+
+    const updated = await Booking.findByIdAndUpdate(
+      bookingId,
+      { paymentStatus: 'failed', status: 'cancelled' },
+      { new: true }
+    ).exec();
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    const carId = updated?.car?.id;
+    if (carId) {
+      await Car.updateOne({ _id: carId }, { $pull: { bookings: { bookingId: updated._id } } }).catch(() => {});
+      await updateCarStatusBasedOnBookings(carId);
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('markPaymentFailed error', error?.stack || error);
+    return res.status(500).json({ success: false, message: 'Failed to mark payment failed', error: String(error?.message || error) });
   }
 };

@@ -52,6 +52,16 @@ function deleteLocalFileIfPresent(filePath) {
 }
 
 /**
+ * Normalize email to lowercase for consistent comparisons
+ */
+const normalizeEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
+
+/**
+ * Escape regex special characters
+ */
+const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
  * Build the car snapshot stored inside booking.car
  * Attempts to extract companyId/companyName from several shapes.
  */
@@ -333,12 +343,28 @@ export const getBookings = async (req, res, next) => {
   }
 };
 
-// GET MY BOOKINGS (user)
+// GET MY BOOKINGS (user) — also claim guest bookings by matching email
 export const getMyBookings = async (req, res, next) => {
   try {
     if (!req.user || (!(req.user.id || req.user._id))) return res.status(401).json({ success: false, message: "Unauthorized" });
     const userId = req.user.id || req.user._id;
-    const bookings = await Booking.find({ userId }).sort({ bookingDate: -1 }).lean();
+    const userEmail = normalizeEmail(req.user.email);
+    const query = [{ userId }];
+    if (userEmail) {
+      query.push({ email: { $regex: `^${escapeRegex(userEmail)}$`, $options: "i" } });
+    }
+    const bookings = await Booking.find({ $or: query }).sort({ bookingDate: -1 }).lean();
+
+    // Claim guest bookings to this user if emails match
+    if (userEmail) {
+      const claimableIds = bookings
+        .filter((b) => normalizeEmail(b.email) === userEmail && String(b.userId) !== String(userId))
+        .map((b) => b._id);
+      if (claimableIds.length) {
+        await Booking.updateMany({ _id: { $in: claimableIds } }, { userId });
+      }
+    }
+
     return res.json(bookings);
   } catch (err) {
     next(err);
@@ -534,7 +560,7 @@ export const updateBooking = async (req, res, next) => {
   }
 };
 
-// UPDATE STATUS (auth required & must own booking)
+// UPDATE STATUS (auth required & must own booking, or email match -> claim)
 export const updateBookingStatus = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -560,10 +586,16 @@ export const updateBookingStatus = async (req, res, next) => {
 
     const bookingUserId = booking.userId ? String(booking.userId) : null;
     const requesterId = String(req.user.id || req.user._id || "");
+    const emailsMatch = normalizeEmail(booking.email) && normalizeEmail(req.user.email) && normalizeEmail(booking.email) === normalizeEmail(req.user.email);
+
     if (!bookingUserId || bookingUserId !== requesterId) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({ message: "Forbidden: not your booking" });
+      if (!emailsMatch) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ message: "Forbidden: not your booking" });
+      }
+      // Claim the booking to this user by email match
+      booking.userId = req.user.id || req.user._id;
     }
 
     booking.status = status;
@@ -572,7 +604,11 @@ export const updateBookingStatus = async (req, res, next) => {
     try {
       const carId = booking.car && booking.car.id ? idToString(booking.car.id) : null;
       if (carId) {
-        await Car.findByIdAndUpdate(carId, { $set: { "bookings.$[elem].status": status } }, { arrayFilters: [{ "elem.bookingId": booking._id }], session });
+        if (status === "cancelled") {
+          await Car.findByIdAndUpdate(carId, { $pull: { bookings: { bookingId: booking._id } } }, { session });
+        } else {
+          await Car.findByIdAndUpdate(carId, { $set: { "bookings.$[elem].status": status } }, { arrayFilters: [{ "elem.bookingId": booking._id }], session });
+        }
       }
     } catch (e) {
     }

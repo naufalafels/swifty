@@ -11,10 +11,11 @@ import {
   FaSyncAlt,
   FaBuilding,
   FaCheck,
+  FaMapPin,
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
-import { GoogleMap, LoadScript, Marker, InfoWindow } from "@react-google-maps/api";
+import { GoogleMap, LoadScript, Marker, InfoWindow, StandaloneSearchBox } from "@react-google-maps/api";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const startOfDay = (d) => {
@@ -22,8 +23,7 @@ const startOfDay = (d) => {
   x.setHours(0, 0, 0, 0);
   return x;
 };
-const daysBetween = (from, to) =>
-  Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
+const daysBetween = (from, to) => Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
 const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury"];
 const DEFAULT_SEATS = [2, 4, 5, 7];
@@ -54,6 +54,9 @@ const Cars = () => {
   const [geoError, setGeoError] = useState("");
   const [locationRequested, setLocationRequested] = useState(false);
 
+  const [locationQuery, setLocationQuery] = useState("");
+  const searchBoxRef = useRef(null);
+
   const abortControllerRef = useRef(null);
   const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
   const limit = 12;
@@ -79,6 +82,7 @@ const Cars = () => {
         }
         if (state) setStateSelected(state);
         if (city) setCitySelected(city);
+        if (results[0]?.formatted_address) setLocationQuery(results[0].formatted_address);
       }
     });
   }, []);
@@ -226,11 +230,7 @@ const Cars = () => {
           return { pickup: new Date(pickup), return: new Date(ret) };
         })
         .filter(Boolean)
-        .filter(
-          (b) =>
-            startOfDay(b.pickup) <= startOfDay(today) &&
-            startOfDay(today) <= startOfDay(b.return)
-        );
+        .filter((b) => startOfDay(b.pickup) <= startOfDay(today) && startOfDay(today) <= startOfDay(b.return));
 
       if (overlapping.length > 0) {
         overlapping.sort((a, b) => b.return - a.return);
@@ -329,10 +329,7 @@ const Cars = () => {
     const dLon = toRad(lon2 - lon1);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -373,6 +370,7 @@ const Cars = () => {
     setLocationRequested(true);
     if (!navigator.geolocation) {
       setGeoError("Geolocation is not supported by your browser.");
+      setLocationRequested(false);
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -381,11 +379,13 @@ const Cars = () => {
         setUserCoords(coords);
         setUseMyLocation(true);
         reverseGeocode(coords[0], coords[1]);
+        setLocationRequested(false);
       },
       (err) => {
         setGeoError(err?.message || "Failed to obtain location");
+        setLocationRequested(false);
       },
-      { timeout: 10000 }
+      { timeout: 10000, enableHighAccuracy: true }
     );
   }, [reverseGeocode]);
 
@@ -395,6 +395,30 @@ const Cars = () => {
       setGeoError("");
     }
   }, [useMyLocation]);
+
+  const handleLocationPlaceChanged = () => {
+    if (!searchBoxRef.current) return;
+    const places = searchBoxRef.current.getPlaces();
+    if (!places || places.length === 0) return;
+    const place = places[0];
+    setLocationQuery(place.formatted_address || place.name || "");
+
+    const comps = place.address_components || [];
+    let state = "";
+    let city = "";
+    comps.forEach((c) => {
+      if (c.types.includes("administrative_area_level_1")) state = c.long_name;
+      if (c.types.includes("locality") || c.types.includes("administrative_area_level_2")) city = c.long_name;
+    });
+    if (state) setStateSelected(state);
+    if (city) setCitySelected(city);
+
+    if (place.geometry?.location) {
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      setUserCoords([lat, lng]);
+    }
+  };
 
   const activeTypes = useMemo(
     () => Object.keys(selectedTypes).filter((t) => selectedTypes[t]),
@@ -406,7 +430,6 @@ const Cars = () => {
     [selectedSeats]
   );
 
-  // True if user selected both dates in filter
   const hasDateFilter = Boolean(pickupDate && returnDate);
 
   const filteredCars = useMemo(() => {
@@ -496,11 +519,7 @@ const Cars = () => {
     const effective = computeEffectiveAvailability(car);
 
     if (!effective) {
-      return (
-        <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
-          Available
-        </span>
-      );
+      return <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">Available</span>;
     }
 
     if (effective.state === "booked") {
@@ -518,9 +537,7 @@ const Cars = () => {
         }
         return (
           <div className="flex flex-col items-end">
-            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
-              Booked
-            </span>
+            <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">Booked</span>
             <small className="text-xs text-gray-400 mt-1">until {formatDate(effective.until)}</small>
           </div>
         );
@@ -566,14 +583,9 @@ const Cars = () => {
       );
     }
 
-    return (
-      <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">
-        Available
-      </span>
-    );
+    return <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">Available</span>;
   };
 
-  // Disable only when user selected dates AND those dates overlap a booking
   const isBookDisabled = (car) => {
     if (!hasDateFilter) return false;
     return !isAvailableForRange(car, pickupDate, returnDate);
@@ -598,6 +610,11 @@ const Cars = () => {
     setSelectedSeats(DEFAULT_SEATS.reduce((acc, s) => ({ ...acc, [s]: false }), {}));
     setPickupDate("");
     setReturnDate("");
+    setStateSelected("");
+    setCitySelected("");
+    setLocationQuery("");
+    setUserCoords(null);
+    setUseMyLocation(false);
   };
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -609,62 +626,37 @@ const Cars = () => {
           <div className={carPageStyles.headerDecoration}></div>
           <h1 className={carPageStyles.title}>Premium Car Collection</h1>
           <p className={carPageStyles.subtitle}>
-            Find cars by state & city in Malaysia — or use Locate to find the closest vehicles to you. Map-first discovery for nearest cars.
+            Search by location with smart autocomplete — or use Locate to find the closest vehicles to you.
           </p>
         </div>
 
         {/* Filters */}
         <div className="w-full max-w-7xl mx-auto mb-6">
-          {/* Main grid: State, City, Dates */}
+          {/* Main grid: Location + Dates */}
           <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-sm text-gray-300 block mb-2">State</label>
-              {malaysiaStates && malaysiaStates.length > 0 ? (
-                <select
-                  value={stateSelected}
-                  onChange={(e) => setStateSelected(e.target.value)}
-                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
-                >
-                  <option value="">Choose a state</option>
-                  {malaysiaStates.map((s) => (
-                    <option key={s.name} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  value={stateSelected}
-                  onChange={(e) => setStateSelected(e.target.value)}
-                  placeholder="State / Region"
-                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
-                />
-              )}
-            </div>
-
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-sm text-gray-300 block mb-2">City</label>
-              {citiesForState && citiesForState.length > 0 ? (
-                <select
-                  value={citySelected}
-                  onChange={(e) => setCitySelected(e.target.value)}
-                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
-                >
-                  <option value="">Choose a city</option>
-                  {citiesForState.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  value={citySelected}
-                  onChange={(e) => setCitySelected(e.target.value)}
-                  placeholder="City"
-                  className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
-                />
-              )}
+            <div className="flex-1 min-w-[240px]">
+              <label className="text-sm text-gray-300 block mb-2">Location (city, state, landmark)</label>
+              <div className="relative">
+                {apiKey ? (
+                  <LoadScript googleMapsApiKey={apiKey} libraries={["places"]}>
+                    <StandaloneSearchBox onLoad={(ref) => (searchBoxRef.current = ref)} onPlacesChanged={handleLocationPlaceChanged}>
+                      <input
+                        value={locationQuery}
+                        onChange={(e) => setLocationQuery(e.target.value)}
+                        placeholder="Start typing to search..."
+                        className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+                      />
+                    </StandaloneSearchBox>
+                  </LoadScript>
+                ) : (
+                  <input
+                    value={locationQuery}
+                    onChange={(e) => setLocationQuery(e.target.value)}
+                    placeholder="Start typing to search..."
+                    className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+                  />
+                )}
+              </div>
             </div>
 
             <div className="flex-1 min-w-[200px]">
@@ -688,25 +680,42 @@ const Cars = () => {
                 className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
               />
             </div>
-          </div>
 
-          {!locationRequested && (
-            <div className="mt-4 bg-blue-900/50 border border-blue-800 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FaMapMarkerAlt className="text-blue-400" />
-                <div>
-                  <p className="text-white font-semibold">Auto-fill Location</p>
-                  <p className="text-sm text-gray-300">Allow location access to automatically fill your state and city for easier car discovery.</p>
-                </div>
-              </div>
+            <div className="flex justify-end items-center gap-2">
               <button
-                onClick={obtainUserLocation}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                onClick={resetFilters}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-200 hover:border-orange-500 hover:text-orange-400 transition-colors"
               >
-                <FaCheck /> Allow
+                Reset
+              </button>
+              <button
+                onClick={() => fetchCars()}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-2"
+              >
+                <FaSyncAlt className="animate-spin-slow" /> Refresh
               </button>
             </div>
-          )}
+          </div>
+
+          {/* Locate */}
+          <div className="mt-4 bg-blue-900/50 border border-blue-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <FaMapMarkerAlt className="text-blue-400" />
+              <div>
+                <p className="text-white font-semibold">Auto-fill Location</p>
+                <p className="text-sm text-gray-300">
+                  Allow location access to automatically fill your state and city for easier car discovery.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={obtainUserLocation}
+              disabled={locationRequested}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <FaCheck /> {locationRequested ? "Requesting..." : "Allow"}
+            </button>
+          </div>
 
           {geoError && (
             <div className="mt-4 bg-red-900/50 border border-red-800 rounded-xl p-4">
@@ -720,8 +729,16 @@ const Cars = () => {
                 <h4 className="text-lg font-semibold text-white mb-3">Car Types</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                   {DEFAULT_TYPES.map((t) => (
-                    <label key={t} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
-                      <input type="checkbox" checked={!!selectedTypes[t]} onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[t] }))} className="w-4 h-4 accent-orange-500" />
+                    <label
+                      key={t}
+                      className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!selectedTypes[t]}
+                        onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[t] }))}
+                        className="w-4 h-4 accent-orange-500"
+                      />
                       <span className="text-gray-200">{t}</span>
                     </label>
                   ))}
@@ -732,8 +749,16 @@ const Cars = () => {
                 <h4 className="text-lg font-semibold text-white mb-3">Seat Numbers</h4>
                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {DEFAULT_SEATS.map((s) => (
-                    <label key={s} className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer">
-                      <input type="checkbox" checked={!!selectedSeats[s]} onChange={() => setSelectedSeats((prev) => ({ ...prev, [s]: !prev[s] }))} className="w-4 h-4 accent-orange-500" />
+                    <label
+                      key={s}
+                      className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!selectedSeats[s]}
+                        onChange={() => setSelectedSeats((prev) => ({ ...prev, [s]: !prev[s] }))}
+                        className="w-4 h-4 accent-orange-500"
+                      />
                       <span className="text-gray-200">{s} Seats</span>
                     </label>
                   ))}
@@ -741,24 +766,20 @@ const Cars = () => {
               </div>
             </div>
           </div>
-
-          <div className="mt-4 flex justify-end">
-            <button onClick={resetFilters} className="px-4 py-2 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors flex items-center gap-2">
-              <FaSyncAlt /> Reset Filters
-            </button>
-          </div>
         </div>
 
+        {/* Map */}
         <div className="w-full mb-6">
           {apiKey ? (
             <LoadScript
               googleMapsApiKey={apiKey}
+              libraries={["places"]}
               onError={() => setMapError("Failed to load Google Maps. Check your API key and billing.")}
             >
               <GoogleMap
                 mapContainerStyle={{ width: "100%", height: "400px" }}
                 center={userCoords ? { lat: userCoords[0], lng: userCoords[1] } : mapCenter}
-                zoom={15}
+                zoom={userCoords ? 12 : 15}
                 onLoad={() => setMapError("")}
                 onError={() => setMapError("Map failed to load.")}
               >
@@ -813,6 +834,7 @@ const Cars = () => {
           )}
         </div>
 
+        {/* Cars grid */}
         <div className={carPageStyles.gridContainer}>
           {loading &&
             Array.from({ length: limit }).map((_, i) => (
@@ -833,11 +855,7 @@ const Cars = () => {
               </div>
             ))}
 
-          {!loading && error && (
-            <div className="col-span-full text-center text-red-600">
-              {error}
-            </div>
-          )}
+          {!loading && error && <div className="col-span-full text-center text-red-600">{error}</div>}
 
           {!loading && !error && filteredCars.length === 0 && (
             <div className="col-span-full text-center">No cars found with current filters.</div>
@@ -870,9 +888,7 @@ const Cars = () => {
                       className={carPageStyles.carImage}
                     />
 
-                    <div className="absolute right-4 top-4 z-20">
-                      {renderAvailabilityBadge(car)}
-                    </div>
+                    <div className="absolute right-4 top-4 z-20">{renderAvailabilityBadge(car)}</div>
 
                     <div className={carPageStyles.priceBadge}>
                       MYR&nbsp;{car.dailyRate ?? car.price ?? car.pricePerDay ?? "—"}
@@ -884,9 +900,7 @@ const Cars = () => {
                     <div className={carPageStyles.headerRow}>
                       <div>
                         <h3 className={carPageStyles.carName}>{carName}</h3>
-                        <p className={carPageStyles.carType}>
-                          {car.category ?? car.type ?? "Sedan"}
-                        </p>
+                        <p className={carPageStyles.carType}>{car.category ?? car.type ?? "Sedan"}</p>
 
                         {companyName ? (
                           <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
@@ -899,9 +913,7 @@ const Cars = () => {
                         ) : null}
                       </div>
                       <div className="text-right text-sm text-gray-300">
-                        {car._distanceKm ? (
-                          <div className="text-xs text-gray-400">{car._distanceKm} km</div>
-                        ) : null}
+                        {car._distanceKm ? <div className="text-xs text-gray-400">{car._distanceKm} km</div> : null}
                       </div>
                     </div>
 

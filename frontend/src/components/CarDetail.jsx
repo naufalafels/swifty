@@ -33,6 +33,7 @@ import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
 import { createRazorpayOrder, verifyRazorpayPayment, markPaymentFailed } from "../services/paymentService";
 import io from "socket.io-client";
+import { LoadScript, StandaloneSearchBox } from "@react-google-maps/api";
 
 // Airbnb-style date range picker
 import { DateRange } from "react-date-range";
@@ -45,6 +46,7 @@ const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
   import.meta.env.VITE_API_URL ||
   (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
+const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
 const todayISO = () => format(new Date(), "yyyy-MM-dd");
 const formatISODate = (d) => format(d, "yyyy-MM-dd");
@@ -151,6 +153,9 @@ const CarDetail = () => {
     idCountry: "Malaysia",
     insurancePlan: "no_excess",
   });
+
+  const [locationQuery, setLocationQuery] = useState("");
+  const searchBoxRef = useRef(null);
 
   // Date-range picker state
   const [range, setRange] = useState([
@@ -359,6 +364,35 @@ const CarDetail = () => {
     }));
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((f) => ({ ...f, [name]: value }));
+  };
+
+  const handlePlaceChanged = () => {
+    if (!searchBoxRef.current) return;
+    const places = searchBoxRef.current.getPlaces();
+    if (!places || places.length === 0) return;
+    const place = places[0];
+    setLocationQuery(place.formatted_address || place.name || "");
+
+    const comps = place.address_components || [];
+    let city = "";
+    let state = "";
+    let zip = "";
+    comps.forEach((c) => {
+      if (c.types.includes("locality") || c.types.includes("administrative_area_level_2")) city = c.long_name;
+      if (c.types.includes("administrative_area_level_1")) state = c.long_name;
+      if (c.types.includes("postal_code")) zip = c.long_name;
+    });
+    setFormData((f) => ({
+      ...f,
+      city: city || f.city,
+      state: state || f.state,
+      zipCode: zip || f.zipCode,
+    }));
+  };
+
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
   if (!car && carError) return <div className="p-6 text-red-400">{carError}</div>;
   if (!car) return <div className="p-6 text-white">Car not found.</div>;
@@ -374,11 +408,6 @@ const CarDetail = () => {
   const selectedPlan = insuranceOptions.find((p) => p.value === formData.insurancePlan) || insuranceOptions[2];
   const insuranceCost = days * (selectedPlan.feePerDay || 0);
   const calculateTotal = () => days * price + insuranceCost;
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((f) => ({ ...f, [name]: value }));
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -711,6 +740,42 @@ const CarDetail = () => {
                         className={carDetailStyles.textInputField}
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Unified location search with Places autocomplete */}
+                <div className="flex flex-col mt-3">
+                  <label className={carDetailStyles.formLabel}>Location (city, state, landmark)</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "locationSearch")}>
+                    <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
+                    {GOOGLE_MAPS_KEY ? (
+                      <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY} libraries={["places"]}>
+                        <StandaloneSearchBox
+                          onLoad={(ref) => (searchBoxRef.current = ref)}
+                          onPlacesChanged={handlePlaceChanged}
+                        >
+                          <input
+                            type="text"
+                            placeholder="Start typing to search..."
+                            value={locationQuery}
+                            onChange={(e) => setLocationQuery(e.target.value)}
+                            onFocus={() => setActiveField("locationSearch")}
+                            onBlur={() => setActiveField(null)}
+                            className={carDetailStyles.textInputField}
+                          />
+                        </StandaloneSearchBox>
+                      </LoadScript>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Start typing to search..."
+                        value={locationQuery}
+                        onChange={(e) => setLocationQuery(e.target.value)}
+                        onFocus={() => setActiveField("locationSearch")}
+                        onBlur={() => setActiveField(null)}
+                        className={carDetailStyles.textInputField}
+                      />
+                    )}
                   </div>
                 </div>
 

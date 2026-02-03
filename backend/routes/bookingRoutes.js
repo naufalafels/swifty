@@ -20,18 +20,20 @@ bookingRouter.post('/', uploads.single('carImage'), createBooking);
 // Guest-friendly lookup by email/bookingId
 bookingRouter.get('/lookup', lookupBooking);
 
+// Authenticated: my bookings (for logged-in users)
+bookingRouter.get('/mybooking', authMiddleWare, getMyBookings);
+
 // Public list
 bookingRouter.get('/', getBookings);
 
 // Public: get single booking by id (used for payment result pages)
 bookingRouter.get('/:id', getBookingById);
 
-// Authenticated: my bookings (for logged-in users)
-bookingRouter.get('/mybooking', authMiddleWare, getMyBookings);
-
 // Updates (kept as-is)
 bookingRouter.put('/:id', uploads.single('carImage'), updateBooking);
 bookingRouter.patch('/:id/status', authMiddleWare, updateBookingStatus);
-bookingRouter.delete('/:id', deleteBooking);
+
+// Delete (kept as-is)
+bookingRouter.delete('/:id', authMiddleWare, deleteBooking);
 
 export default bookingRouter;

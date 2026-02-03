@@ -22,3 +22,14 @@ export async function verifyRazorpayPayment(body) {
   });
   return res.data;
 }
+
+/**
+ * markPaymentFailed(body: { bookingId })
+ * Explicitly cancel a pending booking when payment is dismissed/failed.
+ */
+export async function markPaymentFailed(body) {
+  const res = await api.post("/api/payments/razorpay/failed", body, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return res.data;
+}

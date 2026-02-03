@@ -45,10 +45,7 @@ const getUserIdFromRequest = (req) => {
   }
 };
 
-// Normalize email helper (aligned with bookingController)
 const normalizeEmail = (email) => (typeof email === 'string' ? email.trim().toLowerCase() : '');
-
-// Compute whether a paid booking is active now or upcoming
 const computePostPaymentStatus = (pickupDate) => {
   const now = new Date();
   const pd = new Date(pickupDate);
@@ -56,13 +53,14 @@ const computePostPaymentStatus = (pickupDate) => {
   return 'active';
 };
 
-// Recompute car.status depending on blocking bookings (local copy to avoid circular deps)
+// Only mark "rented" when NOW overlaps an active/upcoming/pending booking
 const updateCarStatusBasedOnBookings = async (carId, session = null) => {
   if (!carId) return;
   const now = new Date();
   const count = await Booking.countDocuments({
     "car.id": carId,
     status: { $in: BLOCKING_STATUSES },
+    pickupDate: { $lte: now },
     returnDate: { $gte: now },
   }).session(session);
   const newStatus = count > 0 ? "rented" : "available";
@@ -147,7 +145,6 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "returnDate must be same or after pickupDate" });
     }
 
-    // Parse car if sent as JSON string
     let carField = car;
     if (typeof car === 'string') {
       try { carField = JSON.parse(car); } catch { carField = { name: car }; }
@@ -160,7 +157,6 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Valid car id is required" });
     }
 
-    // Ensure userId (auth user or guest)
     let finalUserId = tokenUserId || providedUserId || null;
     if (!finalUserId) {
       finalUserId = await getOrCreateGuestUser({ name: customer, email, phone });
@@ -170,7 +166,6 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid userId format' });
     }
 
-    // Enrich car with company
     let bookingCompanyId = null;
     try {
       if (carIdStr) {
@@ -187,7 +182,6 @@ export const createRazorpayOrder = async (req, res) => {
       console.warn('createRazorpayOrder: failed to fetch canonical Car for companyId:', e?.message || e);
     }
 
-    // Normalize KYC with uploaded files (kycFront, kycBack)
     const kycFront = req.files?.kycFront?.[0] || null;
     const kycBack = req.files?.kycBack?.[0] || null;
     const toUrl = (fileObj) => fileObj ? `/uploads/${path.basename(fileObj.path)}` : '';
@@ -198,7 +192,6 @@ export const createRazorpayOrder = async (req, res) => {
       backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
     };
 
-    // Conflict check inside the transaction to prevent double booking
     const conflict = await Booking.findOne({
       "car.id": new mongoose.Types.ObjectId(carIdStr),
       status: { $in: BLOCKING_STATUSES },
@@ -211,7 +204,6 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
     }
 
-    // Create pending booking
     const bookingInput = {
       userId: finalUserId,
       customer: String(customer ?? ""),
@@ -248,12 +240,11 @@ export const createRazorpayOrder = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Create razorpay order AFTER booking successfully created.
     const razorpay = getRazorpay();
     let order;
     try {
       order = await razorpay.orders.create({
-        amount: Math.round(total * 100), // in paise
+        amount: Math.round(total * 100),
         currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
         receipt: booking._id.toString(),
         notes: {
@@ -272,7 +263,6 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(e?.message || e) });
     }
 
-    // Persist razorpayOrderId atomically (avoid in-memory save race)
     try {
       await Booking.findByIdAndUpdate(booking._id, { razorpayOrderId: order.id }).exec();
     } catch (err) {
@@ -330,7 +320,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       ]
     };
 
-    // Decide status (upcoming vs active) based on pickup date
     const bookingDoc = await Booking.findById(bookingId).lean();
     if (!bookingDoc) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -356,7 +345,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.json({ success: true, message: 'Payment already recorded' });
     }
 
-    // Ensure the car's embedded bookings list is updated so availability is blocked
     const carId = updated?.car?.id;
     if (carId) {
       await Car.updateOne(

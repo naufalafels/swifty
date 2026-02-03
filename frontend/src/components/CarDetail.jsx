@@ -31,8 +31,14 @@ import api from "../utils/api";
 import * as authService from "../utils/authService";
 import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
-import { createRazorpayOrder, verifyRazorpayPayment } from "../services/paymentService";
+import { createRazorpayOrder, verifyRazorpayPayment, markPaymentFailed } from "../services/paymentService";
 import io from "socket.io-client";
+
+// Airbnb-style date range picker
+import { DateRange } from "react-date-range";
+import { addDays, eachDayOfInterval, parseISO } from "date-fns";
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
 const SOCKET_URL =
@@ -41,6 +47,7 @@ const SOCKET_URL =
   (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:7889` : "http://localhost:7889");
 
 const todayISO = () => new Date().toISOString().split("T")[0];
+const formatISODate = (d) => d.toISOString().split("T")[0];
 
 const buildImageSrc = (image) => {
   if (!image) return `${API_BASE}/uploads/default-car.png`;
@@ -93,6 +100,8 @@ const loadRazorpayScript = () =>
     document.body.appendChild(script);
   });
 
+const BLOCKING_STATUSES = ["pending", "active", "upcoming"];
+
 const CarDetail = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -124,6 +133,16 @@ const CarDetail = () => {
     idCountry: "Malaysia",
     insurancePlan: "no_excess",
   });
+
+  // Date-range picker state
+  const [range, setRange] = useState([
+    {
+      startDate: initialPickup ? new Date(initialPickup) : new Date(),
+      endDate: initialReturn ? new Date(initialReturn) : addDays(new Date(), 1),
+      key: "selection",
+    },
+  ]);
+  const [disabledDates, setDisabledDates] = useState([]);
 
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
@@ -190,6 +209,38 @@ const CarDetail = () => {
     return () => {
       try { controller.abort(); } catch {}
       fetchControllerRef.current = null;
+    };
+  }, [id]);
+
+  // Load availability and build disabled dates for the date-range picker
+  useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await api.get("/api/bookings", {
+          params: { car: id, limit: 200 },
+          signal: controller.signal,
+        });
+        const bookings = res.data?.data || [];
+        const disabled = [];
+        bookings
+          .filter((b) => BLOCKING_STATUSES.includes(b.status))
+          .forEach((b) => {
+            const start = parseISO(b.pickupDate);
+            const end = parseISO(b.returnDate);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+            const days = eachDayOfInterval({ start, end });
+            disabled.push(...days);
+          });
+        setDisabledDates(disabled);
+      } catch (err) {
+        const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
+        if (!canceled) console.warn("Failed to load availability", err);
+      }
+    })();
+    return () => {
+      try { controller.abort(); } catch {}
     };
   }, [id]);
 
@@ -278,6 +329,17 @@ const CarDetail = () => {
     }
   };
   const closeTerms = () => setTermsOpen(false);
+
+  // Sync form dates when range changes
+  const onRangeChange = (ranges) => {
+    const sel = ranges.selection;
+    setRange([sel]);
+    setFormData((f) => ({
+      ...f,
+      pickupDate: formatISODate(sel.startDate),
+      returnDate: formatISODate(sel.endDate),
+    }));
+  };
 
   if (!car && loadingCar) return <div className="p-6 text-white">Loading car...</div>;
   if (!car && carError) return <div className="p-6 text-red-400">{carError}</div>;
@@ -426,8 +488,11 @@ const CarDetail = () => {
           navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
         },
         modal: {
-          ondismiss: () => {
+          ondismiss: async () => {
             toast.info("Payment was cancelled.");
+            if (res?.bookingId) {
+              try { await markPaymentFailed({ bookingId: res.bookingId }); } catch (e) { console.warn("Failed to mark payment failed", e); }
+            }
             navigate(`/cancel?booking_id=${res.bookingId}&payment_status=cancelled`, { replace: true });
           },
         },
@@ -559,43 +624,21 @@ const CarDetail = () => {
               <p className={carDetailStyles.bookingSubtitle}>Fast · Secure · Easy</p>
 
               <form onSubmit={handleSubmit} className={carDetailStyles.form}>
-                <div className={carDetailStyles.grid2}>
-                  <div>
-                    <label className={carDetailStyles.formLabel}>Pickup Date</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "pickupDate")}>
-                      <div className={carDetailStyles.inputIcon}><FaCalendarAlt /></div>
-                      <input
-                        id="pickupDate"
-                        type="date"
-                        name="pickupDate"
-                        min={today}
-                        value={formData.pickupDate}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("pickupDate")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.inputField}
-                      />
-                    </div>
+                {/* Airbnb-esque date picker */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
+                    <FaCalendarAlt /> <span>Select dates</span>
                   </div>
-                  <div>
-                    <label className={carDetailStyles.formLabel}>Return Date</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "returnDate")}>
-                      <div className={carDetailStyles.inputIcon}><FaCalendarAlt /></div>
-                      <input
-                        id="returnDate"
-                        type="date"
-                        name="returnDate"
-                        min={formData.pickupDate || today}
-                        value={formData.returnDate}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("returnDate")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.inputField}
-                      />
-                    </div>
-                  </div>
+                  <DateRange
+                    ranges={range}
+                    onChange={onRangeChange}
+                    minDate={new Date()}
+                    rangeColors={["#f97316"]}
+                    direction="horizontal"
+                    months={2}
+                    showDateDisplay={false}
+                    disabledDates={disabledDates}
+                  />
                 </div>
 
                 <div className="flex flex-col mt-3">
@@ -831,7 +874,6 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* T&C block INSIDE booking card */}
                 <div className="mb-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center gap-2 text-white font-semibold">
                     <FaFileContract className="text-orange-400" /> Terms & Conditions

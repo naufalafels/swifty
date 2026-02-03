@@ -51,25 +51,16 @@ function deleteLocalFileIfPresent(filePath) {
   });
 }
 
-/**
- * Normalize email to lowercase for consistent comparisons
- */
 const normalizeEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
-
-/**
- * Escape regex special characters
- */
 const escapeRegex = (str = "") => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Build the car snapshot stored inside booking.car
- * Attempts to extract companyId/companyName from several shapes.
  */
 function buildCarSummary(src) {
   src = src || {};
   const id = idToString(src.id || src._id || null);
 
-  // company extraction: accept src.company (object or id), src.companyId, src.company_id, src.companyName
   let companyId = null;
   let companyName = null;
 
@@ -99,7 +90,8 @@ function buildCarSummary(src) {
 }
 
 /**
- * Recompute car.status depending on blocking bookings
+ * Set car.status = "rented" ONLY if a blocking booking overlaps "now"
+ * Otherwise, keep it "available" so future bookings don’t block advance rentals.
  */
 async function updateCarStatusBasedOnBookings(carId, session = null) {
   if (!carId) return;
@@ -107,6 +99,7 @@ async function updateCarStatusBasedOnBookings(carId, session = null) {
   const count = await Booking.countDocuments({
     "car.id": carId,
     status: { $in: BLOCKING_STATUSES },
+    pickupDate: { $lte: now },
     returnDate: { $gte: now },
   }).session(session);
   const newStatus = count > 0 ? "rented" : "available";
@@ -355,7 +348,6 @@ export const getMyBookings = async (req, res, next) => {
     }
     const bookings = await Booking.find({ $or: query }).sort({ bookingDate: -1 }).lean();
 
-    // Claim guest bookings to this user if emails match
     if (userEmail) {
       const claimableIds = bookings
         .filter((b) => normalizeEmail(b.email) === userEmail && String(b.userId) !== String(userId))
@@ -594,7 +586,6 @@ export const updateBookingStatus = async (req, res, next) => {
         session.endSession();
         return res.status(403).json({ message: "Forbidden: not your booking" });
       }
-      // Claim the booking to this user by email match
       booking.userId = req.user.id || req.user._id;
     }
 

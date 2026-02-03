@@ -7,6 +7,7 @@ import * as authService from "../utils/authService";
  * returns an array (backend currently returns array from getMyBookings)
  */
 export async function fetchMyBookings(options = {}) {
+  await authService.ensureAuth(); // ensure token before calling protected endpoint
   const res = await api.get("/api/bookings/mybooking", { signal: options.signal });
   return res.data;
 }

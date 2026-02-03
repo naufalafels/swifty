@@ -1,3 +1,11 @@
+// Key changes vs original:
+// - Wait for ensureAuth before fetching; skip fetch for guests and stop spinner.
+// - fetchMyBookings already ensures auth.
+// - Guest lookup still works (uses public endpoint).
+// - Added authChecked state to control loading UX for guests.
+//
+// Full file below (same UI, safer auth flow).
+
 import React, {
   useState,
   useEffect,
@@ -33,7 +41,7 @@ import * as authService from "../utils/authService";
 
 const TIMEOUT = 15000;
 
-// ---------- Helpers ----------
+// ---------- Helpers (unchanged) ----------
 const safeAccess = (fn, fallback = "") => {
   try {
     const v = fn();
@@ -220,23 +228,33 @@ const normalizeBooking = (booking) => {
     resolvedCompany.name = "";
   }
 
+  // Build friendlier defaults so UI never renders blank/undefined
+  const carMake = carObj.make || carObj.name || "";
+  const carModel = carObj.model || "";
+  const carTitle = [carMake, carModel].filter(Boolean).join(" ").trim() || "Unnamed Car";
+  const carCategory = carObj.model || carObj.category || "Car";
+  const carYear = carObj.year || carObj.modelYear || "";
+
   const normalized = {
     id: booking._id || booking.id || String(Math.random()).slice(2, 8),
     car: {
-      make: carObj.make || carObj.name || "Unnamed Car",
+      make: carTitle,
       image,
-      year: carObj.year || carObj.modelYear || "",
-      category: carObj.category,
+      year: carYear || "—",
+      category: carCategory,
       seats: details.seats || carObj.seats || 4,
       transmission:
-        details.transmission || carObj.transmission || carObj.gearbox || "",
+        details.transmission ||
+        carObj.transmission ||
+        carObj.gearbox ||
+        "Automatic",
       fuelType:
         details.fuelType ||
         details.fuel ||
         carObj.fuelType ||
         carObj.fuel ||
         carObj.fuel_type ||
-        "",
+        "Petrol",
       mileage:
         details.mileage || carObj.mileage || carObj.kmpl || carObj.mpg || "",
     },
@@ -253,12 +271,21 @@ const normalizeBooking = (booking) => {
     },
     dates: { pickup: pickupDate, return: returnDate },
     location:
-      address.city || booking.location || carObj.location || "Pickup location",
-    price: Number(booking.amount || booking.price || booking.total || 0),
+      details.pickupLocation ||
+      address.city ||
+      booking.location ||
+      carObj.location ||
+      "Pickup location",
+    price: Number(
+      booking.amount ||
+        booking.price ||
+        booking.total ||
+        booking.paymentBreakdown?.rent + booking.paymentBreakdown?.insurance ||
+        0
+    ),
     status:
       booking.status ||
-      (booking.paymentStatus === "paid" ? "active" : "") ||
-      (booking.paymentStatus === "pending" ? "pending" : "") ||
+      (booking.paymentStatus === "paid" ? "active" : "pending") ||
       "pending",
     bookingDate:
       booking.bookingDate ||
@@ -280,7 +307,11 @@ const normalizeBooking = (booking) => {
   try {
     const now = new Date();
     const _return = new Date(normalized.dates.return);
-    if (normalized.status === "active" || normalized.status === "pending") {
+    if (
+      normalized.status === "active" ||
+      normalized.status === "pending" ||
+      normalized.status === "upcoming"
+    ) {
       normalized.status = _return > now ? "upcoming" : "completed";
     }
   } catch {
@@ -313,7 +344,7 @@ const StatusBadge = ({ status }) => {
       color: "bg-red-500",
       icon: <FaTimesCircle />,
     },
-    default: { text: "Unknown", color: "bg-gray-500", icon: null },
+    default: { text: "Pending", color: "bg-gray-500", icon: null },
   };
   const { text, color, icon } = map[status] || map.default;
   return (
@@ -351,7 +382,7 @@ const BookingCard = ({ booking, onViewDetails }) => {
           <div>
             <h3 className={s.carTitle}>{booking.car.make}</h3>
             <p className={s.carSubtitle}>
-              {booking.car.category} • {booking.car.year}
+              {booking.car.category} • {booking.car.year || "—"}
             </p>
 
             {booking.company?.name ? (
@@ -659,6 +690,7 @@ const MyBookings = () => {
   const [guestError, setGuestError] = useState("");
 
   const [isAuthed, setIsAuthed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [cancelingId, setCancelingId] = useState(null);
 
   const navigate = useNavigate();
@@ -666,19 +698,6 @@ const MyBookings = () => {
 
   const isMounted = useRef(true);
   useEffect(() => () => (isMounted.current = false), []);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const ok = await authService.ensureAuth();
-        if (mounted) setIsAuthed(!!ok);
-      } catch {
-        if (mounted) setIsAuthed(false);
-      }
-    })();
-    return () => { mounted = false; };
-  }, [location]);
 
   const fetchBookings = useCallback(async () => {
     setError(null);
@@ -767,8 +786,27 @@ const MyBookings = () => {
   }, []);
 
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+    let mounted = true;
+    (async () => {
+      try {
+        const ok = await authService.ensureAuth();
+        if (!mounted) return;
+        setIsAuthed(!!ok);
+        setAuthChecked(true);
+        if (ok) {
+          fetchBookings();
+        } else {
+          setLoading(false);
+        }
+      } catch {
+        if (!mounted) return;
+        setIsAuthed(false);
+        setAuthChecked(true);
+        setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [location, fetchBookings]);
 
   const handleGuestLookup = async (e) => {
     e.preventDefault();

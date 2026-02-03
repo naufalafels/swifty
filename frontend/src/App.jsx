@@ -91,7 +91,14 @@ const App = () => {
         <Route path='/contact' element={<ContactPage />} />
         <Route path='/cars' element={<CarsPage />} />
         <Route path='/cars/:id' element={<CarDetailPage />} />
-        <Route path='/bookings' element={<MyBookingsPage />} />
+        <Route
+          path='/bookings'
+          element={
+            <ProtectedRoute>
+              <MyBookingsPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path='/login'
           element={

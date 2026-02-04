@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide } from 'react-icons/fa';
 import * as authService from '../utils/authService';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const HostOnboardPage = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const [company, setCompany] = useState({
     payoutAccountRef: '',
@@ -37,6 +39,7 @@ const HostOnboardPage = () => {
         notes: company.notes,
       });
       toast.success('Host onboarding submitted. Admin will review.');
+      navigate('/host/dashboard');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to submit host onboarding');
     } finally {
@@ -46,6 +49,13 @@ const HostOnboardPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
+      <button
+        onClick={() => navigate('/profile')}
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-gray-700"
+      >
+        <FaChevronLeft /> Back to Profile
+      </button>
+
       <div className="flex items-center gap-2 text-gray-500 text-2xl font-bold">
         <FaRocket className="text-emerald-400" /> Become a Host
       </div>

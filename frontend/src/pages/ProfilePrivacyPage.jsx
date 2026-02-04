@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { FaShieldAlt, FaEye } from 'react-icons/fa';
+import { FaShieldAlt, FaEye, FaArrowLeft } from 'react-icons/fa';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const ProfilePrivacyPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ showCity: true, showAbout: true });
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
@@ -19,15 +21,13 @@ const ProfilePrivacyPage = () => {
           showCity: profile?.privacy?.showCity ?? true,
           showAbout: profile?.privacy?.showAbout ?? true,
         });
-      } catch (err) {
+      } catch {
         toast.error('Failed to load privacy settings');
       } finally {
         if (mounted) setLoading(false);
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const save = async () => {
@@ -46,6 +46,13 @@ const ProfilePrivacyPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-4">
+      <button
+        onClick={() => navigate('/profile')}
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-gray-700"
+      >
+        <FaArrowLeft /> Back to Profile
+      </button>
+
       <h1 className="text-2xl font-bold text-gray-500 flex items-center gap-2">
         <FaShieldAlt className="text-emerald-400" /> Privacy
       </h1>

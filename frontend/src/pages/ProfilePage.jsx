@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   FaCheckCircle,
-  FaExclamationTriangle,
   FaUserShield,
-  FaHome,
   FaEdit,
   FaLock,
   FaShieldAlt,
@@ -26,6 +24,7 @@ import api from '../utils/api';
 import * as authService from '../utils/authService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import Navbar from '../components/Navbar';
 
 const Badge = ({ children, tone = 'slate' }) => {
   const tones = {
@@ -86,11 +85,15 @@ const ProfilePage = () => {
       return null;
     }
   });
+  const [stats, setStats] = useState({ bookings: 0, completedTrips: 0, years: 0 });
   const [loading, setLoading] = useState(!user);
   const [error, setError] = useState('');
   const [isPersonalModalOpen, setIsPersonalModalOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordCheckField, setPasswordCheckField] = useState(null);
+  const [passwordValue, setPasswordValue] = useState('');
 
   const [personalForm, setPersonalForm] = useState({
     legalName: '',
@@ -125,6 +128,10 @@ const ProfilePage = () => {
     backFile: null,
   });
 
+  const [locked, setLocked] = useState({ phone: true, email: true });
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const addressDebounce = useRef(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -149,6 +156,11 @@ const ProfilePage = () => {
             addressSearch: '',
           });
           setAboutForm({ about: profile?.about || '' });
+          setStats({
+            bookings: profile?.stats?.bookings ?? 0,
+            completedTrips: profile?.stats?.completedTrips ?? 0,
+            years: profile?.stats?.years ?? 0,
+          });
           try {
             authService.setCurrentUser(profile);
           } catch {}
@@ -159,8 +171,24 @@ const ProfilePage = () => {
         if (mounted) setLoading(false);
       }
     })();
+
+    (async () => {
+      try {
+        const res = await api.get('/api/profile/stats');
+        const s = res?.data ?? {};
+        setStats({
+          bookings: s.bookings ?? 0,
+          completedTrips: s.completedTrips ?? 0,
+          years: s.years ?? 0,
+        });
+      } catch {
+        // fallback
+      }
+    })();
+
     return () => {
       mounted = false;
+      if (addressDebounce.current) clearTimeout(addressDebounce.current);
     };
   }, []);
 
@@ -182,6 +210,24 @@ const ProfilePage = () => {
     const percent = Math.round((done / checks.length) * 100);
     return { percent, checks };
   }, [personalForm, isVerified]);
+
+  const verifyPassword = async () => {
+    try {
+      await api.post('/api/auth/verify-password', { password: passwordValue });
+      setLocked((prev) => ({ ...prev, [passwordCheckField]: false }));
+      setIsPasswordModalOpen(false);
+      setPasswordValue('');
+      toast.success('Verified. You can now edit this field.');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Password verification failed');
+    }
+  };
+
+  const handleLockedFieldClick = (field) => {
+    if (!locked[field]) return;
+    setPasswordCheckField(field);
+    setIsPasswordModalOpen(true);
+  };
 
   const savePersonal = async (e) => {
     e.preventDefault();
@@ -228,7 +274,6 @@ const ProfilePage = () => {
 
   const saveEditExtras = async (e) => {
     e.preventDefault();
-    // Placeholder: wire to your API for profile picture + extra fields
     toast.success('Profile extras saved (stub). Wire to your API.');
     setIsEditModalOpen(false);
   };
@@ -255,8 +300,39 @@ const ProfilePage = () => {
     }
   };
 
+  const fetchAddressSuggestions = (input) => {
+    if (!input) {
+      setAddressSuggestions([]);
+      return;
+    }
+    if (addressDebounce.current) clearTimeout(addressDebounce.current);
+    addressDebounce.current = setTimeout(async () => {
+      try {
+        const res = await api.get('/api/places/autocomplete', { params: { input } });
+        const predictions = res?.data?.predictions || [];
+        setAddressSuggestions(predictions.map((p) => p.description || p));
+      } catch {
+        setAddressSuggestions([]);
+      }
+    }, 300);
+  };
+
+  const applySuggestion = (text) => {
+    setPersonalForm((p) => ({
+      ...p,
+      addressSearch: text,
+      residentialAddress: text,
+      mailingAddress: p.sameMailing ? text : p.mailingAddress,
+    }));
+    setAddressSuggestions([]);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 pb-10 pt-24 md:pt-28 space-y-8">
+      <div className="flex justify-center w-full">
+        <Navbar />
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-500 flex items-center gap-2">
@@ -264,55 +340,15 @@ const ProfilePage = () => {
           </h1>
           <p className="text-sm text-slate-400">Your identity, privacy, and host journey in one place.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-400 hover:bg-slate-800"
-          >
-            <FaHome /> Frontpage
-          </button>
-        </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button
-          onClick={() => setIsPersonalModalOpen(true)}
-          className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800"
-        >
-          <FaUserCog /> Personal Information
-        </button>
-        <button
-          onClick={() => navigate('/profile/security')}
-          className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800"
-        >
-          <FaLock /> Login & Security
-        </button>
-        <button
-          onClick={() => navigate('/profile/privacy')}
-          className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800"
-        >
-          <FaShieldAlt /> Privacy
-        </button>
-        <button
-          onClick={() => navigate(isHost ? '/host/dashboard' : '/host/onboard')}
-          className="flex items-center gap-2 px-3 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700"
-        >
-          <FaRocket /> {isHost ? 'Host Centre' : 'Become a Host'}
-        </button>
-      </div>
-
-      {/* Profile completeness */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
         <div className="flex items-center justify-between text-sm text-slate-200">
           <div className="font-semibold">Profile completeness</div>
           <div>{completion.percent}%</div>
         </div>
         <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-          <div
-            className="h-2 bg-gradient-to-r from-orange-400 via-amber-400 to-emerald-400 transition-all"
-            style={{ width: `${completion.percent}%` }}
-          />
+          <div className="h-2 bg-gradient-to-r from-orange-400 via-amber-400 to-emerald-400 transition-all" style={{ width: `${completion.percent}%` }} />
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           {completion.checks.map((c) => (
@@ -323,10 +359,8 @@ const ProfilePage = () => {
         </div>
       </div>
 
-      {/* Profile view (summary) */}
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left */}
           <div className="flex-1 flex gap-4">
             <div className="relative">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner">
@@ -351,31 +385,23 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* Right metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1">
-            <Metric icon={FaCarSide} label="Bookings" value={user?.stats?.bookings ?? 0} />
-            <Metric icon={FaCheckCircle} label="Completed Trips" value={user?.stats?.completedTrips ?? 0} />
-            <Metric icon={FaShieldAlt} label="Years on Swifty" value={user?.stats?.years ?? 0} />
+            <Metric icon={FaCarSide} label="Bookings" value={stats.bookings} />
+            <Metric icon={FaCheckCircle} label="Completed Trips" value={stats.completedTrips} />
+            <Metric icon={FaShieldAlt} label="Years on Swifty" value={stats.years} />
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
-          >
+          <button onClick={() => setIsEditModalOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800">
             <FaEdit /> Edit Profile
           </button>
-          <button
-            onClick={() => setIsAboutModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
-          >
+          <button onClick={() => setIsAboutModalOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800">
             <FaInfoCircle /> Edit About Me
           </button>
         </div>
       </div>
 
-      {/* Identity Verification */}
       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
         <div className="flex items-center gap-2 text-white text-lg font-semibold">
           <FaIdCard className="text-emerald-400" /> Identity Verification
@@ -384,24 +410,14 @@ const ProfilePage = () => {
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="text-sm text-slate-200">
               ID Type
-              <select
-                value={kycForm.idType}
-                onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })}
-                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
-              >
+              <select value={kycForm.idType} onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })} className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white">
                 <option>NRIC</option>
                 <option>Passport</option>
               </select>
             </label>
             <label className="text-sm text-slate-200">
               {kycForm.idType === 'NRIC' ? 'NRIC Number' : 'Passport Number'}
-              <input
-                value={kycForm.idNumber}
-                onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })}
-                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
-                placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'}
-                required
-              />
+              <input value={kycForm.idNumber} onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })} className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white" placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'} required />
             </label>
           </div>
 
@@ -411,12 +427,7 @@ const ProfilePage = () => {
               <div className="flex items-center gap-3">
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
                   <FaCloudUploadAlt /> Choose file
-                  <input
-                    type="file"
-                    accept=".jpeg,.jpg,.png,.pdf"
-                    className="hidden"
-                    onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
-                  />
+                  <input type="file" accept=".jpeg,.jpg,.png,.pdf" className="hidden" onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })} />
                 </label>
                 <PreviewThumb file={kycForm.frontFile} />
               </div>
@@ -427,12 +438,7 @@ const ProfilePage = () => {
               <div className="flex items-center gap-3">
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
                   <FaCloudUploadAlt /> Choose file
-                  <input
-                    type="file"
-                    accept=".jpeg,.jpg,.png,.pdf"
-                    className="hidden"
-                    onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
-                  />
+                  <input type="file" accept=".jpeg,.jpg,.png,.pdf" className="hidden" onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })} />
                 </label>
                 <PreviewThumb file={kycForm.backFile} />
               </div>
@@ -443,10 +449,7 @@ const ProfilePage = () => {
             On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
           </div>
 
-          <button
-            type="submit"
-            className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2"
-          >
+          <button type="submit" className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2">
             <FaCheckCircle /> Submit for verification
           </button>
         </form>
@@ -463,36 +466,19 @@ const ProfilePage = () => {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <FaUserCog /> Personal Information
               </h2>
-              <button onClick={() => setIsPersonalModalOpen(false)} className="text-slate-500 hover:text-slate-800">
-                ✕
-              </button>
+              <button onClick={() => setIsPersonalModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
             </div>
 
             <form onSubmit={savePersonal} className="space-y-3">
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="text-sm font-semibold text-slate-800">Legal Name
-                  <input
-                    value={personalForm.legalName}
-                    onChange={(e) => setPersonalForm({ ...personalForm, legalName: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
-                    required
-                  />
+                  <input value={personalForm.legalName} onChange={(e) => setPersonalForm({ ...personalForm, legalName: e.target.value })} className="w-full mt-1 p-2 border rounded" required />
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Birthdate (one-time)
-                  <input
-                    type="date"
-                    value={personalForm.birthdate}
-                    onChange={(e) => setPersonalForm({ ...personalForm, birthdate: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
-                    required
-                  />
+                  <input type="date" value={personalForm.birthdate} onChange={(e) => setPersonalForm({ ...personalForm, birthdate: e.target.value })} className="w-full mt-1 p-2 border rounded" required />
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Preferred first name
-                  <input
-                    value={personalForm.preferredName}
-                    onChange={(e) => setPersonalForm({ ...personalForm, preferredName: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
-                  />
+                  <input value={personalForm.preferredName} onChange={(e) => setPersonalForm({ ...personalForm, preferredName: e.target.value })} className="w-full mt-1 p-2 border rounded" />
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Phone
                   <input
@@ -500,6 +486,8 @@ const ProfilePage = () => {
                     onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })}
                     className="w-full mt-1 p-2 border rounded"
                     placeholder="+60123456789"
+                    onClick={() => handleLockedFieldClick('phone')}
+                    readOnly={locked.phone}
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Will display as {maskPhone(personalForm.phone)}</div>
                 </label>
@@ -511,17 +499,31 @@ const ProfilePage = () => {
                     className="w-full mt-1 p-2 border rounded"
                     placeholder="johndoe@vroomu.com"
                     required
+                    onClick={() => handleLockedFieldClick('email')}
+                    readOnly={locked.email}
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Will display as {maskEmail(personalForm.email)}</div>
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Search address
                   <input
                     value={personalForm.addressSearch}
-                    onChange={(e) => setPersonalForm({ ...personalForm, addressSearch: e.target.value })}
+                    onChange={(e) => {
+                      setPersonalForm({ ...personalForm, addressSearch: e.target.value });
+                      fetchAddressSuggestions(e.target.value);
+                    }}
                     className="w-full mt-1 p-2 border rounded"
                     placeholder="Search address..."
                   />
-                  <div className="text-[11px] text-slate-500 mt-1">Hook this to Google Places; fallback below.</div>
+                  <div className="text-[11px] text-slate-500 mt-1">Powered by Google Places proxy. Select a suggestion or use fallback fields.</div>
+                  {addressSuggestions.length > 0 && (
+                    <div className="mt-2 max-h-48 overflow-auto border border-slate-200 rounded-md bg-white shadow">
+                      {addressSuggestions.map((s) => (
+                        <button key={s} type="button" onClick={() => applySuggestion(s)} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </label>
               </div>
 
@@ -536,16 +538,8 @@ const ProfilePage = () => {
               </label>
 
               <div className="flex items-center gap-2">
-                <input
-                  id="sameMailing"
-                  type="checkbox"
-                  checked={personalForm.sameMailing}
-                  onChange={(e) => setPersonalForm({ ...personalForm, sameMailing: e.target.checked })}
-                  className="w-4 h-4"
-                />
-                <label htmlFor="sameMailing" className="text-sm text-slate-700">
-                  Same as Residential Address?
-                </label>
+                <input id="sameMailing" type="checkbox" checked={personalForm.sameMailing} onChange={(e) => setPersonalForm({ ...personalForm, sameMailing: e.target.checked })} className="w-4 h-4" />
+                <label htmlFor="sameMailing" className="text-sm text-slate-700">Same as Residential Address?</label>
               </div>
 
               <label className="text-sm font-semibold text-slate-800">Mailing Address
@@ -561,34 +555,18 @@ const ProfilePage = () => {
 
               <div className="grid sm:grid-cols-2 gap-3">
                 <label className="text-sm font-semibold text-slate-800">City
-                  <input
-                    value={personalForm.city}
-                    onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
-                  />
+                  <input value={personalForm.city} onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })} className="w-full mt-1 p-2 border rounded" />
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Country
-                  <input
-                    value={personalForm.country}
-                    onChange={(e) => setPersonalForm({ ...personalForm, country: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
-                  />
+                  <input value={personalForm.country} onChange={(e) => setPersonalForm({ ...personalForm, country: e.target.value })} className="w-full mt-1 p-2 border rounded" />
                 </label>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={loading}
-                >
+                <button type="submit" className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" disabled={loading}>
                   {loading ? 'Saving...' : 'Save changes'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsPersonalModalOpen(false)}
-                  className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
-                >
+                <button type="button" onClick={() => setIsPersonalModalOpen(false)} className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100">
                   Cancel
                 </button>
               </div>
@@ -597,7 +575,26 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* About Me Modal */}
+      {isPasswordModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white text-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <FaLock /> Verify to edit {passwordCheckField}
+              </h2>
+              <button onClick={() => setIsPasswordModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+            <label className="text-sm font-semibold text-slate-800">Password
+              <input type="password" value={passwordValue} onChange={(e) => setPasswordValue(e.target.value)} className="w-full mt-1 p-2 border rounded" placeholder="Enter your password" />
+            </label>
+            <div className="flex gap-2">
+              <button onClick={verifyPassword} className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Verify</button>
+              <button onClick={() => { setIsPasswordModalOpen(false); setPasswordValue(''); }} className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isAboutModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white text-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-xl mx-4 space-y-4">
@@ -605,34 +602,18 @@ const ProfilePage = () => {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <FaInfoCircle /> About me
               </h2>
-              <button onClick={() => setIsAboutModalOpen(false)} className="text-slate-500 hover:text-slate-800">
-                ✕
-              </button>
+              <button onClick={() => setIsAboutModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
             </div>
             <form onSubmit={saveAbout} className="space-y-3">
               <label className="text-sm font-semibold text-slate-800">Tell us a little bit about yourself
-                <textarea
-                  value={aboutForm.about}
-                  onChange={(e) => setAboutForm({ ...aboutForm, about: e.target.value.slice(0, 500) })}
-                  className="w-full mt-1 p-2 border rounded"
-                  rows={4}
-                  placeholder="Up to 500 characters"
-                />
+                <textarea value={aboutForm.about} onChange={(e) => setAboutForm({ ...aboutForm, about: e.target.value.slice(0, 500) })} className="w-full mt-1 p-2 border rounded" rows={4} placeholder="Up to 500 characters" />
                 <div className="text-xs text-slate-500 mt-1">{aboutForm.about.length}/500</div>
               </label>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
-                  disabled={loading}
-                >
+                <button type="submit" className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700" disabled={loading}>
                   {loading ? 'Saving...' : 'Save'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAboutModalOpen(false)}
-                  className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
-                >
+                <button type="button" onClick={() => setIsAboutModalOpen(false)} className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100">
                   Cancel
                 </button>
               </div>
@@ -641,7 +622,6 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* Edit Profile (extras) Modal */}
       {isEditModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white text-slate-900 rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 space-y-4 overflow-y-auto max-h-[90vh]">
@@ -649,9 +629,7 @@ const ProfilePage = () => {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <FaEdit /> Edit Profile
               </h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-500 hover:text-slate-800">
-                ✕
-              </button>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
             </div>
 
             <form className="space-y-3" onSubmit={saveEditExtras}>
@@ -660,12 +638,7 @@ const ProfilePage = () => {
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
                     <FaImage /> Choose image
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })}
-                    />
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
                   </label>
                   <PreviewThumb file={editExtras.profilePic} />
                 </div>
@@ -675,83 +648,57 @@ const ProfilePage = () => {
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaSchool className="text-emerald-500" /> Where I went to school
                 </label>
-                <input
-                  value={editExtras.school}
-                  onChange={(e) => setEditExtras({ ...editExtras, school: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="School"
-                />
+                <input value={editExtras.school} onChange={(e) => setEditExtras({ ...editExtras, school: e.target.value })} className="w-full p-2 border rounded" placeholder="School" />
 
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaBriefcase className="text-emerald-500" /> My work
                 </label>
-                <input
-                  value={editExtras.work}
-                  onChange={(e) => setEditExtras({ ...editExtras, work: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="Company / Role"
-                />
+                <input value={editExtras.work} onChange={(e) => setEditExtras({ ...editExtras, work: e.target.value })} className="w-full p-2 border rounded" placeholder="Company / Role" />
 
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaPaw className="text-emerald-500" /> Pets
                 </label>
-                <input
-                  value={editExtras.pets}
-                  onChange={(e) => setEditExtras({ ...editExtras, pets: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="Cats, dogs..."
-                />
+                <input value={editExtras.pets} onChange={(e) => setEditExtras({ ...editExtras, pets: e.target.value })} className="w-full p-2 border rounded" placeholder="Cats, dogs..." />
 
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaBirthdayCake className="text-emerald-500" /> Decade I was born
                 </label>
-                <input
-                  value={editExtras.decade}
-                  onChange={(e) => setEditExtras({ ...editExtras, decade: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="e.g., 1990s"
-                />
+                <input value={editExtras.decade} onChange={(e) => setEditExtras({ ...editExtras, decade: e.target.value })} className="w-full p-2 border rounded" placeholder="e.g., 1990s" />
 
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaLanguage className="text-emerald-500" /> Languages I speak
                 </label>
-                <input
-                  value={editExtras.languages}
-                  onChange={(e) => setEditExtras({ ...editExtras, languages: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="English, Malay..."
-                />
+                <input value={editExtras.languages} onChange={(e) => setEditExtras({ ...editExtras, languages: e.target.value })} className="w-full p-2 border rounded" placeholder="English, Malay..." />
 
                 <label className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                   <FaCity className="text-emerald-500" /> Where I live
                 </label>
-                <input
-                  value={editExtras.live}
-                  onChange={(e) => setEditExtras({ ...editExtras, live: e.target.value })}
-                  className="w-full p-2 border rounded"
-                  placeholder="City, Country"
-                />
+                <input value={editExtras.live} onChange={(e) => setEditExtras({ ...editExtras, live: e.target.value })} className="w-full p-2 border rounded" placeholder="City, Country" />
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
+                <button type="submit" className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100">Cancel</button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button onClick={() => navigate(isHost ? '/host/dashboard' : '/host/onboard')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
+          <FaRocket /> {isHost ? 'Host Centre' : 'Become a Host'}
+        </button>
+        <button onClick={() => setIsPersonalModalOpen(true)} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+          <FaUserCog /> Personal Information
+        </button>
+        <button onClick={() => navigate('/profile/security')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+          <FaLock /> Login & Security
+        </button>
+        <button onClick={() => navigate('/profile/privacy')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+          <FaShieldAlt /> Privacy
+        </button>
+      </div>
     </div>
   );
 };

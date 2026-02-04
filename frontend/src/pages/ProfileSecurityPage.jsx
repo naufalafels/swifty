@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { FaLock, FaShieldAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaLock, FaShieldAlt } from 'react-icons/fa';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 const ProfileSecurityPage = () => {
   const [form, setForm] = useState({ password: '', confirm: '' });
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
@@ -27,6 +29,13 @@ const ProfileSecurityPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-4">
+      <button
+        onClick={() => navigate('/profile')}
+        className="inline-flex items-center gap-2 text-slate-500 hover:text-gray-700"
+      >
+        <FaArrowLeft /> Back to Profile
+      </button>
+
       <h1 className="text-2xl font-bold text-gray-500 flex items-center gap-2">
         <FaLock className="text-emerald-400" /> Login & Security
       </h1>

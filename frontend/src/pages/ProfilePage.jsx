@@ -130,65 +130,71 @@ const ProfilePage = () => {
 
   const [locked, setLocked] = useState({ phone: true, email: true });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [placesLoading, setPlacesLoading] = useState(false);
+  const [placesError, setPlacesError] = useState('');
   const addressDebounce = useRef(null);
+  const addressAbort = useRef(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const load = async () => {
+      setLoading(true);
       try {
-        const res = await api.get('/api/auth/me');
-        if (mounted) {
-          const profile = res?.data?.user ?? res?.data ?? null;
-          setUser(profile);
-          setPersonalForm({
-            legalName: profile?.legalName || profile?.name || '',
-            birthdate: profile?.birthdate || '',
-            preferredName: profile?.preferredName || profile?.name || '',
-            phone: profile?.phone || '',
-            email: profile?.email || '',
-            residentialAddress: profile?.address || '',
-            mailingAddress: profile?.mailingAddress || profile?.address || '',
-            sameMailing: profile?.mailingAddress ? profile?.mailingAddress === profile?.address : true,
-            city: profile?.city || '',
-            country: profile?.country || '',
-            addressSearch: '',
-          });
-          setAboutForm({ about: profile?.about || '' });
-          setStats({
-            bookings: profile?.stats?.bookings ?? 0,
-            completedTrips: profile?.stats?.completedTrips ?? 0,
-            years: profile?.stats?.years ?? 0,
-          });
-          try {
-            authService.setCurrentUser(profile);
-          } catch {}
+        const [meRes, statsRes] = await Promise.allSettled([
+          api.get('/api/auth/me'),
+          api.get('/api/profile/stats'),
+        ]);
+
+        if (meRes.status === 'fulfilled') {
+          const profile = meRes.value?.data?.user ?? meRes.value?.data ?? null;
+          if (mounted) {
+            setUser(profile);
+            setPersonalForm({
+              legalName: profile?.legalName || profile?.name || '',
+              birthdate: profile?.birthdate || '',
+              preferredName: profile?.preferredName || profile?.name || '',
+              phone: profile?.phone || '',
+              email: profile?.email || '',
+              residentialAddress: profile?.address || '',
+              mailingAddress: profile?.mailingAddress || profile?.address || '',
+              sameMailing: profile?.mailingAddress ? profile?.mailingAddress === profile?.address : true,
+              city: profile?.city || '',
+              country: profile?.country || '',
+              addressSearch: '',
+            });
+            setAboutForm({ about: profile?.about || '' });
+            try {
+              authService.setCurrentUser(profile);
+            } catch {}
+          }
+        } else if (mounted) {
+          setError(meRes.reason?.response?.data?.message || 'Failed to load profile');
         }
-      } catch (err) {
-        if (mounted) setError(err?.response?.data?.message || 'Failed to load profile');
+
+        if (statsRes.status === 'fulfilled') {
+          const s = statsRes.value?.data ?? {};
+          if (mounted) {
+            setStats({
+              bookings: s.bookings ?? 0,
+              completedTrips: s.completedTrips ?? 0,
+              years: s.years ?? 0,
+            });
+          }
+        }
       } finally {
         if (mounted) setLoading(false);
       }
-    })();
+    };
 
-    (async () => {
-      try {
-        const res = await api.get('/api/profile/stats');
-        const s = res?.data ?? {};
-        setStats({
-          bookings: s.bookings ?? 0,
-          completedTrips: s.completedTrips ?? 0,
-          years: s.years ?? 0,
-        });
-      } catch {
-        // fallback
-      }
-    })();
+    load();
 
     return () => {
       mounted = false;
       if (addressDebounce.current) clearTimeout(addressDebounce.current);
+      if (addressAbort.current) addressAbort.current.abort();
     };
   }, []);
 
@@ -306,13 +312,23 @@ const ProfilePage = () => {
       return;
     }
     if (addressDebounce.current) clearTimeout(addressDebounce.current);
+    if (addressAbort.current) addressAbort.current.abort();
     addressDebounce.current = setTimeout(async () => {
+      setPlacesLoading(true);
+      setPlacesError('');
+      const controller = new AbortController();
+      addressAbort.current = controller;
       try {
-        const res = await api.get('/api/places/autocomplete', { params: { input } });
+        const res = await api.get('/api/places/autocomplete', { params: { input }, signal: controller.signal });
         const predictions = res?.data?.predictions || [];
         setAddressSuggestions(predictions.map((p) => p.description || p));
-      } catch {
-        setAddressSuggestions([]);
+      } catch (err) {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          setPlacesError('Address lookup failed');
+          setAddressSuggestions([]);
+        }
+      } finally {
+        setPlacesLoading(false);
       }
     }, 300);
   };
@@ -515,6 +531,8 @@ const ProfilePage = () => {
                     placeholder="Search address..."
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Powered by Google Places proxy. Select a suggestion or use fallback fields.</div>
+                  {placesLoading && <div className="text-[11px] text-slate-500 mt-1">Searching…</div>}
+                  {placesError && <div className="text-[11px] text-rose-500 mt-1">{placesError}</div>}
                   {addressSuggestions.length > 0 && (
                     <div className="mt-2 max-h-48 overflow-auto border border-slate-200 rounded-md bg-white shadow">
                       {addressSuggestions.map((s) => (

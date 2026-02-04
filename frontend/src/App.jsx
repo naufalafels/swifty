@@ -13,7 +13,9 @@ import KycPage from './pages/KycPage';
 import HostOnboardPage from './pages/HostOnboardPage';
 import HostDashboard from './pages/HostDashboard';
 import ProfilePage from './pages/ProfilePage';
-import PaymentResultPage from './pages/PaymentResultPage'; // NEW
+import ProfileSecurityPage from './pages/ProfileSecurityPage';
+import ProfilePrivacyPage from './pages/ProfilePrivacyPage';
+import PaymentResultPage from './pages/PaymentResultPage';
 import * as authService from './utils/authService';
 import CookieConsent from './components/CookieConsent';
 
@@ -66,7 +68,6 @@ const RedirectIfAuthenticated = ({ children }) => {
 };
 
 const App = () => {
-
   const [showButton, setShowButton] = useState(false);
   const location = useLocation();
 
@@ -147,6 +148,20 @@ const App = () => {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path='/profile/security'
+          element={
+            <ProtectedRoute>
+              <ProfileSecurityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path='/profile/privacy'
+          element={
+            <ProtectedRoute>
+              <ProfilePrivacyPage />
             </ProtectedRoute>
           }
         />

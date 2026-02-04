@@ -936,7 +936,7 @@ const Cars = () => {
                         <div className={carPageStyles.specIconContainer}>
                           <FaTachometerAlt className="text-emerald-400" />
                         </div>
-                        <span>{car.mileage ? `${car.mileage} kmpl` : "—"}</span>
+                        <span>{car.mileage ? `${car.mileage}\u00A0kmpl` : "—"}</span>
                       </div>
 
                       <div className={carPageStyles.specItem}>

@@ -7,7 +7,11 @@ import {
   getHostCars,
   createHostCar,
   getHostBookings,
-  updateHostBookingStatus
+  updateHostBookingStatus,
+  getHostCalendar,
+  blockServiceDates,
+  getFlexiblePricing,
+  upsertFlexiblePricing
 } from "../controllers/hostController.js";
 
 const router = express.Router();
@@ -30,14 +34,20 @@ const uploadCarImage = multer({ storage: carStorage, limits: { fileSize: 5 * 102
 // All host routes require auth + host role
 router.use(authMiddleware, requireRoles(["host", "admin"]));
 
-// Cars owned/managed by host
+// Cars
 router.get("/cars", getHostCars);
 router.post("/cars", uploadCarImage.single("image"), createHostCar);
 
-// Bookings for host-owned cars (with KYC visibility)
+// Bookings
 router.get("/bookings", getHostBookings);
-
-// Update booking status (approve/reject/flag/cancel)
 router.patch("/bookings/:id/status", updateHostBookingStatus);
+
+// Calendar + service blocks
+router.get("/calendar", getHostCalendar);
+router.post("/calendar/block", blockServiceDates);
+
+// Flexible pricing
+router.get("/pricing/:carId", getFlexiblePricing);
+router.put("/pricing/:carId", upsertFlexiblePricing);
 
 export default router;

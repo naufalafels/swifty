@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
+import { malaysiaHolidays } from "../utils/holidaysMY.js";
 
 function asObjectId(v) {
   if (!v) return null;
@@ -19,19 +20,20 @@ const removeFileIfExists = (p) => {
   fs.unlink(full, () => {});
 };
 
-// Cars a host should see: hostId/ownerId match OR companyId match
+// helper: get cars accessible by host/admin
+const hostCarFilter = (user) => {
+  const hostId = user?.id;
+  const companyId = user?.companyId;
+  const ors = [];
+  if (hostId) ors.push({ hostId }, { ownerId: hostId }, { createdBy: hostId });
+  if (companyId) ors.push({ companyId }, { "company._id": companyId });
+  return ors.length ? { $or: ors } : {};
+};
+
+// Cars a host should see
 export const getHostCars = async (req, res) => {
   try {
-    const hostId = req.user?.id;
-    const companyId = req.user?.companyId;
-    const ors = [];
-    if (hostId) ors.push({ hostId: hostId }, { ownerId: hostId }, { createdBy: hostId });
-    if (companyId) {
-      ors.push({ companyId: companyId });
-      ors.push({ "company._id": companyId });
-    }
-    const query = ors.length ? { $or: ors } : {};
-    const cars = await Car.find(query).lean();
+    const cars = await Car.find(hostCarFilter(req.user)).lean();
     return res.json({ success: true, data: cars });
   } catch (err) {
     console.error("getHostCars error", err);
@@ -51,7 +53,6 @@ export const createHostCar = async (req, res) => {
     const required = ["make", "model", "year", "dailyRate", "seats", "transmission", "fuelType"];
     for (const k of required) {
       if (body[k] === undefined || body[k] === null || String(body[k]).trim() === "") {
-        // clean up uploaded file if validation fails
         if (req.file?.filename) removeFileIfExists(path.join("car-images", req.file.filename));
         return res.status(400).json({ success: false, message: `${k} is required` });
       }
@@ -76,6 +77,12 @@ export const createHostCar = async (req, res) => {
       ownerId: hostId,
       createdBy: hostId,
       companyId: companyId || undefined,
+      flexiblePricing: {
+        baseDailyRate: Number(body.dailyRate || 0),
+        weekendMultiplier: 1,
+        peakMultipliers: [],
+      },
+      serviceBlocks: [],
     });
 
     return res.status(201).json({ success: true, data: car });
@@ -85,22 +92,15 @@ export const createHostCar = async (req, res) => {
   }
 };
 
-// Bookings for host-owned cars; include KYC and car snapshot
+// Bookings for host-owned cars
 export const getHostBookings = async (req, res) => {
   try {
-    const hostId = req.user?.id;
-    const companyId = req.user?.companyId;
-    const ors = [];
-    if (hostId) {
-      ors.push({ "car.hostId": hostId }, { "car.ownerId": hostId }, { "car.createdBy": hostId });
-    }
-    if (companyId) {
-      ors.push({ companyId: companyId }, { "car.companyId": companyId }, { "car.company": companyId });
-    }
-    if (!ors.length) return res.json({ success: true, data: [] });
+    const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
+    const carIds = cars.map((c) => c._id);
+    if (!carIds.length) return res.json({ success: true, data: [] });
 
-    const bookings = await Booking.find({ $or: ors })
-      .sort({ pickupDate: -1 })
+    const bookings = await Booking.find({ carId: { $in: carIds } })
+      .populate("carId")
       .lean();
 
     return res.json({ success: true, data: bookings });
@@ -110,35 +110,163 @@ export const getHostBookings = async (req, res) => {
   }
 };
 
-// Approve/reject/flag/cancel booking
+// Update booking status (approve/reject/flag/cancel)
 export const updateHostBookingStatus = async (req, res) => {
   try {
-    const bookingId = req.params.id;
+    const id = asObjectId(req.params.id);
+    if (!id) return res.status(400).json({ success: false, message: "Invalid booking id" });
+
     const { status, note } = req.body || {};
-    if (!status) return res.status(400).json({ success: false, message: "status is required" });
-
-    const hostId = req.user?.id;
-    const companyId = req.user?.companyId;
-    const ors = [];
-    if (hostId) ors.push({ "car.hostId": hostId }, { "car.ownerId": hostId }, { "car.createdBy": hostId });
-    if (companyId) ors.push({ companyId: companyId }, { "car.companyId": companyId }, { "car.company": companyId });
-    if (!ors.length) return res.status(403).json({ success: false, message: "Forbidden" });
-
-    const booking = await Booking.findOne({ _id: bookingId, $or: ors });
-    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
-
-    booking.status = status;
-    if (note) {
-      booking.details = {
-        ...(booking.details || {}),
-        hostNote: note,
-      };
+    const allowed = ["approved", "rejected", "flagged", "cancelled", "completed"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: "Invalid status" });
     }
 
-    await booking.save();
+    const booking = await Booking.findByIdAndUpdate(
+      id,
+      { status, statusNote: note || "" },
+      { new: true }
+    );
+
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
     return res.json({ success: true, data: booking });
   } catch (err) {
     console.error("updateHostBookingStatus error", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
+// Host calendar (pickups/returns + holidays + service blocks)
+export const getHostCalendar = async (req, res) => {
+  try {
+    const cars = await Car.find(hostCarFilter(req.user)).select("_id make model serviceBlocks flexiblePricing").lean();
+    const carIds = cars.map((c) => c._id);
+    if (!carIds.length) {
+      return res.json({
+        success: true,
+        data: { holidays: malaysiaHolidays, bookings: [], serviceBlocks: [], today: { pickups: [], returns: [] } },
+      });
+    }
+
+    const bookings = await Booking.find({ carId: { $in: carIds } })
+      .select("pickupDate returnDate status car bookingDate carId location")
+      .lean();
+
+    const serviceBlocks = cars.flatMap((c) =>
+      (c.serviceBlocks || []).map((d) => ({
+        date: d,
+        car: `${c.make} ${c.model}`,
+        type: "service",
+      }))
+    );
+
+    const pickupsToday = bookings.filter((b) => sameDay(b.pickupDate, new Date()));
+    const returnsToday = bookings.filter((b) => sameDay(b.returnDate, new Date()));
+
+    return res.json({
+      success: true,
+      data: {
+        holidays: malaysiaHolidays,
+        bookings,
+        serviceBlocks,
+        today: {
+          pickups: pickupsToday,
+          returns: returnsToday,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("getHostCalendar error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Block selected car(s) for service (date array of yyyy-MM-dd)
+export const blockServiceDates = async (req, res) => {
+  try {
+    const { carIds = [], dates = [] } = req.body || {};
+    if (!Array.isArray(carIds) || !carIds.length) {
+      return res.status(400).json({ success: false, message: "carIds required" });
+    }
+    const cleanDates = (dates || []).map((d) => String(d).slice(0, 10)).filter(Boolean);
+    await Car.updateMany(
+      { _id: { $in: carIds.map(asObjectId).filter(Boolean) } },
+      { $addToSet: { serviceBlocks: { $each: cleanDates } } }
+    );
+    return res.json({ success: true, data: { carIds, dates: cleanDates } });
+  } catch (err) {
+    console.error("blockServiceDates error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Flexible pricing per car
+export const getFlexiblePricing = async (req, res) => {
+  try {
+    const carId = asObjectId(req.params.carId);
+    if (!carId) return res.status(400).json({ success: false, message: "Invalid car id" });
+    const car = await Car.findById(carId).select("flexiblePricing dailyRate");
+    if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+    const fp = car.flexiblePricing || {
+      baseDailyRate: car.dailyRate || 0,
+      weekendMultiplier: 1,
+      peakMultipliers: [],
+    };
+    return res.json({ success: true, data: fp });
+  } catch (err) {
+    console.error("getFlexiblePricing error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const upsertFlexiblePricing = async (req, res) => {
+  try {
+    const carId = asObjectId(req.params.carId);
+    if (!carId) return res.status(400).json({ success: false, message: "Invalid car id" });
+
+    const { baseDailyRate, weekendMultiplier, peakMultipliers = [] } = req.body || {};
+    if (baseDailyRate === undefined || baseDailyRate === null) {
+      return res.status(400).json({ success: false, message: "baseDailyRate required" });
+    }
+
+    const safePeak = (Array.isArray(peakMultipliers) ? peakMultipliers : [])
+      .map((p) => ({
+        label: p.label || "Peak",
+        start: String(p.start || "").slice(0, 10),
+        end: String(p.end || "").slice(0, 10),
+        multiplier: Number(p.multiplier || 1),
+      }))
+      .filter((p) => p.start && p.end && p.multiplier > 0);
+
+    const car = await Car.findByIdAndUpdate(
+      carId,
+      {
+        $set: {
+          flexiblePricing: {
+            baseDailyRate: Number(baseDailyRate),
+            weekendMultiplier: Number(weekendMultiplier || 1),
+            peakMultipliers: safePeak,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+    return res.json({ success: true, data: car.flexiblePricing });
+  } catch (err) {
+    console.error("upsertFlexiblePricing error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+function sameDay(a, b) {
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}

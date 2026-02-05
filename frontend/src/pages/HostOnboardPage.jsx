@@ -254,7 +254,7 @@ const HostOnboardPage = () => {
         <button
           onClick={prev}
           disabled={step === 1}
-          className="px-4 py-3 rounded-lg border border-slate-700 text-slate-200 hover:bg-slate-800 disabled:opacity-50 inline-flex items-center gap-2"
+          className="px-4 py-3 rounded-lg border border-slate-700 text-slate-500 hover:bg-slate-800 disabled:opacity-0 inline-flex items-center gap-2"
         >
           <FaChevronLeft /> Back
         </button>

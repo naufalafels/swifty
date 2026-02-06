@@ -12,6 +12,7 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import KycPage from './pages/KycPage';
 import HostOnboardPage from './pages/HostOnboardPage';
 import HostDashboard from './pages/HostDashboard';
+import HostAddCars from './pages/HostAddCars';
 import ProfilePage from './pages/ProfilePage';
 import ProfileSecurityPage from './pages/ProfileSecurityPage';
 import ProfilePrivacyPage from './pages/ProfilePrivacyPage';
@@ -125,11 +126,20 @@ const App = () => {
           }
         />
 
-        {/* Host onboarding */}
+        {/* Host onboarding (legacy) */}
         <Route path='/host/onboard'
           element={
             <ProtectedRoute>
               <HostOnboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Host add-cars (new dedicated flow) */}
+        <Route path='/host/add-cars'
+          element={
+            <ProtectedRoute>
+              <HostAddCars />
             </ProtectedRoute>
           }
         />

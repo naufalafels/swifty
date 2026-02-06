@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
-import { malaysiaHolidays } from "../utils/holidaysMY.js";
+import { malaysiaHolidays, holidayByDate } from "../utils/holidaysMY.js";
 
 function asObjectId(v) {
   if (!v) return null;
@@ -20,7 +20,6 @@ const removeFileIfExists = (p) => {
   fs.unlink(full, () => {});
 };
 
-// helper: get cars accessible by host/admin
 const hostCarFilter = (user) => {
   const hostId = user?.id;
   const companyId = user?.companyId;
@@ -29,6 +28,30 @@ const hostCarFilter = (user) => {
   if (companyId) ors.push({ companyId }, { "company._id": companyId });
   return ors.length ? { $or: ors } : {};
 };
+
+const eachDayInclusive = (start, end) => {
+  const out = [];
+  let cur = new Date(start);
+  const to = new Date(end);
+  while (cur <= to) {
+    out.push(new Date(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+};
+
+const iso = (d) => new Date(d).toISOString().slice(0, 10);
+
+function sameDay(a, b) {
+  if (!a || !b) return false;
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
 
 // Cars a host should see
 export const getHostCars = async (req, res) => {
@@ -136,7 +159,7 @@ export const updateHostBookingStatus = async (req, res) => {
   }
 };
 
-// Host calendar (pickups/returns + holidays + service blocks)
+// Host calendar (bookings + per-day car occupancy + holidays)
 export const getHostCalendar = async (req, res) => {
   try {
     const cars = await Car.find(hostCarFilter(req.user)).select("_id make model serviceBlocks flexiblePricing").lean();
@@ -144,12 +167,13 @@ export const getHostCalendar = async (req, res) => {
     if (!carIds.length) {
       return res.json({
         success: true,
-        data: { holidays: malaysiaHolidays, bookings: [], serviceBlocks: [], today: { pickups: [], returns: [] } },
+        data: { holidays: malaysiaHolidays, bookings: [], serviceBlocks: [], dayCars: {}, today: { pickups: [], returns: [] } },
       });
     }
 
     const bookings = await Booking.find({ carId: { $in: carIds } })
       .select("pickupDate returnDate status car bookingDate carId location")
+      .populate("carId")
       .lean();
 
     const serviceBlocks = cars.flatMap((c) =>
@@ -160,6 +184,25 @@ export const getHostCalendar = async (req, res) => {
       }))
     );
 
+    // Build per-day car occupancy
+    const dayCars = {};
+    for (const b of bookings) {
+      const start = new Date(b.pickupDate);
+      const end = new Date(b.returnDate || b.pickupDate);
+      const days = eachDayInclusive(start, end);
+      const carName = b.car || `${b.carId?.make || ""} ${b.carId?.model || ""}`.trim();
+      for (const d of days) {
+        const key = iso(d);
+        if (!dayCars[key]) dayCars[key] = [];
+        dayCars[key].push({
+          carId: b.carId?._id || null,
+          car: carName || "Car",
+          bookingId: b._id,
+          status: b.status,
+        });
+      }
+    }
+
     const pickupsToday = bookings.filter((b) => sameDay(b.pickupDate, new Date()));
     const returnsToday = bookings.filter((b) => sameDay(b.returnDate, new Date()));
 
@@ -169,6 +212,7 @@ export const getHostCalendar = async (req, res) => {
         holidays: malaysiaHolidays,
         bookings,
         serviceBlocks,
+        dayCars,
         today: {
           pickups: pickupsToday,
           returns: returnsToday,
@@ -181,7 +225,7 @@ export const getHostCalendar = async (req, res) => {
   }
 };
 
-// Block selected car(s) for service (date array of yyyy-MM-dd)
+// Block selected car(s) for service (prevent blocking active booking days)
 export const blockServiceDates = async (req, res) => {
   try {
     const { carIds = [], dates = [] } = req.body || {};
@@ -189,6 +233,33 @@ export const blockServiceDates = async (req, res) => {
       return res.status(400).json({ success: false, message: "carIds required" });
     }
     const cleanDates = (dates || []).map((d) => String(d).slice(0, 10)).filter(Boolean);
+    if (!cleanDates.length) return res.status(400).json({ success: false, message: "dates required" });
+
+    // fetch conflicting bookings
+    const conflicts = await Booking.find({
+      carId: { $in: carIds.map(asObjectId).filter(Boolean) },
+      $or: cleanDates.map((d) => ({
+        pickupDate: { $lte: new Date(`${d}T23:59:59.999Z`) },
+        returnDate: { $gte: new Date(`${d}T00:00:00.000Z`) },
+      })),
+    })
+      .select("carId pickupDate returnDate status")
+      .lean();
+
+    if (conflicts.length) {
+      const byCar = {};
+      for (const c of conflicts) {
+        const cid = String(c.carId);
+        if (!byCar[cid]) byCar[cid] = [];
+        byCar[cid].push({ pickupDate: c.pickupDate, returnDate: c.returnDate, status: c.status });
+      }
+      return res.status(400).json({
+        success: false,
+        message: "Some dates overlap active bookings. Cannot block service on booked days.",
+        conflicts: byCar,
+      });
+    }
+
     await Car.updateMany(
       { _id: { $in: carIds.map(asObjectId).filter(Boolean) } },
       { $addToSet: { serviceBlocks: { $each: cleanDates } } }
@@ -258,15 +329,4 @@ export const upsertFlexiblePricing = async (req, res) => {
     console.error("upsertFlexiblePricing error", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
-};
-
-function sameDay(a, b) {
-  if (!a || !b) return false;
-  const da = new Date(a);
-  const db = new Date(b);
-  return (
-    da.getFullYear() === db.getFullYear() &&
-    da.getMonth() === db.getMonth() &&
-    da.getDate() === db.getDate()
-  );
 }

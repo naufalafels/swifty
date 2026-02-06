@@ -13,6 +13,7 @@ import {
   FaList,
   FaMapMarkerAlt,
   FaPlus,
+  FaSearch,
   FaShieldAlt,
   FaTimes
 } from "react-icons/fa";
@@ -24,7 +25,6 @@ import {
   getFlexiblePricing,
   upsertFlexiblePricing,
 } from "../services/hostService";
-import * as authService from "../utils/authService";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
@@ -75,14 +75,8 @@ const PricingCard = ({ car, pricing, onSave }) => {
   const [weekend, setWeekend] = useState(pricing?.weekendMultiplier || 1);
   const [peak, setPeak] = useState(pricing?.peakMultipliers || []);
 
-  const addPeak = () => {
-    setPeak((p) => [...p, { label: "Peak", start: "", end: "", multiplier: 1.2 }]);
-  };
-
-  const updatePeak = (idx, key, value) => {
-    setPeak((p) => p.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
-  };
-
+  const addPeak = () => setPeak((p) => [...p, { label: "Peak", start: "", end: "", multiplier: 1.2 }]);
+  const updatePeak = (idx, key, value) => setPeak((p) => p.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
   const removePeak = (idx) => setPeak((p) => p.filter((_, i) => i !== idx));
 
   return (
@@ -198,6 +192,9 @@ const HostDashboard = () => {
   const [selectedRange, setSelectedRange] = useState([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
   const [pricingByCar, setPricingByCar] = useState({});
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("");
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [serviceError, setServiceError] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -238,14 +235,34 @@ const HostDashboard = () => {
   const todayPickups = calendar?.today?.pickups || [];
   const todayReturns = calendar?.today?.returns || [];
   const holidays = calendar?.holidays || [];
+  const dayCars = calendar?.dayCars || {};
+
+  const holidayByDate = useMemo(() => {
+    const m = new Map();
+    holidays.forEach((h) => m.set(h.date, h));
+    return m;
+  }, [holidays]);
+
+  const filteredCars = useMemo(() => {
+    if (!filter.trim()) return cars;
+    return cars.filter((c) =>
+      `${c.make} ${c.model}`.toLowerCase().includes(filter.trim().toLowerCase())
+    );
+  }, [cars, filter]);
 
   const handleBlockService = async () => {
-    const dates = eachDay(selectedRange[0].startDate, selectedRange[0].endDate);
-    const isoDates = dates.map((d) => format(d, "yyyy-MM-dd"));
-    await blockServiceDates(selectedCarIds, isoDates);
-    const updated = await getHostCalendar();
-    setCalendar(updated);
-    setSelectedCarIds([]);
+    setServiceError("");
+    try {
+      const dates = eachDay(selectedRange[0].startDate, selectedRange[0].endDate);
+      const isoDates = dates.map((d) => format(d, "yyyy-MM-dd"));
+      await blockServiceDates(selectedCarIds, isoDates);
+      const updated = await getHostCalendar();
+      setCalendar(updated);
+      setSelectedCarIds([]);
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Failed to block service";
+      setServiceError(msg);
+    }
   };
 
   const handleSavePricing = async (carId, payload) => {
@@ -254,11 +271,13 @@ const HostDashboard = () => {
   };
 
   const dateRangeColor = (date) => {
-    const iso = format(date, "yyyy-MM-dd");
-    if (holidays.includes(iso)) return "ring-2 ring-amber-400";
+    const isoDate = format(date, "yyyy-MM-dd");
+    if (holidayByDate.has(isoDate)) return "ring-2 ring-amber-400";
     if (isWeekend(date)) return "ring-1 ring-emerald-500/60";
     return "";
   };
+
+  const selectedDayCars = selectedDay ? dayCars[selectedDay] || [] : [];
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading host center…</div>;
@@ -274,12 +293,12 @@ const HostDashboard = () => {
               <FaHome className="text-emerald-400" /> Operations overview
             </h1>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => navigate("/host/onboard")}
+              onClick={() => navigate("/host/add-cars")}
               className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold"
             >
-              <FaPlus /> Add car / onboarding
+              <FaPlus /> Add cars
             </button>
             <button
               onClick={() => navigate("/profile")}
@@ -296,53 +315,120 @@ const HostDashboard = () => {
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
         </div>
 
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-slate-200">
+            <FaSearch /> Quick find (20–40 cars)
+          </div>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search by make/model"
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+          />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-auto pr-1">
+            {filteredCars.map((c) => (
+              <div key={c._id} className="border border-slate-800 bg-slate-900 rounded-lg p-3 space-y-1">
+                <div className="text-sm font-semibold text-white">{c.make} {c.model}</div>
+                <div className="text-xs text-slate-400">{c.category} • {c.year}</div>
+                <div className="text-xs text-slate-400">RM {c.dailyRate} / day</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  <Pill tone="slate">{c.transmission}</Pill>
+                  <Pill tone="blue">{c.fuelType}</Pill>
+                </div>
+              </div>
+            ))}
+            {filteredCars.length === 0 && <div className="text-sm text-slate-400">No cars match your search.</div>}
+          </div>
+        </div>
+
         <section className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 font-semibold">
-                <FaCalendarAlt className="text-emerald-400" /> Booking calendar (holidays highlighted)
+                <FaCalendarAlt className="text-emerald-400" /> Booking calendar (holidays highlighted, cars per day)
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
-                <Pill tone="amber">Holidays = amber ring</Pill>
-                <Pill tone="green">Weekends = green ring</Pill>
+                <Pill tone="amber">Holiday ring</Pill>
+                <Pill tone="green">Weekend ring</Pill>
               </div>
             </div>
             <DateRange
-              onChange={(item) => setSelectedRange([item.selection])}
+              onChange={(item) => {
+                setSelectedRange([item.selection]);
+                setSelectedDay(format(item.selection.startDate, "yyyy-MM-dd"));
+              }}
               ranges={selectedRange}
               rangeColors={["#10b981"]}
               minDate={new Date()}
               showMonthAndYearPickers
               showPreview={false}
               weekStartsOn={1}
-              dayContentRenderer={(date) => (
-                <div className={`w-full h-full flex items-center justify-center ${dateRangeColor(date)}`}>
-                  {date.getDate()}
-                </div>
-              )}
+              dayContentRenderer={(date) => {
+                const isoDate = format(date, "yyyy-MM-dd");
+                const carsOnDay = dayCars[isoDate] || [];
+                const holiday = holidayByDate.get(isoDate);
+                return (
+                  <div className={`w-full h-full flex flex-col items-center justify-center gap-0.5 ${dateRangeColor(date)}`}>
+                    <span>{date.getDate()}</span>
+                    {holiday && <span className="text-[10px] text-amber-300 truncate max-w-[64px]">{holiday.label}</span>}
+                    {carsOnDay.slice(0, 2).map((c, idx) => (
+                      <span key={idx} className="text-[10px] bg-slate-800 text-white px-1 rounded">
+                        {c.car}
+                      </span>
+                    ))}
+                    {carsOnDay.length > 2 && (
+                      <span className="text-[10px] text-slate-300">+{carsOnDay.length - 2} more</span>
+                    )}
+                  </div>
+                );
+              }}
             />
             <div className="text-xs text-slate-400 flex items-center gap-2">
-              <FaInfoCircle /> Holidays are informational so you can adjust flexible pricing; selection is still allowed.
+              <FaInfoCircle /> Holidays are informational so you can adjust flexible pricing; selection is allowed.
             </div>
-            {holidays.length > 0 && (
-              <div className="flex flex-wrap gap-2 text-xs text-slate-200">
-                {holidays.slice(0, 12).map((h) => (
-                  <span key={h} className="px-2 py-1 rounded-full bg-amber-900/60 border border-amber-700/60">
-                    {h}
-                  </span>
-                ))}
-                {holidays.length > 12 && <span className="text-slate-400">…more in backend list</span>}
-              </div>
-            )}
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2 font-semibold">
+              <FaList className="text-emerald-400" /> Selected day detail
+            </div>
+            {selectedDay ? (
+              <div className="space-y-2">
+                <div className="text-sm text-slate-200">{selectedDay}</div>
+                {holidayByDate.get(selectedDay) && (
+                  <div className="text-xs text-amber-300 bg-amber-900/40 border border-amber-800 rounded px-2 py-1">
+                    Holiday: {holidayByDate.get(selectedDay).label} ({holidayByDate.get(selectedDay).type})
+                  </div>
+                )}
+                {(dayCars[selectedDay] || []).length === 0 && (
+                  <div className="text-sm text-slate-400">No cars booked.</div>
+                )}
+                <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                  {(dayCars[selectedDay] || []).map((c, idx) => (
+                    <div key={idx} className="border border-slate-800 rounded-lg p-2 text-sm bg-slate-950/60">
+                      <div className="flex justify-between">
+                        <span className="font-semibold">{c.car}</span>
+                        <Pill tone="blue">{c.status}</Pill>
+                      </div>
+                      <div className="text-xs text-slate-400">Booking #{c.bookingId}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-slate-400">Select a date to see booked cars.</div>
+            )}
+          </div>
+        </section>
+
+        <section className="grid lg:grid-cols-3 gap-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 lg:col-span-1">
             <div className="flex items-center gap-2 font-semibold">
               <FaFlag className="text-amber-400" /> Block cars for service
             </div>
             <div className="space-y-2">
               <div className="text-xs text-slate-400">Select cars</div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-auto pr-1">
                 {cars.map((c) => (
                   <button
                     key={c._id}
@@ -376,6 +462,8 @@ const HostDashboard = () => {
               />
             </div>
 
+            {serviceError && <div className="text-xs text-rose-300">{serviceError}</div>}
+
             <button
               disabled={!selectedCarIds.length}
               onClick={handleBlockService}
@@ -384,36 +472,36 @@ const HostDashboard = () => {
               Block selected cars for these dates
             </button>
           </div>
-        </section>
 
-        <section className="grid lg:grid-cols-2 gap-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-semibold">
-                <FaList className="text-emerald-400" /> Today’s pickups
+          <div className="lg:col-span-2 grid gap-6">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold">
+                  <FaList className="text-emerald-400" /> Today’s pickups
+                </div>
+                <Pill tone="green">{todayPickups.length}</Pill>
               </div>
-              <Pill tone="green">{todayPickups.length}</Pill>
+              <div className="space-y-3 max-h-64 overflow-auto pr-1">
+                {todayPickups.length === 0 && <div className="text-slate-400 text-sm">No pickups today.</div>}
+                {todayPickups.map((b) => (
+                  <BookingCard key={b._id} booking={b} />
+                ))}
+              </div>
             </div>
-            <div className="space-y-3">
-              {todayPickups.length === 0 && <div className="text-slate-400 text-sm">No pickups today.</div>}
-              {todayPickups.map((b) => (
-                <BookingCard key={b._id} booking={b} />
-              ))}
-            </div>
-          </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 font-semibold">
-                <FaList className="text-amber-400" /> Today’s returns
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold">
+                  <FaList className="text-amber-400" /> Today’s returns
+                </div>
+                <Pill tone="amber">{todayReturns.length}</Pill>
               </div>
-              <Pill tone="amber">{todayReturns.length}</Pill>
-            </div>
-            <div className="space-y-3">
-              {todayReturns.length === 0 && <div className="text-slate-400 text-sm">No returns today.</div>}
-              {todayReturns.map((b) => (
-                <BookingCard key={b._id} booking={b} />
-              ))}
+              <div className="space-y-3 max-h-64 overflow-auto pr-1">
+                {todayReturns.length === 0 && <div className="text-slate-400 text-sm">No returns today.</div>}
+                {todayReturns.map((b) => (
+                  <BookingCard key={b._id} booking={b} />
+                ))}
+              </div>
             </div>
           </div>
         </section>

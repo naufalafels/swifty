@@ -94,6 +94,9 @@ export const createHostCar = async (req, res) => {
       fuelType: body.fuelType || "Gasoline",
       mileage: Number(body.mileage) || 0,
       dailyRate: Number(body.dailyRate || 0),
+      deposit: Number(body.deposit || 0),
+      gasUsage: body.gasUsage || "",
+      petrolType: body.petrolType || "",
       image: imagePath,
       status: body.status || "available",
       hostId,
@@ -102,7 +105,9 @@ export const createHostCar = async (req, res) => {
       companyId: companyId || undefined,
       flexiblePricing: {
         baseDailyRate: Number(body.dailyRate || 0),
+        baseDeposit: Number(body.deposit || 0),
         weekendMultiplier: 1,
+        depositWeekendMultiplier: 1,
         peakMultipliers: [],
       },
       serviceBlocks: [],
@@ -124,6 +129,7 @@ export const getHostBookings = async (req, res) => {
 
     const bookings = await Booking.find({ carId: { $in: carIds } })
       .populate("carId")
+      .populate("userId") // assuming Booking has userId to fetch verification info
       .lean();
 
     return res.json({ success: true, data: bookings });
@@ -159,7 +165,7 @@ export const updateHostBookingStatus = async (req, res) => {
   }
 };
 
-// Host calendar (bookings + per-day car occupancy + holidays)
+// Host calendar (bookings + per-day car occupancy + holidays + verification meta)
 export const getHostCalendar = async (req, res) => {
   try {
     const cars = await Car.find(hostCarFilter(req.user)).select("_id make model serviceBlocks flexiblePricing").lean();
@@ -172,8 +178,9 @@ export const getHostCalendar = async (req, res) => {
     }
 
     const bookings = await Booking.find({ carId: { $in: carIds } })
-      .select("pickupDate returnDate status car bookingDate carId location")
+      .select("pickupDate returnDate status car bookingDate carId location verificationDocType verificationIdNumber")
       .populate("carId")
+      .populate("userId", "docType idNumber passportNumber nricNumber verificationStatus")
       .lean();
 
     const serviceBlocks = cars.flatMap((c) =>
@@ -184,13 +191,24 @@ export const getHostCalendar = async (req, res) => {
       }))
     );
 
-    // Build per-day car occupancy
+    // Build per-day car occupancy with verification info
     const dayCars = {};
     for (const b of bookings) {
       const start = new Date(b.pickupDate);
       const end = new Date(b.returnDate || b.pickupDate);
       const days = eachDayInclusive(start, end);
       const carName = b.car || `${b.carId?.make || ""} ${b.carId?.model || ""}`.trim();
+      const docType =
+        b.verificationDocType ||
+        b.userId?.docType ||
+        (b.userId?.passportNumber ? "Passport" : b.userId?.nricNumber ? "NRIC" : null);
+      const docId =
+        b.verificationIdNumber ||
+        b.userId?.passportNumber ||
+        b.userId?.nricNumber ||
+        b.userId?.idNumber ||
+        null;
+
       for (const d of days) {
         const key = iso(d);
         if (!dayCars[key]) dayCars[key] = [];
@@ -199,6 +217,8 @@ export const getHostCalendar = async (req, res) => {
           car: carName || "Car",
           bookingId: b._id,
           status: b.status,
+          verificationDocType: docType,
+          verificationIdNumber: docId,
         });
       }
     }
@@ -271,16 +291,18 @@ export const blockServiceDates = async (req, res) => {
   }
 };
 
-// Flexible pricing per car
+// Flexible pricing per car (with deposit flexibility)
 export const getFlexiblePricing = async (req, res) => {
   try {
     const carId = asObjectId(req.params.carId);
     if (!carId) return res.status(400).json({ success: false, message: "Invalid car id" });
-    const car = await Car.findById(carId).select("flexiblePricing dailyRate");
+    const car = await Car.findById(carId).select("flexiblePricing dailyRate deposit");
     if (!car) return res.status(404).json({ success: false, message: "Car not found" });
     const fp = car.flexiblePricing || {
       baseDailyRate: car.dailyRate || 0,
+      baseDeposit: car.deposit || 0,
       weekendMultiplier: 1,
+      depositWeekendMultiplier: 1,
       peakMultipliers: [],
     };
     return res.json({ success: true, data: fp });
@@ -295,7 +317,7 @@ export const upsertFlexiblePricing = async (req, res) => {
     const carId = asObjectId(req.params.carId);
     if (!carId) return res.status(400).json({ success: false, message: "Invalid car id" });
 
-    const { baseDailyRate, weekendMultiplier, peakMultipliers = [] } = req.body || {};
+    const { baseDailyRate, baseDeposit = 0, weekendMultiplier, depositWeekendMultiplier, peakMultipliers = [] } = req.body || {};
     if (baseDailyRate === undefined || baseDailyRate === null) {
       return res.status(400).json({ success: false, message: "baseDailyRate required" });
     }
@@ -306,16 +328,21 @@ export const upsertFlexiblePricing = async (req, res) => {
         start: String(p.start || "").slice(0, 10),
         end: String(p.end || "").slice(0, 10),
         multiplier: Number(p.multiplier || 1),
+        depositMultiplier: Number(p.depositMultiplier || 1),
       }))
-      .filter((p) => p.start && p.end && p.multiplier > 0);
+      .filter((p) => p.start && p.end && p.multiplier > 0 && p.depositMultiplier > 0);
 
     const car = await Car.findByIdAndUpdate(
       carId,
       {
         $set: {
+          dailyRate: Number(baseDailyRate),
+          deposit: Number(baseDeposit),
           flexiblePricing: {
             baseDailyRate: Number(baseDailyRate),
+            baseDeposit: Number(baseDeposit),
             weekendMultiplier: Number(weekendMultiplier || 1),
+            depositWeekendMultiplier: Number(depositWeekendMultiplier || 1),
             peakMultipliers: safePeak,
           },
         },

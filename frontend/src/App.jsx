@@ -135,7 +135,7 @@ const App = () => {
           }
         />
 
-        {/* Host add-cars (new dedicated flow) */}
+        {/* Host add-cars (dedicated flow) */}
         <Route path='/host/add-cars'
           element={
             <ProtectedRoute>

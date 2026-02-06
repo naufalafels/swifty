@@ -15,7 +15,8 @@ import {
   FaPlus,
   FaSearch,
   FaShieldAlt,
-  FaTimes
+  FaTimes,
+  FaChevronDown
 } from "react-icons/fa";
 import {
   getHostCars,
@@ -55,7 +56,7 @@ const BookingCard = ({ booking }) => (
     <div className="flex items-center justify-between gap-2">
       <div className="font-semibold text-white flex items-center gap-2">
         <FaCar className="text-amber-400" />
-        {booking.car || "Car"}
+        {booking.car || booking.carId?.make && booking.carId?.model ? `${booking.carId.make} ${booking.carId.model}` : "Car"}
       </div>
       <Pill tone="blue">{booking.status}</Pill>
     </div>
@@ -71,113 +72,163 @@ const BookingCard = ({ booking }) => (
 );
 
 const PricingCard = ({ car, pricing, onSave }) => {
+  const [collapsed, setCollapsed] = useState(true);
   const [base, setBase] = useState(pricing?.baseDailyRate || car.dailyRate || 0);
+  const [baseDep, setBaseDep] = useState(pricing?.baseDeposit || car.deposit || 0);
   const [weekend, setWeekend] = useState(pricing?.weekendMultiplier || 1);
+  const [depWeekend, setDepWeekend] = useState(pricing?.depositWeekendMultiplier || 1);
   const [peak, setPeak] = useState(pricing?.peakMultipliers || []);
 
-  const addPeak = () => setPeak((p) => [...p, { label: "Peak", start: "", end: "", multiplier: 1.2 }]);
+  const addPeak = () => setPeak((p) => [...p, { label: "Peak", start: "", end: "", multiplier: 1.2, depositMultiplier: 1.1 }]);
   const updatePeak = (idx, key, value) => setPeak((p) => p.map((row, i) => (i === idx ? { ...row, [key]: value } : row)));
   const removePeak = (idx) => setPeak((p) => p.filter((_, i) => i !== idx));
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl">
+      <button
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        onClick={() => setCollapsed((c) => !c)}
+      >
         <div className="flex items-center gap-2 text-white font-semibold">
           <FaDollarSign className="text-emerald-400" />
           Flexible Pricing — {car.make} {car.model}
         </div>
-        <Pill tone="amber">Base RM {base}</Pill>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-4">
-        <label className="flex flex-col text-sm text-slate-200 gap-1">
-          Base daily rate (RM)
-          <input
-            type="number"
-            min="0"
-            value={base}
-            onChange={(e) => setBase(Number(e.target.value))}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-          />
-        </label>
-
-        <label className="flex flex-col text-sm text-slate-200 gap-1">
-          Weekend multiplier
-          <input
-            type="number"
-            step="0.05"
-            min="0.5"
-            value={weekend}
-            onChange={(e) => setWeekend(Number(e.target.value))}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-          />
-          <span className="text-xs text-slate-400">Applied on Saturday/Sunday</span>
-        </label>
-
-        <div className="flex flex-col gap-2">
-          <div className="text-sm text-slate-200 flex items-center gap-2">
-            <FaFlag className="text-amber-400" /> Peak multipliers
-          </div>
-          <button
-            onClick={addPeak}
-            className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 flex items-center gap-2"
-          >
-            <FaPlus /> Add peak window
-          </button>
+        <div className="flex items-center gap-3 text-sm text-slate-300">
+          <Pill tone="amber">RM {base}</Pill>
+          <Pill tone="blue">Dep RM {baseDep}</Pill>
+          <span className="text-xs text-slate-400">{collapsed ? "Expand" : "Collapse"}</span>
         </div>
-      </div>
+      </button>
+      {!collapsed && (
+        <div className="p-4 space-y-4 border-t border-slate-800">
+          <div className="grid md:grid-cols-3 gap-4">
+            <label className="flex flex-col text-sm text-slate-200 gap-1">
+              Base daily rate (RM)
+              <input
+                type="number"
+                min="0"
+                value={base}
+                onChange={(e) => setBase(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
+              />
+            </label>
 
-      {peak.length > 0 && (
-        <div className="space-y-3">
-          {peak.map((p, idx) => (
-            <div key={idx} className="grid md:grid-cols-4 gap-3 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+            <label className="flex flex-col text-sm text-slate-200 gap-1">
+              Base deposit (RM)
               <input
-                value={p.label}
-                onChange={(e) => updatePeak(idx, "label", e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                placeholder="Label"
+                type="number"
+                min="0"
+                value={baseDep}
+                onChange={(e) => setBaseDep(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
               />
+            </label>
+
+            <label className="flex flex-col text-sm text-slate-200 gap-1">
+              Weekend multiplier
               <input
-                type="date"
-                value={p.start}
-                onChange={(e) => updatePeak(idx, "start", e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                type="number"
+                step="0.05"
+                min="0.5"
+                value={weekend}
+                onChange={(e) => setWeekend(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
               />
+              <span className="text-xs text-slate-400">Applied on Saturday/Sunday</span>
+            </label>
+
+            <label className="flex flex-col text-sm text-slate-200 gap-1">
+              Deposit weekend multiplier
               <input
-                type="date"
-                value={p.end}
-                onChange={(e) => updatePeak(idx, "end", e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                type="number"
+                step="0.05"
+                min="0.5"
+                value={depWeekend}
+                onChange={(e) => setDepWeekend(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
               />
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.05"
-                  value={p.multiplier}
-                  onChange={(e) => updatePeak(idx, "multiplier", Number(e.target.value))}
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                  placeholder="Multiplier"
-                />
-                <button
-                  onClick={() => removePeak(idx)}
-                  className="bg-rose-700 hover:bg-rose-600 text-white rounded px-3 py-2"
-                >
-                  <FaTimes />
-                </button>
-              </div>
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="text-sm text-slate-200 flex items-center gap-2">
+              <FaFlag className="text-amber-400" /> Peak multipliers
             </div>
-          ))}
+            <button
+              onClick={addPeak}
+              className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 flex items-center gap-2"
+            >
+              <FaPlus /> Add peak window
+            </button>
+          </div>
+
+          {peak.length > 0 && (
+            <div className="space-y-3">
+              {peak.map((p, idx) => (
+                <div key={idx} className="grid md:grid-cols-5 gap-3 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+                  <input
+                    value={p.label}
+                    onChange={(e) => updatePeak(idx, "label", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                    placeholder="Label"
+                  />
+                  <input
+                    type="date"
+                    value={p.start}
+                    onChange={(e) => updatePeak(idx, "start", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                  />
+                  <input
+                    type="date"
+                    value={p.end}
+                    onChange={(e) => updatePeak(idx, "end", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                  />
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={p.multiplier}
+                    onChange={(e) => updatePeak(idx, "multiplier", Number(e.target.value))}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                    placeholder="Rate x"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={p.depositMultiplier}
+                      onChange={(e) => updatePeak(idx, "depositMultiplier", Number(e.target.value))}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
+                      placeholder="Deposit x"
+                    />
+                    <button
+                      onClick={() => removePeak(idx)}
+                      className="bg-rose-700 hover:bg-rose-600 text-white rounded px-3 py-2"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              onClick={() => onSave({
+                baseDailyRate: base,
+                baseDeposit: baseDep,
+                weekendMultiplier: weekend,
+                depositWeekendMultiplier: depWeekend,
+                peakMultipliers: peak,
+              })}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2 font-semibold"
+            >
+              Save pricing
+            </button>
+          </div>
         </div>
       )}
-
-      <div className="flex justify-end">
-        <button
-          onClick={() => onSave({ baseDailyRate: base, weekendMultiplier: weekend, peakMultipliers: peak })}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2 font-semibold"
-        >
-          Save pricing
-        </button>
-      </div>
     </div>
   );
 };
@@ -215,7 +266,7 @@ const HostDashboard = () => {
             try {
               map[c._id] = await getFlexiblePricing(c._id);
             } catch {
-              map[c._id] = { baseDailyRate: c.dailyRate || 0, weekendMultiplier: 1, peakMultipliers: [] };
+              map[c._id] = { baseDailyRate: c.dailyRate || 0, baseDeposit: c.deposit || 0, weekendMultiplier: 1, depositWeekendMultiplier: 1, peakMultipliers: [] };
             }
           })
         );
@@ -268,6 +319,13 @@ const HostDashboard = () => {
   const handleSavePricing = async (carId, payload) => {
     const saved = await upsertFlexiblePricing(carId, payload);
     setPricingByCar((m) => ({ ...m, [carId]: saved }));
+    setCars((list) =>
+      list.map((c) =>
+        c._id === carId
+          ? { ...c, dailyRate: payload.baseDailyRate, deposit: payload.baseDeposit }
+          : c
+      )
+    );
   };
 
   const dateRangeColor = (date) => {
@@ -287,11 +345,19 @@ const HostDashboard = () => {
     <div className="min-h-screen bg-slate-950 text-white pb-10">
       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="text-xs uppercase text-slate-500">Host Centre</div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FaHome className="text-emerald-400" /> Operations overview
-            </h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/")}
+              className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2"
+            >
+              <FaHome /> Home
+            </button>
+            <div>
+              <div className="text-xs uppercase text-slate-500">Host Centre</div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <FaHome className="text-emerald-400" /> Operations overview
+              </h1>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <button
@@ -331,6 +397,7 @@ const HostDashboard = () => {
                 <div className="text-sm font-semibold text-white">{c.make} {c.model}</div>
                 <div className="text-xs text-slate-400">{c.category} • {c.year}</div>
                 <div className="text-xs text-slate-400">RM {c.dailyRate} / day</div>
+                <div className="text-xs text-slate-400">Dep RM {c.deposit || 0}</div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   <Pill tone="slate">{c.transmission}</Pill>
                   <Pill tone="blue">{c.fuelType}</Pill>
@@ -406,11 +473,14 @@ const HostDashboard = () => {
                 <div className="space-y-2 max-h-56 overflow-auto pr-1">
                   {(dayCars[selectedDay] || []).map((c, idx) => (
                     <div key={idx} className="border border-slate-800 rounded-lg p-2 text-sm bg-slate-950/60">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-start gap-2">
                         <span className="font-semibold">{c.car}</span>
                         <Pill tone="blue">{c.status}</Pill>
                       </div>
                       <div className="text-xs text-slate-400">Booking #{c.bookingId}</div>
+                      <div className="text-xs text-slate-300 mt-1">
+                        Verification: {c.verificationDocType || "Not provided"} {c.verificationIdNumber ? `(${c.verificationIdNumber})` : ""}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -426,28 +496,14 @@ const HostDashboard = () => {
             <div className="flex items-center gap-2 font-semibold">
               <FaFlag className="text-amber-400" /> Block cars for service
             </div>
+
             <div className="space-y-2">
-              <div className="text-xs text-slate-400">Select cars</div>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-auto pr-1">
-                {cars.map((c) => (
-                  <button
-                    key={c._id}
-                    onClick={() =>
-                      setSelectedCarIds((ids) =>
-                        ids.includes(c._id) ? ids.filter((id) => id !== c._id) : [...ids, c._id]
-                      )
-                    }
-                    className={`rounded-lg border px-3 py-2 text-left ${
-                      selectedCarIds.includes(c._id)
-                        ? "bg-emerald-700 border-emerald-500"
-                        : "bg-slate-800 border-slate-700"
-                    }`}
-                  >
-                    <div className="text-sm font-semibold">{c.make} {c.model}</div>
-                    <div className="text-xs text-slate-300">RM {c.dailyRate} / day</div>
-                  </button>
-                ))}
-              </div>
+              <div className="text-xs text-slate-400">Select cars (predictive, scrollable)</div>
+              <PredictiveMultiSelect
+                options={cars.map((c) => ({ value: c._id, label: `${c.make} ${c.model}` }))}
+                value={selectedCarIds}
+                onChange={setSelectedCarIds}
+              />
             </div>
 
             <div className="space-y-2">
@@ -540,6 +596,64 @@ const StatCard = ({ title, value, icon, tone = "slate" }) => {
         <div className="text-lg">{icon}</div>
       </div>
       <div className="text-3xl font-bold mt-2 text-white">{value}</div>
+    </div>
+  );
+};
+
+const PredictiveMultiSelect = ({ options, value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(
+    () => options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase())),
+    [options, query]
+  );
+
+  const toggle = (val) => {
+    onChange((prev) =>
+      prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]
+    );
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-left text-white flex items-center justify-between"
+      >
+        <span>{value.length ? `${value.length} car(s) selected` : "Select cars"}</span>
+        <FaChevronDown className="text-slate-400" />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-800 rounded-lg shadow-lg">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Type to filter"
+            className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white"
+          />
+          <div className="max-h-48 overflow-auto">
+            {filtered.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-800 text-white cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="accent-emerald-500"
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-2 text-sm text-slate-400">No matches</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

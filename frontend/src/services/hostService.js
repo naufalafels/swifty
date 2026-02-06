@@ -6,7 +6,6 @@ export const getHostCars = async () => {
 };
 
 export const createHostCar = async (payload) => {
-  // payload may contain File, so use FormData when caller needs it
   const res = await api.post("/api/host/cars", payload);
   return res.data?.data;
 };
@@ -21,19 +20,19 @@ export const updateHostBookingStatus = async (id, status, note = "") => {
   return res.data?.data;
 };
 
-// New: holiday-aware calendar (bookings + service blocks + today summary)
+// Holiday-aware calendar (bookings + service blocks + today summary + dayCars)
 export const getHostCalendar = async () => {
   const res = await api.get("/api/host/calendar");
   return res.data?.data;
 };
 
-// New: block car(s) for service
+// Block car(s) for service
 export const blockServiceDates = async (carIds, dates) => {
   const res = await api.post("/api/host/calendar/block", { carIds, dates });
   return res.data?.data;
 };
 
-// New: flexible pricing
+// Flexible pricing
 export const getFlexiblePricing = async (carId) => {
   const res = await api.get(`/api/host/pricing/${carId}`);
   return res.data?.data;

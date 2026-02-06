@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   FaCheckCircle,
+  FaTimesCircle,
   FaUserShield,
   FaEdit,
   FaLock,
@@ -146,7 +147,6 @@ const ProfilePage = () => {
         const res = await api.get('/api/profile/stats');
         return res?.data ?? {};
       } catch (err) {
-        // Swallow 404 (endpoint absent) and fall back to zeros; log others for debugging
         if (err?.response?.status !== 404) {
           console.error('profile stats error', err);
         }
@@ -421,11 +421,17 @@ const ProfilePage = () => {
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner">
                 {user?.name?.[0]?.toUpperCase() || 'U'}
               </div>
-              {isVerified && (
-                <div className="absolute -bottom-2 -right-2 bg-emerald-600 text-white rounded-full p-1.5 border border-slate-900">
-                  <FaCheckCircle />
-                </div>
-              )}
+              <div className="absolute -bottom-2 -right-2">
+                {isVerified ? (
+                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-600 text-white text-xs font-semibold border border-slate-900 shadow">
+                    <FaCheckCircle className="text-sm" /> Verified
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-600 text-white text-xs font-semibold border border-slate-900 shadow">
+                    <FaTimesCircle className="text-sm" /> Unverified
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <div className="text-xl font-semibold text-white">{user?.name || 'Unnamed user'}</div>
@@ -450,7 +456,7 @@ const ProfilePage = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-3 py- rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
           >
             <FaEdit /> Edit Profile
           </button>
@@ -671,7 +677,7 @@ const ProfilePage = () => {
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <FaLock /> Verify to edit {passwordCheckField}
               </h2>
-              <button onClick={() => setIsPasswordModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
+              <button onClick={() => setIsPasswordModalOpen(false)} className="text-slate-500 hover-text-slate-800">✕</button>
             </div>
             <label className="text-sm font-semibold text-slate-800">Password
               <input type="password" value={passwordValue} onChange={(e) => setPasswordValue(e.target.value)} className="w-full mt-1 p-2 border rounded" placeholder="Enter your password" />

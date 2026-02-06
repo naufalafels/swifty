@@ -94,6 +94,7 @@ const ProfilePage = () => {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordCheckField, setPasswordCheckField] = useState(null);
   const [passwordValue, setPasswordValue] = useState('');
+  const [submittingKyc, setSubmittingKyc] = useState(false);
 
   const [personalForm, setPersonalForm] = useState({
     legalName: '',
@@ -140,12 +141,25 @@ const ProfilePage = () => {
   useEffect(() => {
     let mounted = true;
 
+    const loadStats = async () => {
+      try {
+        const res = await api.get('/api/profile/stats');
+        return res?.data ?? {};
+      } catch (err) {
+        // Swallow 404 (endpoint absent) and fall back to zeros; log others for debugging
+        if (err?.response?.status !== 404) {
+          console.error('profile stats error', err);
+        }
+        return {};
+      }
+    };
+
     const load = async () => {
       setLoading(true);
       try {
-        const [meRes, statsRes] = await Promise.allSettled([
+        const [meRes, statsData] = await Promise.allSettled([
           api.get('/api/auth/me'),
-          api.get('/api/profile/stats'),
+          loadStats(),
         ]);
 
         if (meRes.status === 'fulfilled') {
@@ -174,15 +188,13 @@ const ProfilePage = () => {
           setError(meRes.reason?.response?.data?.message || 'Failed to load profile');
         }
 
-        if (statsRes.status === 'fulfilled') {
-          const s = statsRes.value?.data ?? {};
-          if (mounted) {
-            setStats({
-              bookings: s.bookings ?? 0,
-              completedTrips: s.completedTrips ?? 0,
-              years: s.years ?? 0,
-            });
-          }
+        if (mounted) {
+          const s = statsData?.value ?? {};
+          setStats({
+            bookings: s.bookings ?? 0,
+            completedTrips: s.completedTrips ?? 0,
+            years: s.years ?? 0,
+          });
         }
       } finally {
         if (mounted) setLoading(false);
@@ -280,7 +292,7 @@ const ProfilePage = () => {
 
   const saveEditExtras = async (e) => {
     e.preventDefault();
-    toast.success('Profile extras saved (stub). Wire to your API.');
+    toast.info('Profile extras saved (stub). Wire to your API when ready.');
     setIsEditModalOpen(false);
   };
 
@@ -296,6 +308,7 @@ const ProfilePage = () => {
     if (kycForm.frontFile) fd.append('frontImage', kycForm.frontFile);
     if (kycForm.backFile) fd.append('backImage', kycForm.backFile);
 
+    setSubmittingKyc(true);
     try {
       await api.post('/api/kyc/submit', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -303,6 +316,8 @@ const ProfilePage = () => {
       toast.success('Identity submitted to Admin');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to submit identity');
+    } finally {
+      setSubmittingKyc(false);
     }
   };
 
@@ -343,6 +358,29 @@ const ProfilePage = () => {
     setAddressSuggestions([]);
   };
 
+  const handleHostNavigate = () => {
+    if (loading) return;
+    navigate(isHost ? '/host/dashboard' : '/host/onboard');
+  };
+
+  if (!loading && !user) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center px-4">
+        <Navbar />
+        <div className="max-w-md text-center space-y-4 mt-10">
+          <h1 className="text-2xl font-bold">You’re signed out</h1>
+          <p className="text-slate-300">Please log in to view your profile and host centre.</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 pb-10 pt-24 md:pt-28 space-y-8">
       <div className="flex justify-center w-full">
@@ -356,6 +394,7 @@ const ProfilePage = () => {
           </h1>
           <p className="text-sm text-slate-400">Your identity, privacy, and host journey in one place.</p>
         </div>
+        {loading && <div className="text-xs text-slate-400">Refreshing profile…</div>}
       </div>
 
       <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-3 shadow-lg">
@@ -409,10 +448,16 @@ const ProfilePage = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setIsEditModalOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800">
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+          >
             <FaEdit /> Edit Profile
           </button>
-          <button onClick={() => setIsAboutModalOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800">
+          <button
+            onClick={() => setIsAboutModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+          >
             <FaInfoCircle /> Edit About Me
           </button>
         </div>
@@ -426,14 +471,24 @@ const ProfilePage = () => {
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="text-sm text-slate-200">
               ID Type
-              <select value={kycForm.idType} onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })} className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white">
+              <select
+                value={kycForm.idType}
+                onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })}
+                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+              >
                 <option>NRIC</option>
                 <option>Passport</option>
               </select>
             </label>
             <label className="text-sm text-slate-200">
               {kycForm.idType === 'NRIC' ? 'NRIC Number' : 'Passport Number'}
-              <input value={kycForm.idNumber} onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })} className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white" placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'} required />
+              <input
+                value={kycForm.idNumber}
+                onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })}
+                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'}
+                required
+              />
             </label>
           </div>
 
@@ -443,7 +498,12 @@ const ProfilePage = () => {
               <div className="flex items-center gap-3">
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
                   <FaCloudUploadAlt /> Choose file
-                  <input type="file" accept=".jpeg,.jpg,.png,.pdf" className="hidden" onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })} />
+                  <input
+                    type="file"
+                    accept=".jpeg,.jpg,.png,.pdf"
+                    className="hidden"
+                    onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
+                  />
                 </label>
                 <PreviewThumb file={kycForm.frontFile} />
               </div>
@@ -454,7 +514,12 @@ const ProfilePage = () => {
               <div className="flex items-center gap-3">
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
                   <FaCloudUploadAlt /> Choose file
-                  <input type="file" accept=".jpeg,.jpg,.png,.pdf" className="hidden" onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })} />
+                  <input
+                    type="file"
+                    accept=".jpeg,.jpg,.png,.pdf"
+                    className="hidden"
+                    onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
+                  />
                 </label>
                 <PreviewThumb file={kycForm.backFile} />
               </div>
@@ -465,8 +530,12 @@ const ProfilePage = () => {
             On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
           </div>
 
-          <button type="submit" className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2">
-            <FaCheckCircle /> Submit for verification
+          <button
+            type="submit"
+            disabled={submittingKyc}
+            className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2 disabled:opacity-70"
+          >
+            <FaCheckCircle /> {submittingKyc ? 'Submitting…' : 'Submit for verification'}
           </button>
         </form>
       </div>
@@ -504,6 +573,7 @@ const ProfilePage = () => {
                     placeholder="+60123456789"
                     onClick={() => handleLockedFieldClick('phone')}
                     readOnly={locked.phone}
+                    aria-label="Phone (locked until verified)"
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Will display as {maskPhone(personalForm.phone)}</div>
                 </label>
@@ -517,6 +587,7 @@ const ProfilePage = () => {
                     required
                     onClick={() => handleLockedFieldClick('email')}
                     readOnly={locked.email}
+                    aria-label="Email (locked until verified)"
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Will display as {maskEmail(personalForm.email)}</div>
                 </label>
@@ -703,17 +774,22 @@ const ProfilePage = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <button onClick={() => navigate(isHost ? '/host/dashboard' : '/host/onboard')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+        <button
+          onClick={handleHostNavigate}
+          className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-70"
+          disabled={loading}
+          aria-label={isHost ? 'Go to Host Centre' : 'Become a Host'}
+        >
           <FaRocket /> {isHost ? 'Host Centre' : 'Become a Host'}
         </button>
-        <button onClick={() => setIsPersonalModalOpen(true)} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+        <button onClick={() => setIsPersonalModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
           <FaUserCog /> Personal Information
         </button>
-        <button onClick={() => navigate('/profile/security')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+        <button onClick={() => navigate('/profile/security')} className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
           <FaLock /> Login & Security
         </button>
-        <button onClick={() => navigate('/profile/privacy')} className="flex items-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
+        <button onClick={() => navigate('/profile/privacy')} className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
           <FaShieldAlt /> Privacy
         </button>
       </div>

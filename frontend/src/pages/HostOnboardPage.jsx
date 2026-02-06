@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide } from 'react-icons/fa';
+import React, { useEffect, useRef, useState } from 'react';
+import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe } from 'react-icons/fa';
 import * as authService from '../utils/authService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
+import { LoadScript, StandaloneSearchBox } from '@react-google-maps/api';
 
 const HostOnboardPage = () => {
   const [step, setStep] = useState(1);
@@ -28,6 +29,17 @@ const HostOnboardPage = () => {
     carType: '',
   });
 
+  const [location, setLocation] = useState({
+    search: '',
+    selectedAddress: '',
+    latitude: '',
+    longitude: '',
+    useCoords: false,
+  });
+
+  const searchBoxRef = useRef(null);
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
   const next = () => setStep((s) => Math.min(3, s + 1));
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
@@ -37,6 +49,7 @@ const HostOnboardPage = () => {
       await authService.becomeHost({
         payoutAccountRef: company.payoutAccountRef,
         notes: company.notes,
+        // location kept client-side; persist later if desired
       });
       toast.success('Host onboarding submitted. Admin will review.');
       navigate('/host/dashboard');
@@ -45,6 +58,57 @@ const HostOnboardPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePlaceChanged = () => {
+    if (!searchBoxRef.current) return;
+    const places = searchBoxRef.current.getPlaces();
+    if (!places || places.length === 0) return;
+    const place = places[0];
+    const formatted = place.formatted_address || place.name || '';
+    const comps = place.address_components || [];
+    let lat = '';
+    let lng = '';
+    if (place.geometry?.location) {
+      lat = place.geometry.location.lat()?.toFixed(6) || '';
+      lng = place.geometry.location.lng()?.toFixed(6) || '';
+    }
+
+    setLocation((p) => ({
+      ...p,
+      search: formatted,
+      selectedAddress: formatted,
+      latitude: lat,
+      longitude: lng,
+      useCoords: false,
+    }));
+  };
+
+  const toggleCoords = async () => {
+    setLocation((p) => ({ ...p, useCoords: !p.useCoords }));
+    if (location.useCoords) {
+      setLocation((p) => ({ ...p, latitude: '', longitude: '' }));
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast.error('Geolocation not supported in this browser.');
+      setLocation((p) => ({ ...p, useCoords: false }));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude?.toFixed(6) || '';
+        const lng = pos.coords.longitude?.toFixed(6) || '';
+        setLocation((p) => ({ ...p, latitude: lat, longitude: lng, useCoords: true }));
+        toast.success('Coordinates captured from your location.');
+      },
+      (err) => {
+        console.error('Geolocation error', err);
+        toast.error('Unable to fetch location. Please allow location access or enter manually.');
+        setLocation((p) => ({ ...p, useCoords: false }));
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
   };
 
   return (
@@ -77,10 +141,11 @@ const HostOnboardPage = () => {
       </div>
 
       {step === 1 && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3">
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="text-sm text-white font-semibold flex items-center gap-2">
             <FaList /> Company details
           </div>
+
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="text-sm text-slate-200">Company name
               <input
@@ -116,6 +181,7 @@ const HostOnboardPage = () => {
               />
             </label>
           </div>
+
           <label className="text-sm text-slate-200">Notes (optional)
             <textarea
               value={company.notes}
@@ -124,6 +190,77 @@ const HostOnboardPage = () => {
               rows={3}
             />
           </label>
+
+          {/* Company Location (mirrors Cars page approach) */}
+          <div className="border border-slate-800 rounded-xl p-4 bg-slate-950/70 space-y-3">
+            <div className="text-sm text-white font-semibold flex items-center gap-2">
+              <FaMapMarkerAlt className="text-emerald-400" /> Company Location
+            </div>
+
+            <label className="text-sm text-slate-200 block">Search address (Google Places)
+              <div className="relative mt-1">
+                {apiKey ? (
+                  <LoadScript googleMapsApiKey={apiKey} libraries={['places']}>
+                    <StandaloneSearchBox onLoad={(ref) => (searchBoxRef.current = ref)} onPlacesChanged={handlePlaceChanged}>
+                      <input
+                        value={location.search}
+                        onChange={(e) => setLocation((p) => ({ ...p, search: e.target.value }))}
+                        placeholder="Start typing an address..."
+                        className="w-full p-3 rounded bg-slate-800 border border-slate-700 text-white focus:border-emerald-500 focus:outline-none"
+                      />
+                    </StandaloneSearchBox>
+                  </LoadScript>
+                ) : (
+                  <input
+                    value={location.search}
+                    onChange={(e) => setLocation((p) => ({ ...p, search: e.target.value }))}
+                    placeholder="Start typing an address..."
+                    className="w-full p-3 rounded bg-slate-800 border border-slate-700 text-white focus:border-emerald-500 focus:outline-none"
+                  />
+                )}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">Select a place to auto-fill address and coordinates.</div>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="useCoords"
+                type="checkbox"
+                checked={location.useCoords}
+                onChange={toggleCoords}
+                className="w-4 h-4 accent-emerald-500"
+              />
+              <label htmlFor="useCoords" className="text-sm text-slate-200 inline-flex items-center gap-2">
+                <FaGlobe className="text-emerald-400" /> Use my current coordinates (auto-fill)
+              </label>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-sm text-slate-200">Latitude
+                <input
+                  value={location.latitude}
+                  onChange={(e) => setLocation((p) => ({ ...p, latitude: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., 3.1390"
+                />
+              </label>
+              <label className="text-sm text-slate-200">Longitude
+                <input
+                  value={location.longitude}
+                  onChange={(e) => setLocation((p) => ({ ...p, longitude: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., 101.6869"
+                />
+              </label>
+            </div>
+
+            {(location.selectedAddress || (location.latitude && location.longitude)) && (
+              <div className="text-xs text-emerald-300">
+                Selected: {location.selectedAddress || 'Coordinates only'}{' '}
+                {(location.latitude && location.longitude) ? `(${location.latitude}, ${location.longitude})` : ''}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -233,6 +370,13 @@ const HostOnboardPage = () => {
               <div>SSM: {company.ssmNumber || '—'}</div>
               <div>NRIC: {company.nricNumber || '—'}</div>
               <div>Payout ref: {company.payoutAccountRef || '—'}</div>
+              <div>
+                Location:{' '}
+                {location.selectedAddress ||
+                  (location.latitude && location.longitude
+                    ? `${location.latitude}, ${location.longitude}`
+                    : '—')}
+              </div>
             </div>
             <div className="bg-slate-800/60 border border-slate-700 rounded-lg p-3">
               <div className="font-semibold text-white mb-1">Vehicle</div>

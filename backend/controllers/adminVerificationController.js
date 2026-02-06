@@ -7,10 +7,11 @@ const formatUser = (u) => ({
   fullName: u.fullName || u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
   email: u.email,
   phone: u.phone,
-  idNumber: u.idNumber || u.documentId,
-  verificationStatus: u.verificationStatus || 'pending',
+  idNumber: u.kyc?.idNumber || u.idNumber || u.documentId,
+  kycStatus: u.kyc?.status || u.verificationStatus || 'pending',
   payoutReference: u.payoutReference || '',
   documents: u.documents || [],
+  kyc: u.kyc || {},
 });
 
 export const listUsers = async (req, res) => {
@@ -47,7 +48,16 @@ export const updateVerification = async (req, res) => {
     const nextStatus = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : null;
     if (!nextStatus) return res.status(400).json({ success: false, message: 'Invalid action' });
 
+    // For KYC-backed flow, prefer kyc.status; keep legacy verificationStatus for compatibility
+    user.kyc = {
+      ...(user.kyc || {}),
+      status: nextStatus,
+      statusReason: req.body?.reason || user.kyc?.statusReason || '',
+      reviewedAt: new Date(),
+      reviewedBy: req.user.id,
+    };
     user.verificationStatus = nextStatus;
+
     await user.save();
 
     return res.json({ success: true, status: nextStatus });
@@ -73,6 +83,50 @@ export const savePayoutReference = async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error('savePayoutReference error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// List pending KYC for admin review
+export const listPendingKyc = async (req, res) => {
+  try {
+    const users = await User.find(
+      { companyId: req.user.companyId, 'kyc.status': { $in: ['pending'] } },
+      baseProjection
+    )
+      .limit(200)
+      .lean();
+    return res.json({ success: true, users: users.map(formatUser) });
+  } catch (err) {
+    console.error('listPendingKyc error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// Approve/reject a KYC
+export const reviewKyc = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, reason } = req.body || {};
+    const nextStatus = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : null;
+    if (!nextStatus) return res.status(400).json({ success: false, message: 'Invalid action' });
+
+    const user = await User.findOne({ _id: id, companyId: req.user.companyId });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.kyc = {
+      ...(user.kyc || {}),
+      status: nextStatus,
+      statusReason: reason || '',
+      reviewedAt: new Date(),
+      reviewedBy: req.user.id,
+    };
+    user.verificationStatus = nextStatus;
+
+    await user.save();
+    return res.json({ success: true, status: nextStatus });
+  } catch (err) {
+    console.error('reviewKyc error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

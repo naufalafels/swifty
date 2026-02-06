@@ -19,7 +19,9 @@ import {
   listUsers,
   listHosts,
   updateVerification,
-  savePayoutReference
+  savePayoutReference,
+  listPendingKyc,
+  reviewKyc
 } from '../controllers/adminVerificationController.js';
 import { getTerms, updateTerms, getPublicTerms } from '../controllers/adminLegalController.js';
 import { processRefund } from '../controllers/adminRefundController.js';
@@ -102,6 +104,10 @@ router.get('/verifications/users', listUsers);
 router.get('/verifications/hosts', listHosts);
 router.post('/verifications/:type/:id/:action', updateVerification);
 router.post('/verifications/hosts/:id/payout-reference', savePayoutReference);
+
+// KYC review
+router.get('/verification/kyc/pending', listPendingKyc);
+router.post('/verification/kyc/:id', reviewKyc);
 
 // Refunds
 router.post('/refunds', processRefund);

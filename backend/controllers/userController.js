@@ -12,7 +12,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m';
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 1);
 const REFRESH_TOKEN_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken';
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:7889';
+const SERVER_URL = (process.env.SERVER_URL || 'http://localhost:7889').replace(/\/$/, '');
 
 function createAccessToken(userId, extra = {}) {
   return jwt.sign({ id: userId, ...extra }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
@@ -69,6 +69,11 @@ function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/' });
 }
 
+function buildKycUrl(fileName) {
+  if (!fileName) return '';
+  return `${SERVER_URL}/uploads/kyc/${fileName}`;
+}
+
 function userResponse(user) {
   return {
     id: user._id,
@@ -77,8 +82,19 @@ function userResponse(user) {
     role: user.role,
     roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
     companyId: user.companyId || null,
-    kyc: user.kyc || { status: 'not_submitted' },
     isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
+    legalName: user.legalName || '',
+    preferredName: user.preferredName || '',
+    birthdate: user.birthdate || '',
+    phone: user.phone || '',
+    address: user.address || '',
+    mailingAddress: user.mailingAddress || '',
+    city: user.city || '',
+    country: user.country || '',
+    about: user.about || '',
+    privacy: user.privacy || { showCity: true, showAbout: true },
+    kyc: user.kyc || { status: 'not_submitted' },
+    createdAt: user.createdAt,
   };
 }
 
@@ -245,31 +261,97 @@ export async function me(req, res) {
   }
 }
 
-/** Renter: submit KYC (NRIC/Passport only) */
-export async function submitKyc(req, res) {
+// Verify password before sensitive edits
+export async function verifyPassword(req, res) {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    const { password } = req.body || {};
+    if (!password) return res.status(400).json({ success: false, message: 'Password required' });
 
-    const idType = String(req.body.idType || 'passport').toLowerCase();
-    if (!['passport', 'nric'].includes(idType)) {
-      return res.status(400).json({ success: false, message: 'idType must be passport or nric' });
-    }
-
-    const idNumber = String(req.body.idNumber || '').trim();
-    const idCountry = String(req.body.idCountry || 'MY').trim() || 'MY';
-    const frontImageUrl = String(req.body.frontImageUrl || '').trim();
-    const backImageUrl = String(req.body.backImageUrl || '').trim();
-
-    const user = await User.findById(userId);
+    const user = await User.findById(req.user.id).select('+password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ success: false, message: 'Invalid password' });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('verifyPassword error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// Update profile (personal info, about, privacy)
+export async function updateProfile(req, res) {
+  try {
+    const {
+      legalName,
+      preferredName,
+      birthdate,
+      phone,
+      email,
+      address,
+      mailingAddress,
+      sameMailing,
+      city,
+      country,
+      about,
+      privacy,
+    } = req.body || {};
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (email && email !== user.email) {
+      if (!validator.isEmail(email)) return res.status(400).json({ success: false, message: 'Invalid email' });
+      user.email = validator.normalizeEmail(email) || email.toLowerCase();
+    }
+
+    if (legalName !== undefined) user.legalName = String(legalName).trim();
+    if (preferredName !== undefined) user.preferredName = String(preferredName).trim();
+    if (birthdate !== undefined) user.birthdate = birthdate;
+    if (phone !== undefined) user.phone = String(phone).trim();
+    if (address !== undefined) user.address = String(address).trim();
+    if (mailingAddress !== undefined) {
+      user.mailingAddress = sameMailing ? String(address || '') : String(mailingAddress || '');
+    }
+    if (city !== undefined) user.city = String(city).trim();
+    if (country !== undefined) user.country = String(country).trim();
+    if (about !== undefined) user.about = String(about);
+
+    if (privacy && typeof privacy === 'object') {
+      user.privacy = {
+        showCity: privacy.showCity !== undefined ? !!privacy.showCity : user.privacy?.showCity ?? true,
+        showAbout: privacy.showAbout !== undefined ? !!privacy.showAbout : user.privacy?.showAbout ?? true,
+      };
+    }
+
+    await user.save();
+    return res.json({ success: true, user: userResponse(user) });
+  } catch (err) {
+    console.error('updateProfile error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// Renter: submit KYC (multipart with images)
+export async function submitKycMultipart(req, res) {
+  try {
+    const { idType = 'passport', idNumber = '', idCountry = 'MY' } = req.body || {};
+    if (!idNumber.trim()) return res.status(400).json({ success: false, message: 'idNumber required' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const frontFile = req.files?.frontImage?.[0];
+    const backFile = req.files?.backImage?.[0];
+
     user.kyc = {
-      idType,
-      idNumber,
-      idCountry,
-      frontImageUrl,
-      backImageUrl,
+      ...(user.kyc || {}),
+      idType: String(idType).toLowerCase(),
+      idNumber: idNumber.trim(),
+      idCountry: idCountry || 'MY',
+      frontImageUrl: frontFile ? buildKycUrl(frontFile.filename) : user.kyc?.frontImageUrl || '',
+      backImageUrl: backFile ? buildKycUrl(backFile.filename) : user.kyc?.backImageUrl || '',
       status: 'pending',
       statusReason: '',
       submittedAt: new Date(),
@@ -278,14 +360,14 @@ export async function submitKyc(req, res) {
     };
 
     await user.save();
-    return res.json({ success: true, message: 'KYC submitted for host review', kyc: user.kyc });
+    return res.json({ success: true, kyc: user.kyc });
   } catch (err) {
-    console.error('submitKyc error', err);
+    console.error('submitKycMultipart error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
 
-/** Renter: get own KYC */
+// Renter: get own KYC
 export async function getKyc(req, res) {
   try {
     const userId = req.user?.id;
@@ -301,7 +383,7 @@ export async function getKyc(req, res) {
   }
 }
 
-/** Become a host */
+// Become a host
 export async function becomeHost(req, res) {
   try {
     const userId = req.user?.id;
@@ -336,7 +418,7 @@ export async function becomeHost(req, res) {
   }
 }
 
-/** Host: fetch renter KYC by userId (for in-person validation) */
+// Host: fetch renter KYC by userId
 export async function hostGetRenterKyc(req, res) {
   try {
     const hostRoles = req.user?.roles || [];
@@ -352,7 +434,6 @@ export async function hostGetRenterKyc(req, res) {
     const renter = await User.findById(renterId).lean();
     if (!renter) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Only return KYC metadata, not password, etc.
     return res.json({
       success: true,
       renter: {

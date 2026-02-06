@@ -20,8 +20,12 @@ import companyRouter from './routes/companyRoutes.js';
 import hostRouter from './routes/hostRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import reviewRouter from './routes/reviewRoutes.js';
+import profileRouter from './routes/profileRoutes.js';
 
 import { generalLimiter } from './middlewares/rateLimit.js';
+import authMiddleware from './middlewares/auth.js';
+import { uploadKyc } from './middlewares/uploadKyc.js';
+import { submitKycMultipart } from './controllers/userController.js';
 
 dotenv.config();
 
@@ -69,6 +73,7 @@ app.use('/api', generalLimiter);
 
 // ROUTES
 app.use('/api/auth', userRouter);
+app.use('/api/profile', profileRouter);
 app.use('/api/cars', carRouter);
 app.use('/api/bookings', bookingRouter);
 app.use('/api/payments', paymentRouter);
@@ -77,6 +82,17 @@ app.use('/api/companies', companyRouter);
 app.use('/api/host', hostRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/reviews', reviewRouter);
+
+// Expose KYC submit at the path the frontend calls: /api/kyc/submit
+app.post(
+  '/api/kyc/submit',
+  authMiddleware,
+  uploadKyc.fields([
+    { name: 'frontImage', maxCount: 1 },
+    { name: 'backImage', maxCount: 1 },
+  ]),
+  submitKycMultipart
+);
 
 // socket.io
 io.on('connection', (socket) => {

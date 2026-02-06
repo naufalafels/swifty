@@ -56,7 +56,7 @@ const BookingCard = ({ booking }) => (
     <div className="flex items-center justify-between gap-2">
       <div className="font-semibold text-white flex items-center gap-2">
         <FaCar className="text-amber-400" />
-        {booking.car || booking.carId?.make && booking.carId?.model ? `${booking.carId.make} ${booking.carId.model}` : "Car"}
+        {booking.car || (booking.carId?.make && booking.carId?.model ? `${booking.carId.make} ${booking.carId.model}` : "Car")}
       </div>
       <Pill tone="blue">{booking.status}</Pill>
     </div>
@@ -233,6 +233,45 @@ const PricingCard = ({ car, pricing, onSave }) => {
   );
 };
 
+// Build fallback dayCars and today summaries from bookings if API omitted them
+const buildDayCarsAndToday = (bookings) => {
+  const dayCars = {};
+  const now = new Date();
+  const todayIso = format(now, "yyyy-MM-dd");
+  const pickupsToday = [];
+  const returnsToday = [];
+
+  bookings.forEach((b) => {
+    const start = new Date(b.pickupDate);
+    const end = new Date(b.returnDate || b.pickupDate);
+    const carName = b.car || (b.carId?.make && b.carId?.model ? `${b.carId.make} ${b.carId.model}` : "Car");
+    const docType = b.verificationDocType || b.userId?.docType || (b.userId?.passportNumber ? "Passport" : b.userId?.nricNumber ? "NRIC" : null);
+    const docId = b.verificationIdNumber || b.userId?.passportNumber || b.userId?.nricNumber || b.userId?.idNumber || null;
+
+    let cur = start;
+    while (cur <= end) {
+      const isoDate = format(cur, "yyyy-MM-dd");
+      if (!dayCars[isoDate]) dayCars[isoDate] = [];
+      dayCars[isoDate].push({
+        carId: b.carId?._id || null,
+        car: carName,
+        bookingId: b._id,
+        status: b.status,
+        verificationDocType: docType,
+        verificationIdNumber: docId,
+      });
+      cur = addDays(cur, 1);
+    }
+
+    const pickupIso = format(start, "yyyy-MM-dd");
+    const returnIso = format(end, "yyyy-MM-dd");
+    if (pickupIso === todayIso) pickupsToday.push(b);
+    if (returnIso === todayIso) returnsToday.push(b);
+  });
+
+  return { dayCars, today: { pickups: pickupsToday, returns: returnsToday } };
+};
+
 const HostDashboard = () => {
   const navigate = useNavigate();
   const [cars, setCars] = useState([]);
@@ -259,7 +298,12 @@ const HostDashboard = () => {
         if (!mounted) return;
         setCars(carsRes);
         setBookings(bookingsRes);
-        setCalendar(calendarRes);
+        let calData = calendarRes || {};
+        if (!calData.dayCars || !calData.today) {
+          const derived = buildDayCarsAndToday(bookingsRes || []);
+          calData = { ...calData, ...derived };
+        }
+        setCalendar(calData);
         const map = {};
         await Promise.all(
           (carsRes || []).map(async (c) => {
@@ -283,10 +327,10 @@ const HostDashboard = () => {
     };
   }, []);
 
-  const todayPickups = calendar?.today?.pickups || [];
-  const todayReturns = calendar?.today?.returns || [];
   const holidays = calendar?.holidays || [];
   const dayCars = calendar?.dayCars || {};
+  const todayPickups = calendar?.today?.pickups || [];
+  const todayReturns = calendar?.today?.returns || [];
 
   const holidayByDate = useMemo(() => {
     const m = new Map();
@@ -308,7 +352,12 @@ const HostDashboard = () => {
       const isoDates = dates.map((d) => format(d, "yyyy-MM-dd"));
       await blockServiceDates(selectedCarIds, isoDates);
       const updated = await getHostCalendar();
-      setCalendar(updated);
+      let calData = updated || {};
+      if (!calData.dayCars || !calData.today) {
+        const derived = buildDayCarsAndToday(bookings || []);
+        calData = { ...calData, ...derived };
+      }
+      setCalendar(calData);
       setSelectedCarIds([]);
     } catch (err) {
       const msg = err?.response?.data?.message || "Failed to block service";
@@ -428,6 +477,8 @@ const HostDashboard = () => {
               rangeColors={["#10b981"]}
               minDate={new Date()}
               showMonthAndYearPickers
+              months={2}
+              direction="horizontal"
               showPreview={false}
               weekStartsOn={1}
               dayContentRenderer={(date) => {

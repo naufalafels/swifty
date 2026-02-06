@@ -33,7 +33,7 @@ const HostAddCars = () => {
 
   const petrolEnabled = car.fuelType === "Petrol";
 
-  const requiredFields = ["make", "model", "year", "dailyRate", "deposit", "seats", "transmission", "fuelType", "category", "gasUsage"];
+  const requiredFields = ["make", "model", "year", "dailyRate", "deposit", "seats", "transmission", "fuelType", "category", "gasUsage", "mileage"];
   const validate = () => {
     const next = {};
     requiredFields.forEach((f) => {

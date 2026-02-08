@@ -1,9 +1,8 @@
-// Admin auth helper - in-memory token + cookie-based refresh + scheduled refresh
+// Admin auth helper - cookie-based token storage + scheduled refresh
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:7889";
 
-let accessToken = null;
 let currentUser = null;
 let refreshing = null;
 let refreshTimerId = null;
@@ -26,6 +25,13 @@ function parseJwt(token) {
   } catch {
     return null;
   }
+}
+
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
 }
 
 function scheduleRefreshFromToken(token) {
@@ -51,12 +57,10 @@ function scheduleRefreshFromToken(token) {
         const r = await adminRefresh();
         if (!(r && r.ok)) {
           // failed refresh -> clear session
-          accessToken = null;
           currentUser = null;
           if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
         }
       } catch {
-        accessToken = null;
         currentUser = null;
         if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
       }
@@ -67,13 +71,12 @@ function scheduleRefreshFromToken(token) {
 }
 
 export const saveAdminSession = (token, user) => {
-  accessToken = token || null;
+  // Token is in cookies; just store user and schedule refresh
   currentUser = user || null;
-  if (accessToken) scheduleRefreshFromToken(accessToken);
+  if (token) scheduleRefreshFromToken(token);
 };
 
 export const clearAdminSession = () => {
-  accessToken = null;
   currentUser = null;
   if (refreshTimerId) {
     clearTimeout(refreshTimerId);
@@ -81,19 +84,20 @@ export const clearAdminSession = () => {
   }
 };
 
-export const getAdminToken = () => accessToken;
+export const getAdminToken = () => getCookie('adminToken');  // Read from cookies
 export const getAdminUser = () => currentUser;
 
 /* Auth API calls */
 export const adminLogin = async (credentials) => {
   const res = await axios.post(`${API_BASE}/api/auth/login`, credentials, {
-    withCredentials: true,
+    withCredentials: true,  // Sends/receives cookies
     headers: { "Content-Type": "application/json" },
   });
   const data = res.data || {};
-  accessToken = data?.accessToken || data?.token || accessToken;
+  // Token is now in cookie; read it for client-side scheduling
+  const token = getCookie('adminToken') || data?.token;
   currentUser = data?.user || currentUser;
-  if (accessToken) scheduleRefreshFromToken(accessToken);
+  if (token) scheduleRefreshFromToken(token);
   return data;
 };
 
@@ -113,12 +117,11 @@ export const adminRefresh = async () => {
     try {
       const res = await axios.post(`${API_BASE}/api/auth/refresh`, {}, { withCredentials: true });
       const data = res.data || {};
-      accessToken = data?.accessToken || data?.token || accessToken;
+      const token = getCookie('adminToken') || data?.token;
       if (data?.user) currentUser = data.user;
-      if (accessToken) scheduleRefreshFromToken(accessToken);
+      if (token) scheduleRefreshFromToken(token);
       return { ok: true, data };
     } catch (err) {
-      accessToken = null;
       currentUser = null;
       if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
       return { ok: false, err };
@@ -141,7 +144,6 @@ export const adminLogout = async () => {
   } catch (err) {
     // ignore
   } finally {
-    accessToken = null;
     currentUser = null;
     if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
   }

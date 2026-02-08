@@ -69,6 +69,22 @@ function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/' });
 }
 
+// NEW: Set admin token cookie for admin users
+function setAdminTokenCookie(res, token) {
+  const cookieOptions = {
+    httpOnly: false,  // Allow SPA to read for Authorization headers
+    secure: process.env.NODE_ENV === 'production',  // HTTPS only
+    sameSite: 'strict',  // CSRF protection
+    maxAge: 15 * 60 * 1000,  // 15 minutes (match access token)
+    path: '/',
+  };
+  res.cookie('adminToken', token, cookieOptions);
+}
+
+function clearAdminTokenCookie(res) {
+  res.clearCookie('adminToken', { path: '/' });
+}
+
 function buildKycUrl(fileName) {
   if (!fileName) return '';
   return `${SERVER_URL}/uploads/kyc/${fileName}`;
@@ -179,6 +195,11 @@ export async function login(req, res) {
     await saveRefreshToken({ token: refreshToken, userId: user._id, expiresAt, createdByIp: req.ip || '' });
     setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
+    // NEW: Set admin token cookie if user is admin
+    if (user.role === 'company_admin') {
+      setAdminTokenCookie(res, accessToken);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Login Successfully!',
@@ -204,12 +225,14 @@ export async function refresh(req, res) {
     if (saved.revoked) {
       await revokeAllUserRefreshTokens(saved.userId);
       clearRefreshCookie(res);
+      clearAdminTokenCookie(res);  // NEW: Clear admin cookie on revoke
       return res.status(401).json({ success: false, message: 'Refresh token revoked. Please login again.' });
     }
 
     if (new Date(saved.expiresAt) < new Date()) {
       await revokeRefreshTokenByHash(saved.tokenHash);
       clearRefreshCookie(res);
+      clearAdminTokenCookie(res);  // NEW: Clear admin cookie on expiry
       return res.status(401).json({ success: false, message: 'Refresh token expired. Please login again.' });
     }
 
@@ -223,7 +246,13 @@ export async function refresh(req, res) {
 
     const accessToken = createAccessToken(saved.userId.toString());
     setRefreshCookie(res, newToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
+
     const user = await User.findById(saved.userId).lean();
+    // NEW: Set admin token cookie if user is admin
+    if (user && user.role === 'company_admin') {
+      setAdminTokenCookie(res, accessToken);
+    }
+
     return res.json({ success: true, accessToken, user: user ? userResponse(user) : null });
   } catch (err) {
     console.error('Refresh error', err);
@@ -241,10 +270,12 @@ export async function logout(req, res) {
       }
     }
     clearRefreshCookie(res);
+    clearAdminTokenCookie(res);  // NEW: Clear admin cookie on logout
     return res.json({ success: true, message: 'Logged out' });
   } catch (err) {
     console.error('Logout error', err);
     clearRefreshCookie(res);
+    clearAdminTokenCookie(res);  // NEW: Clear admin cookie on error
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }

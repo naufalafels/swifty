@@ -155,6 +155,7 @@ const ProfilePage = () => {
     };
 
     const load = async () => {
+      console.log('Loading data');  // DEBUG
       setLoading(true);
       try {
         const [meRes, statsData] = await Promise.allSettled([
@@ -164,6 +165,7 @@ const ProfilePage = () => {
 
         if (meRes.status === 'fulfilled') {
           const profile = meRes.value?.data?.user ?? meRes.value?.data ?? null;
+          console.log('Fetched user KYC status:', profile?.kyc?.status);  // DEBUG
           if (mounted) {
             setUser(profile);
             setPersonalForm({
@@ -203,8 +205,16 @@ const ProfilePage = () => {
 
     load();
 
+    // Add refetch on window focus to update after external changes (e.g., admin approval)
+    const handleFocus = () => {
+      console.log('Window focused, reloading data');  // DEBUG
+      load();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       mounted = false;
+      window.removeEventListener('focus', handleFocus);
       if (addressDebounce.current) clearTimeout(addressDebounce.current);
       if (addressAbort.current) addressAbort.current.abort();
     };
@@ -296,7 +306,7 @@ const ProfilePage = () => {
     setIsEditModalOpen(false);
   };
 
-    const submitKyc = async (e) => {
+  const submitKyc = async (e) => {
     e.preventDefault();
     if (!kycForm.idNumber || !kycForm.frontFile) {
       toast.error('ID number and front image are required');
@@ -478,77 +488,180 @@ const ProfilePage = () => {
         <div className="flex items-center gap-2 text-white text-lg font-semibold">
           <FaIdCard className="text-emerald-400" /> Identity Verification
         </div>
-        <form className="space-y-3" onSubmit={submitKyc}>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-sm text-slate-200">
-              ID Type
-              <select
-                value={kycForm.idType}
-                onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })}
-                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+        {user?.kyc?.status === 'approved' ? (
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold">
+              <FaCheckCircle /> Approved
+            </div>
+            <p className="text-xs text-slate-400">
+              Your identity has been verified. You can now host cars and book without restrictions.
+            </p>
+          </div>
+        ) : user?.kyc?.status === 'pending' ? (
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold">
+              <FaTimesCircle /> Pending Review
+            </div>
+            <p className="text-xs text-slate-400">
+              Your submission is under review by our admin team. You'll be notified once processed.
+            </p>
+          </div>
+        ) : user?.kyc?.status === 'rejected' ? (
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold">
+              <FaTimesCircle /> Rejected
+            </div>
+            <p className="text-xs text-slate-400">
+              Reason: {user.kyc.statusReason || 'Contact support for details.'}
+            </p>
+            <p className="text-xs text-slate-400">
+              Please resubmit with corrected information.
+            </p>
+            <form className="space-y-3" onSubmit={submitKyc}>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="text-sm text-slate-200">
+                  ID Type
+                  <select
+                    value={kycForm.idType}
+                    onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })}
+                    className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  >
+                    <option>NRIC</option>
+                    <option>Passport</option>
+                  </select>
+                </label>
+                <label className="text-sm text-slate-200">
+                  {kycForm.idType === 'NRIC' ? 'NRIC Number' : 'Passport Number'}
+                  <input
+                    value={kycForm.idNumber}
+                    onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })}
+                    className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                    placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="text-sm text-slate-200 flex flex-col gap-2">
+                  Upload Front (jpeg, jpg, png, pdf)
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
+                      <FaCloudUploadAlt /> Choose file
+                      <input
+                        type="file"
+                        accept=".jpeg,.jpg,.png,.pdf"
+                        className="hidden"
+                        onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
+                      />
+                    </label>
+                    <PreviewThumb file={kycForm.frontFile} />
+                  </div>
+                </label>
+
+                <label className="text-sm text-slate-200 flex flex-col gap-2">
+                  Upload Back (jpeg, jpg, png, pdf)
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
+                      <FaCloudUploadAlt /> Choose file
+                      <input
+                        type="file"
+                        accept=".jpeg,.jpg,.png,.pdf"
+                        className="hidden"
+                        onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
+                      />
+                    </label>
+                    <PreviewThumb file={kycForm.backFile} />
+                  </div>
+                </label>
+              </div>
+
+              <div className="text-xs text-slate-400">
+                On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingKyc}
+                className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2 disabled:opacity-70"
               >
-                <option>NRIC</option>
-                <option>Passport</option>
-              </select>
-            </label>
-            <label className="text-sm text-slate-200">
-              {kycForm.idType === 'NRIC' ? 'NRIC Number' : 'Passport Number'}
-              <input
-                value={kycForm.idNumber}
-                onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })}
-                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
-                placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'}
-                required
-              />
-            </label>
+                <FaCheckCircle /> {submittingKyc ? 'Submitting…' : 'Resubmit for verification'}
+              </button>
+            </form>
           </div>
+        ) : (
+          <form className="space-y-3" onSubmit={submitKyc}>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-sm text-slate-200">
+                ID Type
+                <select
+                  value={kycForm.idType}
+                  onChange={(e) => setKycForm({ ...kycForm, idType: e.target.value })}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option>NRIC</option>
+                  <option>Passport</option>
+                </select>
+              </label>
+              <label className="text-sm text-slate-200">
+                {kycForm.idType === 'NRIC' ? 'NRIC Number' : 'Passport Number'}
+                <input
+                  value={kycForm.idNumber}
+                  onChange={(e) => setKycForm({ ...kycForm, idNumber: e.target.value })}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder={kycForm.idType === 'NRIC' ? '111111223333' : 'A123456'}
+                  required
+                />
+              </label>
+            </div>
 
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-sm text-slate-200 flex flex-col gap-2">
-              Upload Front (jpeg, jpg, png, pdf)
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
-                  <FaCloudUploadAlt /> Choose file
-                  <input
-                    type="file"
-                    accept=".jpeg,.jpg,.png,.pdf"
-                    className="hidden"
-                    onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
-                  />
-                </label>
-                <PreviewThumb file={kycForm.frontFile} />
-              </div>
-            </label>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-sm text-slate-200 flex flex-col gap-2">
+                Upload Front (jpeg, jpg, png, pdf)
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
+                    <FaCloudUploadAlt /> Choose file
+                    <input
+                      type="file"
+                      accept=".jpeg,.jpg,.png,.pdf"
+                      className="hidden"
+                      onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
+                    />
+                  </label>
+                  <PreviewThumb file={kycForm.frontFile} />
+                </div>
+              </label>
 
-            <label className="text-sm text-slate-200 flex flex-col gap-2">
-              Upload Back (jpeg, jpg, png, pdf)
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
-                  <FaCloudUploadAlt /> Choose file
-                  <input
-                    type="file"
-                    accept=".jpeg,.jpg,.png,.pdf"
-                    className="hidden"
-                    onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
-                  />
-                </label>
-                <PreviewThumb file={kycForm.backFile} />
-              </div>
-            </label>
-          </div>
+              <label className="text-sm text-slate-200 flex flex-col gap-2">
+                Upload Back (jpeg, jpg, png, pdf)
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer">
+                    <FaCloudUploadAlt /> Choose file
+                    <input
+                      type="file"
+                      accept=".jpeg,.jpg,.png,.pdf"
+                      className="hidden"
+                      onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
+                    />
+                  </label>
+                  <PreviewThumb file={kycForm.backFile} />
+                </div>
+              </label>
+            </div>
 
-          <div className="text-xs text-slate-400">
-            On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
-          </div>
+            <div className="text-xs text-slate-400">
+              On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
+            </div>
 
-          <button
-            type="submit"
-            disabled={submittingKyc}
-            className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2 disabled:opacity-70"
-          >
-            <FaCheckCircle /> {submittingKyc ? 'Submitting…' : 'Submit for verification'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={submittingKyc}
+              className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2 disabled:opacity-70"
+            >
+              <FaCheckCircle /> {submittingKyc ? 'Submitting…' : 'Submit for verification'}
+            </button>
+          </form>
+        )}
       </div>
 
       {loading ? <div className="text-slate-200">Loading profile...</div> : null}

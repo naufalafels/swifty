@@ -87,6 +87,7 @@ const Verification = () => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Full Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Number</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pictures</th>
               {isHost && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center gap-2">
@@ -102,7 +103,7 @@ const Verification = () => {
               <tr>
                 <td
                   className="px-6 py-6 text-center text-sm text-gray-500"
-                  colSpan={isHost ? 5 : 4}
+                  colSpan={isHost ? 6 : 5}
                 >
                   No records found.
                 </td>
@@ -112,6 +113,7 @@ const Verification = () => {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 font-medium text-gray-900">{item.fullName}</td>
                 <td className="px-6 py-4 text-gray-700">{item.idNumber}</td>
+                <td className="px-6 py-4 text-gray-700 capitalize">{item.kycStatus}</td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-2">
                     {item.pictures?.map((pic, idx) => (
@@ -153,14 +155,16 @@ const Verification = () => {
                 <td className="px-6 py-4 space-x-2">
                   <button
                     onClick={() => handleAction(item.id, type, 'approve')}
-                    className="inline-flex items-center gap-1 rounded bg-green-500 px-3 py-1 text-sm font-semibold text-white hover:bg-green-400"
+                    disabled={item.kycStatus !== 'pending'}
+                    className="inline-flex items-center gap-1 rounded bg-green-500 px-3 py-1 text-sm font-semibold text-white hover:bg-green-400 disabled:opacity-60"
                   >
                     <CheckCircle size={16} />
                     Approve
                   </button>
                   <button
                     onClick={() => handleAction(item.id, type, 'reject')}
-                    className="inline-flex items-center gap-1 rounded bg-red-500 px-3 py-1 text-sm font-semibold text-white hover:bg-red-400"
+                    disabled={item.kycStatus !== 'pending'}
+                    className="inline-flex items-center gap-1 rounded bg-red-500 px-3 py-1 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-60"
                   >
                     <XCircle size={16} />
                     Reject

@@ -296,7 +296,7 @@ const ProfilePage = () => {
     setIsEditModalOpen(false);
   };
 
-  const submitKyc = async (e) => {
+    const submitKyc = async (e) => {
     e.preventDefault();
     if (!kycForm.idNumber || !kycForm.frontFile) {
       toast.error('ID number and front image are required');
@@ -314,6 +314,11 @@ const ProfilePage = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success('Identity submitted to Admin');
+      
+      // Refetch user data to update local state
+      const userRes = await api.get('/api/auth/me');
+      setUser(userRes.data.user);
+      authService.setCurrentUser(userRes.data.user);
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to submit identity');
     } finally {

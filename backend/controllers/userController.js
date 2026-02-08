@@ -398,6 +398,37 @@ export async function submitKycMultipart(req, res) {
   }
 }
 
+// Renter: submit KYC (JSON, no files - for KycPage.jsx)
+export async function submitKyc(req, res) {
+  try {
+    const { idType = 'passport', idNumber = '', idCountry = 'MY', frontImageUrl = '', backImageUrl = '' } = req.body || {};
+    if (!idNumber.trim()) return res.status(400).json({ success: false, message: 'idNumber required' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    user.kyc = {
+      ...(user.kyc || {}),
+      idType: String(idType).toLowerCase(),
+      idNumber: idNumber.trim(),
+      idCountry: idCountry || 'MY',
+      frontImageUrl: frontImageUrl.trim(),
+      backImageUrl: backImageUrl.trim(),
+      status: 'pending',
+      statusReason: '',
+      submittedAt: new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
+    };
+
+    await user.save();
+    return res.json({ success: true, message: 'KYC submitted', kyc: user.kyc });
+  } catch (err) {
+    console.error('submitKyc error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
 // Renter: get own KYC
 export async function getKyc(req, res) {
   try {

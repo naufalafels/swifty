@@ -6,6 +6,7 @@ import {
   logout,
   me,
   submitKycMultipart,
+  submitKyc,
   getKyc,
   becomeHost,
   hostGetRenterKyc,
@@ -41,6 +42,7 @@ userRouter.post(
   ]),
   submitKycMultipart
 );
+userRouter.post('/kyc', authMiddleware, submitKyc);  // Added for JSON submission
 userRouter.get('/kyc', authMiddleware, getKyc);
 
 // Protected: become host

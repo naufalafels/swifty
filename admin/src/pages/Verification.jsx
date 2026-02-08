@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { CheckCircle, XCircle, Eye, WalletCards } from 'lucide-react';
+import { getAdminToken } from '../utils/auth';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
@@ -11,8 +12,9 @@ const Verification = () => {
   const [activeTab, setActiveTab] = useState('users');
   const [payoutEdits, setPayoutEdits] = useState({});
   const [savingPayout, setSavingPayout] = useState({});
+  const [selectedImage, setSelectedImage] = useState(null);
 
-  const authHeader = { Authorization: `Bearer ${localStorage.getItem('adminToken')}` };
+  const authHeader = { Authorization: `Bearer ${getAdminToken()}` };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -117,7 +119,8 @@ const Verification = () => {
                         key={idx}
                         src={pic}
                         alt="ID"
-                        className="w-16 h-16 object-cover rounded border"
+                        className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80"
+                        onClick={() => setSelectedImage(pic)}
                       />
                     ))}
                     {!item.pictures?.length && (
@@ -214,6 +217,21 @@ const Verification = () => {
           )}
         </div>
       </div>
+
+      {/* Image Zoom Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
+          <div className="relative max-w-4xl max-h-full p-4">
+            <img src={selectedImage} alt="Zoomed ID" className="max-w-full max-h-full object-contain" />
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute top-2 right-2 bg-white text-black rounded-full p-2 text-xl font-bold hover:bg-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

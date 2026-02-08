@@ -11,6 +11,7 @@ const formatUser = (u) => ({
   kycStatus: u.kyc?.status || u.verificationStatus || 'pending',
   payoutReference: u.payoutReference || '',
   documents: u.documents || [],
+  pictures: [u.kyc?.frontImageUrl, u.kyc?.backImageUrl].filter(Boolean),  // Added pictures array with front/back URLs
   kyc: u.kyc || {},
 });
 

@@ -373,6 +373,8 @@ export async function submitKycMultipart(req, res) {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    console.log('User before save:', user.kyc);  // DEBUG: Check current KYC
+
     const frontFile = req.files?.frontImage?.[0];
     const backFile = req.files?.backImage?.[0];
 
@@ -390,10 +392,13 @@ export async function submitKycMultipart(req, res) {
       reviewedBy: null,
     };
 
+    console.log('User after update:', user.kyc);  // DEBUG: Check updated KYC
     await user.save();
+    console.log('User saved successfully');  // DEBUG: Confirm save
+
     return res.json({ success: true, kyc: user.kyc });
   } catch (err) {
-    console.error('submitKycMultipart error', err);
+    console.error('submitKycMultipart error', err);  // DEBUG: Full error details
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }

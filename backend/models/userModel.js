@@ -36,13 +36,13 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["user", "customer", "company_admin", "superadmin", "guest"],  // Added "customer" to allow registration
+      enum: ["user", "customer", "company_admin", "superadmin", "guest"],  // Added "customer"
       default: "user",
     },
 
     roles: {
       type: [String],
-      enum: ["renter", "host", "admin", "company_admin"],  // Added "company_admin" to allow admin roles
+      enum: ["renter", "host", "admin", "company_admin"],  // Added "company_admin"
       default: ["renter"],
     },
 

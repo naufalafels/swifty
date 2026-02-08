@@ -19,6 +19,8 @@ import ProfilePrivacyPage from './pages/ProfilePrivacyPage';
 import PaymentResultPage from './pages/PaymentResultPage';
 import * as authService from './utils/authService';
 import CookieConsent from './components/CookieConsent';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // PROTECTED ROUTE that supports async token refresh on page load
 const ProtectedRoute = ({ children }) => {
@@ -193,6 +195,9 @@ const App = () => {
           <FaArrowUp />
         </button>
       )}
+
+      {/* Add ToastContainer for global toasts */}
+      <ToastContainer />
 
       {/* Cookie consent banner */}
       <CookieConsent />

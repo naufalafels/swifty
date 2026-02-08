@@ -375,6 +375,10 @@ const ProfilePage = () => {
 
   const handleHostNavigate = () => {
     if (loading) return;
+    if (!isVerified) {
+      toast.error('You must be verified to become a host.');
+      return;
+    }
     navigate(isHost ? '/host/dashboard' : '/host/onboard');
   };
 

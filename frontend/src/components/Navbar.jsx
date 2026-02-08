@@ -6,6 +6,7 @@ import logo from "../assets/swifty-logo.png";
 import { navbarStyles as styles } from "../assets/dummyStyles.js";
 import api from "../utils/api";
 import * as authService from "../utils/authService";
+import { toast } from 'react-toastify';  // Added for notifications
 import io from "socket.io-client";
 
 const ME_ENDPOINT = "/api/auth/me";
@@ -177,10 +178,13 @@ const Navbar = () => {
   };
 
   const isHost = Array.isArray(user?.roles) && user.roles.includes("host");
+  const isVerified = !!user?.kyc?.status && user.kyc.status === 'approved';  // Added verification check
 
   const goHost = () => {
     if (!isLoggedIn) {
       navigate("/login", { replace: false, state: { from: "/host/dashboard" } });
+    } else if (!isVerified) {
+      toast.error('You must be verified to become a host.');  // Added toast for unverified
     } else if (isHost) {
       navigate("/host/dashboard");
     } else {

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe } from 'react-icons/fa';
+import React, { useRef, useState } from 'react';
+import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe, FaInfoCircle } from 'react-icons/fa';
 import * as authService from '../utils/authService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -37,13 +37,64 @@ const HostOnboardPage = () => {
     useCoords: false,
   });
 
+  const [floaty, setFloaty] = useState('');
+  const floatyTimerRef = useRef(null);
+
   const searchBoxRef = useRef(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-  const next = () => setStep((s) => Math.min(3, s + 1));
+  const isEmpty = (v) => !v || String(v).trim() === '';
+
+  const showFloaty = (msg) => {
+    setFloaty(msg);
+    if (floatyTimerRef.current) clearTimeout(floatyTimerRef.current);
+    floatyTimerRef.current = setTimeout(() => setFloaty(''), 4000);
+  };
+
+  const validateStep1 = () => {
+    const missing = [];
+    if (isEmpty(company.companyName)) missing.push('Company name');
+    if (isEmpty(company.ssmNumber)) missing.push('SSM number');
+    if (isEmpty(company.nricNumber)) missing.push('NRIC number');
+    if (isEmpty(company.payoutAccountRef)) missing.push('Payout account reference');
+    if (missing.length) {
+      const msg = 'Complete first step before moving on';
+      toast.error(`Step 1: ${missing.join(', ')}`);
+      showFloaty(msg);
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+    const missing = [];
+    if (isEmpty(vehicle.make)) missing.push('Make');
+    if (isEmpty(vehicle.model)) missing.push('Model');
+    if (isEmpty(vehicle.year)) missing.push('Manufactured year');
+    if (isEmpty(vehicle.dailyRate)) missing.push('Daily rate');
+    if (isEmpty(vehicle.seats)) missing.push('Seats');
+    if (isEmpty(vehicle.shiftType)) missing.push('Shift type');
+    if (isEmpty(vehicle.fuel)) missing.push('Fuel');
+    if (isEmpty(vehicle.carType)) missing.push('Car type');
+    if (missing.length) {
+      const msg = 'Complete vehicle step before publishing';
+      toast.error(`Step 2: ${missing.join(', ')}`);
+      showFloaty(msg);
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
+    setStep((s) => Math.min(3, s + 1));
+  };
+
   const prev = () => setStep((s) => Math.max(1, s - 1));
 
   const publish = async () => {
+    if (!validateStep2()) return; // gate publish on step 2 completeness
     setLoading(true);
     try {
       await authService.becomeHost({
@@ -66,7 +117,6 @@ const HostOnboardPage = () => {
     if (!places || places.length === 0) return;
     const place = places[0];
     const formatted = place.formatted_address || place.name || '';
-    const comps = place.address_components || [];
     let lat = '';
     let lng = '';
     if (place.geometry?.location) {
@@ -191,7 +241,7 @@ const HostOnboardPage = () => {
             />
           </label>
 
-          {/* Company Location (mirrors Cars page approach) */}
+          {/* Company Location */}
           <div className="border border-slate-800 rounded-xl p-4 bg-slate-950/70 space-y-3">
             <div className="text-sm text-white font-semibold flex items-center gap-2">
               <FaMapMarkerAlt className="text-emerald-400" /> Company Location
@@ -404,7 +454,7 @@ const HostOnboardPage = () => {
         </button>
         {step < 3 ? (
           <button
-            onClick={next}
+            onClick={handleNext}
             className="px-4 py-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center gap-2"
           >
             Next <FaChevronRight />
@@ -419,6 +469,14 @@ const HostOnboardPage = () => {
           </button>
         )}
       </div>
+
+      {floaty && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <div className="bg-amber-400 text-slate-900 rounded-full shadow-lg px-4 py-2 text-sm font-semibold flex items-center gap-2">
+            <FaInfoCircle /> {floaty}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

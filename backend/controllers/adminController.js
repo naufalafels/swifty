@@ -271,23 +271,44 @@ export const updateCompanyProfile = async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
 };
 
-// NEW: KYC list for admin
-import Kyc from '../models/kycModel.js'; // Assuming Kyc model exists
+// UPDATED: KYC list for admin - Fetch from User model
 import { generateDownloadUrl } from '../services/s3Service.js';
 import { decrypt } from '../services/cryptoService.js';
 
 export const getKycList = async (req, res) => {
   try {
-    const kycList = await Kyc.find({}).populate('userId', 'name').lean();
-    const result = await Promise.all(kycList.map(async (kyc) => ({
-      id: kyc._id,
-      userId: kyc.userId,
-      fullName: kyc.userId ? kyc.userId.name : 'Unknown',
-      idNumber: kyc.idNumber ? decrypt(kyc.idNumber) : 'N/A',
-      status: kyc.status || 'pending',
-      frontImageUrl: kyc.frontKey ? await generateDownloadUrl(kyc.frontKey) : null,
-      backImageUrl: kyc.backKey ? await generateDownloadUrl(kyc.backKey) : null,
-    })));
+    const users = await User.find({ 'kyc.status': { $exists: true } }).lean();
+    const result = await Promise.all(users.map(async (user) => {
+      const kyc = user.kyc || {};
+      let frontUrl = null;
+      try {
+        frontUrl = kyc.frontImageUrl ? await generateDownloadUrl(kyc.frontImageUrl) : null;
+      } catch (err) {
+        console.error('Error generating front URL for user', user._id, err);
+      }
+      let backUrl = null;
+      try {
+        backUrl = kyc.backImageUrl ? await generateDownloadUrl(kyc.backImageUrl) : null;
+      } catch (err) {
+        console.error('Error generating back URL for user', user._id, err);
+      }
+      let idNum = 'N/A';
+      try {
+        idNum = kyc.idNumber ? decrypt(kyc.idNumber) : 'N/A';
+      } catch (err) {
+        console.error('Error decrypting idNumber for user', user._id, err);
+        idNum = kyc.idNumber || 'N/A';  // Return original if decrypt fails
+      }
+      return {
+        id: user._id,
+        userId: user._id,
+        fullName: user.name,
+        idNumber: idNum,
+        status: kyc.status || 'pending',
+        frontImageUrl: frontUrl,
+        backImageUrl: backUrl,
+      };
+    }));
     res.json(result);
   } catch (err) {
     console.error('getKycList error', err);
@@ -298,12 +319,14 @@ export const getKycList = async (req, res) => {
 export const approveKyc = async (req, res) => {
   try {
     const { id } = req.params;
-    const kyc = await Kyc.findById(id);
-    if (!kyc) return res.status(404).json({ message: 'KYC not found' });
-    kyc.status = 'approved';
-    await kyc.save();
-    // Update user roles to include 'host'
-    await User.findByIdAndUpdate(kyc.userId, { $addToSet: { roles: 'host' } });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'approved';
+    user.kyc.reviewedAt = new Date();
+    // Add 'host' role
+    user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+    await user.save();
     res.json({ message: 'Approved' });
   } catch (err) {
     console.error('approveKyc error', err);
@@ -315,11 +338,13 @@ export const rejectKyc = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
-    const kyc = await Kyc.findById(id);
-    if (!kyc) return res.status(404).json({ message: 'KYC not found' });
-    kyc.status = 'rejected';
-    kyc.statusReason = reason || 'Rejected by admin';
-    await kyc.save();
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'rejected';
+    user.kyc.statusReason = reason || 'Rejected by admin';
+    user.kyc.reviewedAt = new Date();
+    await user.save();
     res.json({ message: 'Rejected' });
   } catch (err) {
     console.error('rejectKyc error', err);

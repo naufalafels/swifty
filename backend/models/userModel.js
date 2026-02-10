@@ -19,12 +19,11 @@ const kycSubSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// NEW: Pre-save hook to encrypt idNumber
-kycSubSchema.pre('save', function (next) {
-  if (this.idNumber && !this.idNumber.includes(':')) {  // Encrypt only if not already encrypted
+// NEW: Pre-save hook to encrypt idNumber (synchronous for subdocs)
+kycSubSchema.pre('save', function () {  // REMOVED: next parameter
+  if (this.idNumber && !this.idNumber.includes(':')) {
     this.idNumber = encrypt(this.idNumber);
   }
-  next();
 });
 
 // NEW: Post-find hooks to decrypt idNumber (for queries)

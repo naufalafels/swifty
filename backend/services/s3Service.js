@@ -2,6 +2,11 @@ import { S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 
+// DEBUG: Check env vars
+console.log('S3Service: AWS_REGION =', process.env.AWS_REGION);
+console.log('S3Service: AWS_ACCESS_KEY_ID set =', !!process.env.AWS_ACCESS_KEY_ID);
+console.log('S3Service: AWS_SECRET_ACCESS_KEY set =', !!process.env.AWS_SECRET_ACCESS_KEY);
+
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {

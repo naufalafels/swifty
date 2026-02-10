@@ -28,7 +28,8 @@ import profileRouter from './routes/profileRoutes.js';
 
 import { generalLimiter } from './middlewares/rateLimit.js';
 import authMiddleware from './middlewares/auth.js';
-import { uploadKyc, handleS3Upload } from './middlewares/uploadKyc.js';  // UPDATED
+import { uploadKyc } from './middlewares/uploadKyc.js';  // Keep if used elsewhere
+// REMOVED: handleS3Upload (not needed for client-side upload)
 import { submitKycMultipart } from './controllers/userController.js';
 
 const app = express();
@@ -109,15 +110,10 @@ app.use('/api/host', hostRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/reviews', reviewRouter);
 
-// UPDATED: KYC route with S3 handling
+// UPDATED: KYC route (client-side S3 upload, no files/multer)
 app.post(
   '/api/kyc/submit',
   authMiddleware,
-  uploadKyc.fields([  // ADDED: .fields() since uploadKyc is the instance
-    { name: 'frontImage', maxCount: 1 },
-    { name: 'backImage', maxCount: 1 },
-  ]),
-  handleS3Upload,  // NEW: S3 upload middleware
   submitKycMultipart
 );
 

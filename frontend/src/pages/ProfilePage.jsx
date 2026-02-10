@@ -311,27 +311,27 @@ const ProfilePage = () => {
 
   // UPDATED: Upload to S3 and submit KYC
   const uploadToS3 = async () => {
-  try {
-    const res = await api.get('/auth/kyc/upload-urls');  // FIXED: Add /auth prefix
-    const { urls, keys } = res.data;
+    try {
+      const res = await api.get('/api/auth/kyc/upload-urls');  // FIXED: Correct path
+      const { urls, keys } = res.data;
 
-    await Promise.all([
-      api.put(urls.front, kycForm.frontImage, {
-        headers: { 'Content-Type': kycForm.frontImage.type },
-      }),
-      api.put(urls.back, kycForm.backImage, {
-        headers: { 'Content-Type': kycForm.backImage.type },
-      }),
-    ]);
+      await Promise.all([
+        api.put(urls.front, kycForm.frontImage, {
+          headers: { 'Content-Type': kycForm.frontImage.type },
+        }),
+        api.put(urls.back, kycForm.backImage, {
+          headers: { 'Content-Type': kycForm.backImage.type },
+        }),
+      ]);
 
-    setKycForm({ ...kycForm, frontKey: keys.front, backKey: keys.back });
-    return true;
-  } catch (err) {
-    console.error('Upload failed', err);
-    toast.error('Upload failed');
-    return false;
-  }
-};
+      setKycForm({ ...kycForm, frontKey: keys.front, backKey: keys.back });
+      return true;
+    } catch (err) {
+      console.error('Upload failed', err);
+      toast.error('Upload failed');
+      return false;
+    }
+  };
 
   const submitKyc = async (e) => {
     e.preventDefault();
@@ -345,7 +345,7 @@ const ProfilePage = () => {
       const uploaded = await uploadToS3();
       if (!uploaded) return;
 
-      await api.post('/api/kyc/submit', {
+      await api.post('/api/auth/kyc/submit', {  // FIXED: Correct path
         idType: kycForm.idType,
         idNumber: kycForm.idNumber,
         idCountry: 'MY',

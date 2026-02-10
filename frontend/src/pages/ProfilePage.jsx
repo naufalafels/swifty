@@ -317,14 +317,20 @@ const ProfilePage = () => {
 
       await Promise.all([
         api.put(urls.front, kycForm.frontImage, {
-          headers: { 'Content-Type': kycForm.frontImage.type },
-          withCredentials: false,
-        }),
-        api.put(urls.back, kycForm.backImage, {
-          headers: { 'Content-Type': kycForm.backImage.type },
-          withCredentials: false,
-        }),
-      ]);
+        headers: {
+          'Content-Type': kycForm.frontImage.type,
+          'x-amz-server-side-encryption': 'AES256',
+        },
+        withCredentials: false,
+      }),
+      api.put(urls.back, kycForm.backImage, {
+      headers: {
+        'Content-Type': kycForm.backImage.type,
+        'x-amz-server-side-encryption': 'AES256',
+        },
+        withCredentials: false,
+      }),
+    ]);
 
       setKycForm({ ...kycForm, frontKey: keys.front, backKey: keys.back });
       return true;

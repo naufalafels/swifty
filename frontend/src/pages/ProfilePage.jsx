@@ -318,9 +318,11 @@ const ProfilePage = () => {
       await Promise.all([
         api.put(urls.front, kycForm.frontImage, {
           headers: { 'Content-Type': kycForm.frontImage.type },
+          withCredentials: false,
         }),
         api.put(urls.back, kycForm.backImage, {
           headers: { 'Content-Type': kycForm.backImage.type },
+          withCredentials: false,
         }),
       ]);
 
@@ -759,7 +761,7 @@ const ProfilePage = () => {
                   />
                   <div className="text-[11px] text-slate-500 mt-1">Powered by Google Places proxy. Select a suggestion or use fallback fields.</div>
                   {placesLoading && <div className="text-[11px] text-slate-500 mt-1">Searching…</div>}
-                  {placesError && <div className="text-[11px] text-rose-500 mt-1">{placesError}</div>}
+                  {placesError && <div className="text-[11px] text-slate-500 mt-1">{placesError}</div>}
                   {addressSuggestions.length > 0 && (
                     <div className="mt-2 max-h-48 overflow-auto border border-slate-200 rounded-md bg-white shadow">
                       {addressSuggestions.map((s) => (

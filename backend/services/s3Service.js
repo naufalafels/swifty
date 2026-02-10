@@ -19,6 +19,7 @@ export async function generateUploadUrl(key, contentType, expiresIn = 900) {
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
+    ServerSideEncryption: 'AES256',  // Add for encrypted buckets
     // ContentType removed to avoid signed header mismatch
   });
   const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });

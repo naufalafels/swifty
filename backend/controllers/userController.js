@@ -468,6 +468,29 @@ export async function getKyc(req, res) {
   }
 }
 
+// Get signed upload URLs for KYC
+export async function getKycUploadUrls(req, res) {
+  try {
+    const userId = req.user.id;
+    const frontKey = `kyc/${userId}/front-${Date.now()}.jpg`;
+    const backKey = `kyc/${userId}/back-${Date.now()}.jpg`;
+
+    const urls = {
+      front: await generateUploadUrl(frontKey, 'image/jpeg'),
+      back: await generateUploadUrl(backKey, 'image/jpeg'),
+    };
+    const keys = {
+      front: frontKey,
+      back: backKey,
+    };
+
+    res.json({ urls, keys });
+  } catch (err) {
+    console.error('Error generating upload URLs:', err);
+    res.status(500).json({ message: 'Failed to generate upload URLs' });
+  }
+}
+
 // Become a host
 export async function becomeHost(req, res) {
   try {

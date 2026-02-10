@@ -12,9 +12,10 @@ import {
   hostGetRenterKyc,
   updateProfile,
   verifyPassword,
+  getKycUploadUrls,  // ADD THIS
 } from '../controllers/userController.js';
 import authMiddleware from '../middlewares/auth.js';
-import { uploadKyc } from '../middlewares/uploadKyc.js';
+// REMOVE: import { uploadKyc } from '../middlewares/uploadKyc.js';
 import { loginLimiter } from '../middlewares/rateLimit.js';
 
 const userRouter = express.Router();
@@ -32,17 +33,10 @@ userRouter.get('/me', authMiddleware, me);
 userRouter.post('/verify-password', authMiddleware, verifyPassword);
 userRouter.put('/update-profile', authMiddleware, updateProfile);
 
-// Protected: renter KYC (multipart, matches frontend /api/kyc/submit)
-userRouter.post(
-  '/kyc/submit',
-  authMiddleware,
-  uploadKyc.fields([
-    { name: 'frontImage', maxCount: 1 },
-    { name: 'backImage', maxCount: 1 },
-  ]),
-  submitKycMultipart
-);
-userRouter.post('/kyc', authMiddleware, submitKyc);  // Added for JSON submission
+// Protected: renter KYC
+userRouter.get('/kyc/upload-urls', authMiddleware, getKycUploadUrls);  // ADD THIS
+userRouter.post('/kyc/submit', authMiddleware, submitKycMultipart);  // REMOVE uploadKyc.fields
+userRouter.post('/kyc', authMiddleware, submitKyc);  // JSON submission
 userRouter.get('/kyc', authMiddleware, getKyc);
 
 // Protected: become host

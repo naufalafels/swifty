@@ -309,30 +309,22 @@ const ProfilePage = () => {
     setIsEditModalOpen(false);
   };
 
-  // UPDATED: Upload to S3 and submit KYC
+  // UPDATED: Upload to backend then S3
   const uploadToS3 = async () => {
     try {
-      const res = await api.get('/api/auth/kyc/upload-urls');  // FIXED: Correct path
-      const { urls, keys } = res.data;
+      const formDataFront = new FormData();
+      formDataFront.append('file', kycForm.frontImage);
+      const frontRes = await api.post('/api/auth/kyc/upload', formDataFront, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
-      await Promise.all([
-        api.put(urls.front, kycForm.frontImage, {
-        headers: {
-          'Content-Type': kycForm.frontImage.type,
-          'x-amz-server-side-encryption': 'AES256',
-        },
-        withCredentials: false,
-      }),
-      api.put(urls.back, kycForm.backImage, {
-      headers: {
-        'Content-Type': kycForm.backImage.type,
-        'x-amz-server-side-encryption': 'AES256',
-        },
-        withCredentials: false,
-      }),
-    ]);
+      const formDataBack = new FormData();
+      formDataBack.append('file', kycForm.backImage);
+      const backRes = await api.post('/api/auth/kyc/upload', formDataBack, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
 
-      setKycForm({ ...kycForm, frontKey: keys.front, backKey: keys.back });
+      setKycForm({ ...kycForm, frontKey: frontRes.data.key, backKey: backRes.data.key });
       return true;
     } catch (err) {
       console.error('Upload failed', err);

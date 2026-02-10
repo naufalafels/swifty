@@ -31,6 +31,8 @@ import authMiddleware from './middlewares/auth.js';
 import { uploadKyc } from './middlewares/uploadKyc.js';  // Keep if used elsewhere
 // REMOVED: handleS3Upload (not needed for client-side upload)
 import { submitKycMultipart } from './controllers/userController.js';
+import multer from 'multer';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 const app = express();
 const PORT = process.env.PORT || 7889;
@@ -116,6 +118,29 @@ app.post(
   authMiddleware,
   submitKycMultipart
 );
+
+// NEW: Upload route for files to S3
+const s3Client = new S3Client({ region: 'ap-southeast-1' });
+const BUCKET_NAME = 'swifty-kyc-uploads';
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/auth/kyc/upload', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file' });
+    const key = `kyc/${req.user.id}/${Date.now()}-${req.file.originalname}`;
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    });
+    await s3Client.send(command);
+    res.json({ key });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Upload failed' });
+  }
+});
 
 // socket.io
 io.on('connection', (socket) => {

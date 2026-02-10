@@ -123,11 +123,14 @@ const ProfilePage = () => {
     live: '',
   });
 
+  // UPDATED: KYC form with S3 keys
   const [kycForm, setKycForm] = useState({
     idType: 'NRIC',
     idNumber: '',
-    frontFile: null,
-    backFile: null,
+    frontImage: null,
+    backImage: null,
+    frontKey: '',
+    backKey: '',
   });
 
   const [locked, setLocked] = useState({ phone: true, email: true });
@@ -306,26 +309,51 @@ const ProfilePage = () => {
     setIsEditModalOpen(false);
   };
 
+  // UPDATED: Upload to S3 and submit KYC
+  const uploadToS3 = async () => {
+  try {
+    const res = await api.get('/auth/kyc/upload-urls');  // FIXED: Add /auth prefix
+    const { urls, keys } = res.data;
+
+    await Promise.all([
+      api.put(urls.front, kycForm.frontImage, {
+        headers: { 'Content-Type': kycForm.frontImage.type },
+      }),
+      api.put(urls.back, kycForm.backImage, {
+        headers: { 'Content-Type': kycForm.backImage.type },
+      }),
+    ]);
+
+    setKycForm({ ...kycForm, frontKey: keys.front, backKey: keys.back });
+    return true;
+  } catch (err) {
+    console.error('Upload failed', err);
+    toast.error('Upload failed');
+    return false;
+  }
+};
+
   const submitKyc = async (e) => {
     e.preventDefault();
-    if (!kycForm.idNumber || !kycForm.frontFile) {
-      toast.error('ID number and front image are required');
+    if (!kycForm.idNumber || !kycForm.frontImage || !kycForm.backImage) {
+      toast.error('All fields required');
       return;
     }
-    const fd = new FormData();
-    fd.append('idType', kycForm.idType);
-    fd.append('idNumber', kycForm.idNumber);
-    if (kycForm.frontFile) fd.append('frontImage', kycForm.frontFile);
-    if (kycForm.backFile) fd.append('backImage', kycForm.backFile);
 
     setSubmittingKyc(true);
     try {
-      await api.post('/api/kyc/submit', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const uploaded = await uploadToS3();
+      if (!uploaded) return;
+
+      await api.post('/api/kyc/submit', {
+        idType: kycForm.idType,
+        idNumber: kycForm.idNumber,
+        idCountry: 'MY',
+        frontKey: kycForm.frontKey,
+        backKey: kycForm.backKey,
       });
       toast.success('Identity submitted to Admin');
-      
-      // Refetch user data to update local state
+
       const userRes = await api.get('/api/auth/me');
       setUser(userRes.data.user);
       authService.setCurrentUser(userRes.data.user);
@@ -387,7 +415,7 @@ const ProfilePage = () => {
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center px-4">
         <Navbar />
         <div className="max-w-md text-center space-y-4 mt-10">
-          <h1 className="text-2xl font-bold">You’re signed out</h1>
+          <h1 className="text-2xl font-bold">You're signed out</h1>
           <p className="text-slate-300">Please log in to view your profile and host centre.</p>
           <button
             onClick={() => navigate('/login')}
@@ -556,10 +584,10 @@ const ProfilePage = () => {
                         type="file"
                         accept=".jpeg,.jpg,.png,.pdf"
                         className="hidden"
-                        onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
+                        onChange={(e) => setKycForm({ ...kycForm, frontImage: e.target.files?.[0] || null })}
                       />
                     </label>
-                    <PreviewThumb file={kycForm.frontFile} />
+                    <PreviewThumb file={kycForm.frontImage} />
                   </div>
                 </label>
 
@@ -572,16 +600,16 @@ const ProfilePage = () => {
                         type="file"
                         accept=".jpeg,.jpg,.png,.pdf"
                         className="hidden"
-                        onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
+                        onChange={(e) => setKycForm({ ...kycForm, backImage: e.target.files?.[0] || null })}
                       />
                     </label>
-                    <PreviewThumb file={kycForm.backFile} />
+                    <PreviewThumb file={kycForm.backImage} />
                   </div>
                 </label>
               </div>
 
               <div className="text-xs text-slate-400">
-                On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
+                On submit, images are uploaded securely to S3, and keys are sent to Admin Verification.
               </div>
 
               <button
@@ -629,10 +657,10 @@ const ProfilePage = () => {
                       type="file"
                       accept=".jpeg,.jpg,.png,.pdf"
                       className="hidden"
-                      onChange={(e) => setKycForm({ ...kycForm, frontFile: e.target.files?.[0] || null })}
+                      onChange={(e) => setKycForm({ ...kycForm, frontImage: e.target.files?.[0] || null })}
                     />
                   </label>
-                  <PreviewThumb file={kycForm.frontFile} />
+                  <PreviewThumb file={kycForm.frontImage} />
                 </div>
               </label>
 
@@ -645,16 +673,16 @@ const ProfilePage = () => {
                       type="file"
                       accept=".jpeg,.jpg,.png,.pdf"
                       className="hidden"
-                      onChange={(e) => setKycForm({ ...kycForm, backFile: e.target.files?.[0] || null })}
+                      onChange={(e) => setKycForm({ ...kycForm, backImage: e.target.files?.[0] || null })}
                     />
                   </label>
-                  <PreviewThumb file={kycForm.backFile} />
+                  <PreviewThumb file={kycForm.backImage} />
                 </div>
               </label>
             </div>
 
             <div className="text-xs text-slate-400">
-              On submit, Legal Name, Email, ID type/number, and thumbnails are sent to Admin Verification.
+              On submit, images are uploaded securely to S3, and keys are sent to Admin Verification.
             </div>
 
             <button

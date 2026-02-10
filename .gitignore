@@ -28,3 +28,6 @@ uploads/
 .LSOverride
 # Temporary files
 *.tmp
+# SSL Certificates (self-signed for dev)
+key.pem
+cert.pem

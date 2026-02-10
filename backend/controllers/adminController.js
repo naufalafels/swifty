@@ -292,13 +292,17 @@ export const getKycList = async (req, res) => {
       } catch (err) {
         console.error('Error generating back URL for user', user._id, err);
       }
+      console.log('Processing user', user._id, 'ID', kyc.idNumber);
       let idNum = 'N/A';
       try {
         idNum = kyc.idNumber ? decrypt(kyc.idNumber) : 'N/A';
+        console.log('Decrypted to', idNum);
       } catch (err) {
-        console.error('Error decrypting idNumber for user', user._id, err);
-        idNum = kyc.idNumber || 'N/A';  // Return original if decrypt fails
+        console.error('Decrypt error for user', user._id, err);
+        idNum = kyc.idNumber || 'N/A';
+        console.log('Returning original', idNum);
       }
+      console.log('Front key', kyc.frontImageUrl);
       return {
         id: user._id,
         userId: user._id,

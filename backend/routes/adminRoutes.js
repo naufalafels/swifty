@@ -11,7 +11,10 @@ import {
   getAdminBookings,
   updateAdminBookingStatus,
   getCompanyProfile,
-  updateCompanyProfile
+  updateCompanyProfile,
+  getKycList,
+  approveKyc,
+  rejectKyc
 } from '../controllers/adminController.js';
 import { getAnalytics } from '../controllers/adminAnalyticsController.js';
 import { getAuditLogs, logAdminGeoLogin } from '../controllers/adminAuditController.js';
@@ -74,7 +77,7 @@ router.use(requireCompanyAdmin);
 // Cars
 router.get('/cars', getAdminCars);
 router.post('/cars', uploadCarImage.single('image'), createAdminCar);
-router.put('/cars/:id', uploadCarImage.single('image'), updateAdminCar);
+router.put('/cars/:id', updateAdminCar);
 router.delete('/cars/:id', deleteAdminCar);
 
 // Bookings
@@ -108,6 +111,11 @@ router.post('/verifications/hosts/:id/payout-reference', savePayoutReference);
 // KYC review
 router.get('/verification/kyc/pending', listPendingKyc);
 router.post('/verification/kyc/:id', reviewKyc);
+
+// NEW: KYC routes
+router.get('/kyc', getKycList);
+router.post('/kyc/:id/approve', approveKyc);
+router.post('/kyc/:id/reject', rejectKyc);
 
 // Refunds
 router.post('/refunds', processRefund);

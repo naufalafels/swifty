@@ -14,7 +14,7 @@ function getKey() {
  */
 export function encrypt(text) {
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipher(ALGORITHM, getKey());
+  const cipher = crypto.createCipheriv(ALGORITHM, getKey(), iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   return iv.toString('hex') + ':' + encrypted; // Store IV with encrypted data
@@ -22,13 +22,13 @@ export function encrypt(text) {
 
 /**
  * Decrypt a string.
- * @param {string} encryptedText - Encrypted text (hex format)
+ * @param {string} text - Encrypted text (hex format)
  * @returns {string} Decrypted plaintext
  */
 export function decrypt(encryptedText) {
   const [ivHex, encrypted] = encryptedText.split(':');
   const iv = Buffer.from(ivHex, 'hex');
-  const decipher = crypto.createDecipher(ALGORITHM, getKey());
+  const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   return decrypted;

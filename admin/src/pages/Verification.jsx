@@ -21,7 +21,7 @@ const Verification = () => {
     try {
       const [userRes, hostRes] = await Promise.all([
         axios.get(`${API_BASE}/api/admin/verifications/users`, { headers: authHeader }),
-        axios.get(`${API_BASE}/api/admin/verifications/hosts`, { headers: authHeader }),
+        axios.get(`${API_BASE}/api/admin/kyc`, { headers: authHeader }),
       ]);
       setUsers(userRes.data || []);
       setHosts(hostRes.data || []);
@@ -43,9 +43,10 @@ const Verification = () => {
   }, [fetchData]);
 
   const handleAction = async (id, type, action) => {
+    const endpoint = type === 'hosts' ? `/api/admin/kyc/${id}/${action}` : `/api/admin/verifications/${type}/${id}/${action}`;
     try {
       await axios.post(
-        `${API_BASE}/api/admin/verifications/${type}/${id}/${action}`,
+        `${API_BASE}${endpoint}`,
         {},
         { headers: authHeader }
       );
@@ -113,19 +114,26 @@ const Verification = () => {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 font-medium text-gray-900">{item.fullName}</td>
                 <td className="px-6 py-4 text-gray-700">{item.idNumber}</td>
-                <td className="px-6 py-4 text-gray-700 capitalize">{item.kycStatus}</td>
+                <td className="px-6 py-4 text-gray-700 capitalize">{item.status}</td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-2">
-                    {item.pictures?.map((pic, idx) => (
+                    {item.frontImageUrl && (
                       <img
-                        key={idx}
-                        src={pic}
-                        alt="ID"
+                        src={item.frontImageUrl}
+                        alt="Front"
                         className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80"
-                        onClick={() => setSelectedImage(pic)}
+                        onClick={() => setSelectedImage(item.frontImageUrl)}
                       />
-                    ))}
-                    {!item.pictures?.length && (
+                    )}
+                    {item.backImageUrl && (
+                      <img
+                        src={item.backImageUrl}
+                        alt="Back"
+                        className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80"
+                        onClick={() => setSelectedImage(item.backImageUrl)}
+                      />
+                    )}
+                    {!item.frontImageUrl && !item.backImageUrl && (
                       <span className="text-xs text-gray-500">No pictures</span>
                     )}
                   </div>
@@ -155,7 +163,7 @@ const Verification = () => {
                 <td className="px-6 py-4 space-x-2">
                   <button
                     onClick={() => handleAction(item.id, type, 'approve')}
-                    disabled={item.kycStatus !== 'pending'}
+                    disabled={item.status !== 'pending'}
                     className="inline-flex items-center gap-1 rounded bg-green-500 px-3 py-1 text-sm font-semibold text-white hover:bg-green-400 disabled:opacity-60"
                   >
                     <CheckCircle size={16} />
@@ -163,7 +171,7 @@ const Verification = () => {
                   </button>
                   <button
                     onClick={() => handleAction(item.id, type, 'reject')}
-                    disabled={item.kycStatus !== 'pending'}
+                    disabled={item.status !== 'pending'}
                     className="inline-flex items-center gap-1 rounded bg-red-500 px-3 py-1 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-60"
                   >
                     <XCircle size={16} />

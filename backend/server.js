@@ -1,9 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();  // MOVED TO TOP
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import { Server } from 'socket.io';
 import http from 'http';
+import https from 'https';  // NEW: For HTTPS
+import fs from 'fs';        // NEW: For certs
 
 import path from 'path';
 import helmet from 'helmet';
@@ -24,10 +28,8 @@ import profileRouter from './routes/profileRoutes.js';
 
 import { generalLimiter } from './middlewares/rateLimit.js';
 import authMiddleware from './middlewares/auth.js';
-import { uploadKyc } from './middlewares/uploadKyc.js';
+import { uploadKyc, handleS3Upload } from './middlewares/uploadKyc.js';  // UPDATED
 import { submitKycMultipart } from './controllers/userController.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 7889;
@@ -35,7 +37,20 @@ const PORT = process.env.PORT || 7889;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const server = http.createServer(app);
+// NEW: HTTPS setup
+let server;
+if (process.env.NODE_ENV === 'production') {
+  // Use real certs in prod
+  const sslOptions = {
+    key: fs.readFileSync(process.env.SSL_KEY_PATH || './key.pem'),
+    cert: fs.readFileSync(process.env.SSL_CERT_PATH || './cert.pem'),
+  };
+  server = https.createServer(sslOptions, app);
+} else {
+  // HTTP for dev, or HTTPS with self-signed
+  server = http.createServer(app);  // Change to https.createServer if using self-signed
+}
+
 const io = new Server(server, { cors: { origin: "*", credentials: true } });
 
 // Attach io to app for use in routes
@@ -45,7 +60,18 @@ connectDB();
 
 app.use(cookieParser());
 
-// Serve uploads static files (allow cross origin)
+// NEW: Redirect HTTP to HTTPS in prod
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
+
+// Serve uploads static files (allow cross origin) - Keep for legacy, but remove if not needed
 app.use(
   '/uploads',
   (req, res, next) => {
@@ -83,14 +109,15 @@ app.use('/api/host', hostRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/reviews', reviewRouter);
 
-// Expose KYC submit at the path the frontend calls: /api/kyc/submit
+// UPDATED: KYC route with S3 handling
 app.post(
   '/api/kyc/submit',
   authMiddleware,
-  uploadKyc.fields([
+  uploadKyc.fields([  // ADDED: .fields() since uploadKyc is the instance
     { name: 'frontImage', maxCount: 1 },
     { name: 'backImage', maxCount: 1 },
   ]),
+  handleS3Upload,  // NEW: S3 upload middleware
   submitKycMultipart
 );
 

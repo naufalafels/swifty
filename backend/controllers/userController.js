@@ -4,6 +4,8 @@ import validator from 'validator';
 import crypto from 'crypto';
 import User from '../models/userModel.js';
 import RefreshToken from '../models/refreshTokenModel.js';
+import { generateUploadUrl, generateDownloadUrl } from '../services/s3Service.js';  // NEW: S3 service
+import { encrypt } from '../services/cryptoService.js';  // NEW: Crypto service
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 dotenv.config();
@@ -87,7 +89,13 @@ function clearAdminTokenCookie(res) {
 
 function buildKycUrl(fileName) {
   if (!fileName) return '';
-  return `${SERVER_URL}/uploads/kyc/${fileName}`;
+  return `${SERVER_URL}/uploads/kyc/${fileName}`;  // Keep for legacy, but will be replaced
+}
+
+// NEW: Build signed URL for S3 key
+async function buildSignedKycUrl(s3Key) {
+  if (!s3Key) return '';
+  return await generateDownloadUrl(s3Key);
 }
 
 function userResponse(user) {
@@ -348,7 +356,7 @@ export async function updateProfile(req, res) {
     if (city !== undefined) user.city = String(city).trim();
     if (country !== undefined) user.country = String(country).trim();
     if (about !== undefined) user.about = String(about);
-
+    
     if (privacy && typeof privacy === 'object') {
       user.privacy = {
         showCity: privacy.showCity !== undefined ? !!privacy.showCity : user.privacy?.showCity ?? true,
@@ -364,7 +372,7 @@ export async function updateProfile(req, res) {
   }
 }
 
-// Renter: submit KYC (multipart with images)
+// UPDATED: submitKycMultipart - Use S3 and encrypt idNumber
 export async function submitKycMultipart(req, res) {
   try {
     const { idType = 'passport', idNumber = '', idCountry = 'MY' } = req.body || {};
@@ -376,13 +384,21 @@ export async function submitKycMultipart(req, res) {
     const frontFile = req.files?.frontImage?.[0];
     const backFile = req.files?.backImage?.[0];
 
+    // NEW: Encrypt idNumber
+    const encryptedIdNumber = encrypt(idNumber.trim());
+
+    // NEW: Generate S3 keys and signed upload URLs (but since files are already uploaded via middleware, store keys)
+    // Assuming middleware updates req with S3 keys
+    const frontKey = req.frontKey || '';  // Will be set by updated middleware
+    const backKey = req.backKey || '';
+
     user.kyc = {
       ...(user.kyc || {}),
       idType: String(idType).toLowerCase(),
-      idNumber: idNumber.trim(),
+      idNumber: encryptedIdNumber,  // Store encrypted
       idCountry: idCountry || 'MY',
-      frontImageUrl: frontFile ? buildKycUrl(frontFile.filename) : user.kyc?.frontImageUrl || '',
-      backImageUrl: backFile ? buildKycUrl(backFile.filename) : user.kyc?.backImageUrl || '',
+      frontImageUrl: frontKey,  // Store S3 key
+      backImageUrl: backKey,    // Store S3 key
       status: 'pending',
       statusReason: '',
       submittedAt: new Date(),
@@ -391,11 +407,11 @@ export async function submitKycMultipart(req, res) {
     };
 
     await user.save();
-    console.log('User saved successfully');  // DEBUG: Confirm save
+    console.log('User saved successfully');
 
     return res.json({ success: true, kyc: user.kyc });
   } catch (err) {
-    console.error('submitKycMultipart error', err);  // DEBUG: Full error details
+    console.error('submitKycMultipart error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
@@ -431,7 +447,7 @@ export async function submitKyc(req, res) {
   }
 }
 
-// Renter: get own KYC
+// UPDATED: getKyc - Return signed URLs
 export async function getKyc(req, res) {
   try {
     const userId = req.user?.id;
@@ -440,7 +456,12 @@ export async function getKyc(req, res) {
     const user = await User.findById(userId).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    return res.json({ success: true, kyc: user.kyc || { status: 'not_submitted' } });
+    const kyc = user.kyc || { status: 'not_submitted' };
+    // NEW: Generate signed URLs for images
+    if (kyc.frontImageUrl) kyc.frontImageUrl = await buildSignedKycUrl(kyc.frontImageUrl);
+    if (kyc.backImageUrl) kyc.backImageUrl = await buildSignedKycUrl(kyc.backImageUrl);
+
+    return res.json({ success: true, kyc });
   } catch (err) {
     console.error('getKyc error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -482,7 +503,7 @@ export async function becomeHost(req, res) {
   }
 }
 
-// Host: fetch renter KYC by userId
+// UPDATED: hostGetRenterKyc - Return signed URLs
 export async function hostGetRenterKyc(req, res) {
   try {
     const hostRoles = req.user?.roles || [];
@@ -498,13 +519,18 @@ export async function hostGetRenterKyc(req, res) {
     const renter = await User.findById(renterId).lean();
     if (!renter) return res.status(404).json({ success: false, message: 'User not found' });
 
+    const kyc = renter.kyc || { status: 'not_submitted' };
+    // NEW: Generate signed URLs
+    if (kyc.frontImageUrl) kyc.frontImageUrl = await buildSignedKycUrl(kyc.frontImageUrl);
+    if (kyc.backImageUrl) kyc.backImageUrl = await buildSignedKycUrl(kyc.backImageUrl);
+
     return res.json({
       success: true,
       renter: {
         id: renter._id,
         name: renter.name,
         email: renter.email,
-        kyc: renter.kyc || { status: 'not_submitted' },
+        kyc,
       },
     });
   } catch (err) {

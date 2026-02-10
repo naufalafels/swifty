@@ -1,14 +1,15 @@
 import mongoose from "mongoose";
+import { encrypt, decrypt } from '../services/cryptoService.js';  // NEW: Import crypto service
 
 const KYC_STATUSES = ["not_submitted", "pending", "approved", "rejected"];
 
 const kycSubSchema = new mongoose.Schema(
   {
     idType: { type: String, enum: ["passport", "nric"], default: "passport" },
-    idNumber: { type: String, default: "" },
+    idNumber: { type: String, default: "" },  // This will now store encrypted data
     idCountry: { type: String, default: "MY" },
-    frontImageUrl: { type: String, default: "" },
-    backImageUrl: { type: String, default: "" },
+    frontImageUrl: { type: String, default: "" },  // Store S3 key, not URL
+    backImageUrl: { type: String, default: "" },  // Store S3 key, not URL
     status: { type: String, enum: KYC_STATUSES, default: "not_submitted" },
     statusReason: { type: String, default: "" },
     submittedAt: { type: Date, default: null },
@@ -17,6 +18,29 @@ const kycSubSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+// NEW: Pre-save hook to encrypt idNumber
+kycSubSchema.pre('save', function (next) {
+  if (this.idNumber && !this.idNumber.includes(':')) {  // Encrypt only if not already encrypted
+    this.idNumber = encrypt(this.idNumber);
+  }
+  next();
+});
+
+// NEW: Post-find hooks to decrypt idNumber (for queries)
+kycSubSchema.post('find', function (docs) {
+  docs.forEach(doc => {
+    if (doc.idNumber && doc.idNumber.includes(':')) {
+      doc.idNumber = decrypt(doc.idNumber);
+    }
+  });
+});
+
+kycSubSchema.post('findOne', function (doc) {
+  if (doc && doc.idNumber && doc.idNumber.includes(':')) {
+    doc.idNumber = decrypt(doc.idNumber);
+  }
+});
 
 const hostProfileSchema = new mongoose.Schema(
   {

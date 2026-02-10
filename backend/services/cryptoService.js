@@ -35,10 +35,15 @@ export function decrypt(encryptedText) {
     decrypted += decipher.final('utf8');
     return decrypted;
   } else {
-    // Old format without IV
-    const decipher = crypto.createDecipher(ALGORITHM, getKey());
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    // Old format or plain: try to decrypt with fixed IV (for old encrypted), or return as plain
+    try {
+      const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), Buffer.alloc(16, 0));
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (err) {
+      // If decrypt fails (e.g., plain text), return original
+      return encryptedText;
+    }
   }
 }

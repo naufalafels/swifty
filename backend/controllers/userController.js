@@ -372,33 +372,25 @@ export async function updateProfile(req, res) {
   }
 }
 
-// UPDATED: submitKycMultipart - Use S3 and encrypt idNumber
+// UPDATED: submitKycMultipart - Accept keys in body
 export async function submitKycMultipart(req, res) {
   try {
-    const { idType = 'passport', idNumber = '', idCountry = 'MY' } = req.body || {};
+    const { idType = 'passport', idNumber = '', idCountry = 'MY', frontKey, backKey } = req.body || {};
     if (!idNumber.trim()) return res.status(400).json({ success: false, message: 'idNumber required' });
+    if (!frontKey || !backKey) return res.status(400).json({ success: false, message: 'frontKey and backKey required' });
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const frontFile = req.files?.frontImage?.[0];
-    const backFile = req.files?.backImage?.[0];
-
-    // NEW: Encrypt idNumber
     const encryptedIdNumber = encrypt(idNumber.trim());
-
-    // NEW: Generate S3 keys and signed upload URLs (but since files are already uploaded via middleware, store keys)
-    // Assuming middleware updates req with S3 keys
-    const frontKey = req.frontKey || '';  // Will be set by updated middleware
-    const backKey = req.backKey || '';
 
     user.kyc = {
       ...(user.kyc || {}),
       idType: String(idType).toLowerCase(),
-      idNumber: encryptedIdNumber,  // Store encrypted
+      idNumber: encryptedIdNumber,
       idCountry: idCountry || 'MY',
-      frontImageUrl: frontKey,  // Store S3 key
-      backImageUrl: backKey,    // Store S3 key
+      frontImageUrl: frontKey,
+      backImageUrl: backKey,
       status: 'pending',
       statusReason: '',
       submittedAt: new Date(),

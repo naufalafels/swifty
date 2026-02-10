@@ -468,17 +468,21 @@ export async function getKyc(req, res) {
   }
 }
 
-// Get signed upload URLs for KYC
 export async function getKycUploadUrls(req, res) {
   try {
     const userId = req.user.id;
+    console.log('Generating URLs for user:', userId);
     const frontKey = `kyc/${userId}/front-${Date.now()}.jpg`;
     const backKey = `kyc/${userId}/back-${Date.now()}.jpg`;
+    console.log('Front key:', frontKey);
+    console.log('Back key:', backKey);
 
     const urls = {
       front: await generateUploadUrl(frontKey, 'image/jpeg'),
       back: await generateUploadUrl(backKey, 'image/jpeg'),
     };
+    console.log('URLs generated successfully');
+
     const keys = {
       front: frontKey,
       back: backKey,

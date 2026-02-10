@@ -8,11 +8,7 @@ console.log('S3Service: AWS_ACCESS_KEY_ID set =', !!process.env.AWS_ACCESS_KEY_I
 console.log('S3Service: AWS_SECRET_ACCESS_KEY set =', !!process.env.AWS_SECRET_ACCESS_KEY);
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+  region: 'ap-southeast-1',
 });
 
 const BUCKET_NAME = 'swifty-kyc-uploads';

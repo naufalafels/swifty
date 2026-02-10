@@ -21,7 +21,12 @@ export async function generateUploadUrl(key, contentType, expiresIn = 900) {
     Key: key,
     // ContentType removed to avoid signed header mismatch
   });
-  return await getSignedUrl(s3Client, command, { expiresIn });
+  const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+  // Remove checksum params to avoid 400 error
+  const url = new URL(signedUrl);
+  url.searchParams.delete('x-amz-checksum-crc32');
+  url.searchParams.delete('x-amz-sdk-checksum-algorithm');
+  return url.toString();
 }
 
 /**

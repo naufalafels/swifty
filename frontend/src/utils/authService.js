@@ -178,9 +178,10 @@ export const getKyc = async () => {
   return res.data;
 };
 
+// FIX: Remove "Content-Type": "application/json" for FormData (axios auto-sets "multipart/form-data")
 export const becomeHost = async (payload) => {
   const url = `${API_BASE}/api/auth/host/onboard`;
-  const res = await axios.post(url, payload, { headers: { ...authHeaders(), "Content-Type": "application/json" } });
+  const res = await axios.post(url, payload, { headers: authHeaders() });
   return res.data;
 };
 

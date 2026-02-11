@@ -139,7 +139,14 @@ const HostOnboardPage = () => {
         carType: vehicle.carType,
         mileage: vehicle.mileage,  // Added mileage
       }));
-      if (vehicle.image) formData.append('vehicleImage', vehicle.image);
+
+      // FIX: Ensure vehicle.image is a valid File before appending to avoid sending {} (empty object)
+      // This prevents req.file from being undefined in backend (logs showed vehicleImage: {})
+      if (vehicle.image && vehicle.image instanceof File) {
+        formData.append('vehicleImage', vehicle.image);
+      } else {
+        console.warn('No valid image file selected');  // DEBUG: Warn if no file
+      }
 
       await authService.becomeHost(formData); // Assuming authService.becomeHost accepts FormData
       // Update user state locally (since no context)

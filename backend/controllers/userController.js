@@ -16,6 +16,11 @@ const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS
 const REFRESH_TOKEN_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken';
 const SERVER_URL = (process.env.SERVER_URL || 'http://localhost:7889').replace(/\/$/, '');
 
+const buildCarImageUrl = (file) => {
+  if (!file) return '';
+  return `${SERVER_URL.replace(/\/$/, '')}/uploads/car-images/${file.filename}`;
+};
+
 function createAccessToken(userId, extra = {}) {
   return jwt.sign({ id: userId, ...extra }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES });
 }
@@ -518,6 +523,7 @@ export async function becomeHost(req, res) {
 
     // Store initial car details in user (temp)
     if (vehicle.make && vehicle.model && vehicle.year) {
+      const imageUrl = req.file ? buildCarImageUrl(req.file) : (vehicle.image || '');
       user.initialCar = {
         make: vehicle.make,
         model: vehicle.model,
@@ -530,7 +536,7 @@ export async function becomeHost(req, res) {
         petrolType: vehicle.fuelType === 'Petrol' ? (vehicle.petrolType || []) : [],
         mileage: Number(vehicle.mileage) || 0,
         dailyRate: Number(vehicle.dailyRate) || 0,
-        image: req.file ? buildCarImageUrl(req.file) : (vehicle.image || ''),
+        image: imageUrl,
       };
     }
 

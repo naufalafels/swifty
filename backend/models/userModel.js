@@ -44,7 +44,7 @@ kycSubSchema.post('findOne', function (doc) {
 const hostProfileSchema = new mongoose.Schema(
   {
     payoutProvider: { type: String, default: "razorpay_curlec_my" },
-    payoutAccountRef: { type: String, default: "" }, // e.g., bank/Curlec mandate ref
+    payoutAccountRef: { type: String, default: "" },  // e.g., bank/Curlec mandate ref
     notes: { type: String, default: "" },
     onboardingCompletedAt: { type: Date, default: null },
   },
@@ -78,6 +78,8 @@ const userSchema = new mongoose.Schema(
     kyc: { type: kycSubSchema, default: () => ({}) },
 
     hostProfile: { type: hostProfileSchema, default: () => ({}) },
+
+    applyingForHost: { type: Boolean, default: false },  // NEW: Flag for host application
   },
   {
     timestamps: true,

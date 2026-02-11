@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe, FaInfoCircle } from 'react-icons/fa';
+import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe, FaInfoCircle, FaImage } from 'react-icons/fa';
 import * as authService from '../utils/authService';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -25,9 +25,13 @@ const HostOnboardPage = () => {
     dailyRate: '',
     seats: '',
     shiftType: '',
-    fuel: '',
+    fuelType: '',
+    petrolType: [],
     carType: '',
+    image: null,
   });
+
+  const [imagePreview, setImagePreview] = useState(null);
 
   const [location, setLocation] = useState({
     search: '',
@@ -74,8 +78,10 @@ const HostOnboardPage = () => {
     if (isEmpty(vehicle.dailyRate)) missing.push('Daily rate');
     if (isEmpty(vehicle.seats)) missing.push('Seats');
     if (isEmpty(vehicle.shiftType)) missing.push('Shift type');
-    if (isEmpty(vehicle.fuel)) missing.push('Fuel');
+    if (isEmpty(vehicle.fuelType)) missing.push('Fuel type');
     if (isEmpty(vehicle.carType)) missing.push('Car type');
+    if (vehicle.fuelType === 'Petrol' && (!vehicle.petrolType || vehicle.petrolType.length === 0)) missing.push('Petrol type');
+    if (!vehicle.image) missing.push('Vehicle image');
     if (missing.length) {
       const msg = 'Complete vehicle step before publishing';
       toast.error(`Step 2: ${missing.join(', ')}`);
@@ -97,11 +103,23 @@ const HostOnboardPage = () => {
     if (!validateStep2()) return; // gate publish on step 2 completeness
     setLoading(true);
     try {
-      await authService.becomeHost({
-        payoutAccountRef: company.payoutAccountRef,
-        notes: company.notes,
-        // location kept client-side; persist later if desired
-      });
+      const formData = new FormData();
+      formData.append('payoutAccountRef', company.payoutAccountRef);
+      formData.append('notes', company.notes);
+      formData.append('vehicle', JSON.stringify({
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        dailyRate: vehicle.dailyRate,
+        seats: vehicle.seats,
+        shiftType: vehicle.shiftType,
+        fuelType: vehicle.fuelType,
+        petrolType: vehicle.petrolType,
+        carType: vehicle.carType,
+      }));
+      if (vehicle.image) formData.append('vehicleImage', vehicle.image);
+
+      await authService.becomeHost(formData); // Assuming authService.becomeHost accepts FormData
       toast.success('Host onboarding submitted. Admin will review.');
       navigate('/host/dashboard');
     } catch (err) {
@@ -159,6 +177,14 @@ const HostOnboardPage = () => {
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setVehicle({ ...vehicle, image: file });
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   return (
@@ -379,10 +405,10 @@ const HostOnboardPage = () => {
                 <option>Manual</option>
               </select>
             </label>
-            <label className="text-sm text-slate-200">Fuel
+            <label className="text-sm text-slate-200">Fuel type
               <select
-                value={vehicle.fuel}
-                onChange={(e) => setVehicle({ ...vehicle, fuel: e.target.value })}
+                value={vehicle.fuelType}
+                onChange={(e) => setVehicle({ ...vehicle, fuelType: e.target.value })}
                 className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
               >
                 <option value="">Select</option>
@@ -392,6 +418,30 @@ const HostOnboardPage = () => {
                 <option>Electric</option>
               </select>
             </label>
+            {vehicle.fuelType === 'Petrol' && (
+              <div className="col-span-2">
+                <label className="text-sm text-slate-200">Petrol type (check all that apply)
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {['Ron95', 'Ron97', 'Ron100', 'Ethanol', 'E85'].map(type => (
+                      <label key={type} className="flex items-center gap-2 text-sm text-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={vehicle.petrolType.includes(type)}
+                          onChange={(e) => {
+                            const updated = e.target.checked
+                              ? [...vehicle.petrolType, type]
+                              : vehicle.petrolType.filter(t => t !== type);
+                            setVehicle({ ...vehicle, petrolType: updated });
+                          }}
+                          className="accent-emerald-500"
+                        />
+                        {type}
+                      </label>
+                    ))}
+                  </div>
+                </label>
+              </div>
+            )}
             <label className="text-sm text-slate-200">Car type
               <select
                 value={vehicle.carType}
@@ -404,6 +454,22 @@ const HostOnboardPage = () => {
                 ))}
               </select>
             </label>
+            <div className="col-span-2">
+              <label className="text-sm text-slate-200">Vehicle image
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  required
+                />
+              </label>
+              {imagePreview && (
+                <div className="mt-2">
+                  <img src={imagePreview} alt="Vehicle Preview" className="w-32 h-32 object-cover rounded border" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -435,7 +501,9 @@ const HostOnboardPage = () => {
               </div>
               <div>Daily rate: {vehicle.dailyRate || '—'}</div>
               <div>Seats: {vehicle.seats || '—'} | Shift: {vehicle.shiftType || '—'}</div>
-              <div>Fuel: {vehicle.fuel || '—'} | Type: {vehicle.carType || '—'}</div>
+              <div>Fuel: {vehicle.fuelType || '—'} {vehicle.fuelType === 'Petrol' && vehicle.petrolType.length > 0 ? `(${vehicle.petrolType.join(', ')})` : ''}</div>
+              <div>Type: {vehicle.carType || '—'}</div>
+              {imagePreview && <img src={imagePreview} alt="Vehicle Preview" className="w-16 h-16 object-cover rounded mt-2" />}
             </div>
           </div>
           <div className="text-xs text-slate-400">

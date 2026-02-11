@@ -19,6 +19,7 @@ const carSchema = new Schema({
   seats: Number,
   transmission: String,
   fuelType: String,
+  petrolType: { type: [String], default: [] },  // NEW: Array for petrol types
   mileage: Number,
   dailyRate: { type: Number, required: true },
   status: { type: String, enum: ['available','rented','maintenance'], default: 'available' },

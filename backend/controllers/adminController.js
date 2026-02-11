@@ -338,8 +338,12 @@ export const approveKyc = async (req, res) => {
     if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
     user.kyc.status = 'approved';
     user.kyc.reviewedAt = new Date();
-    // Add 'host' role
-    user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+
+    // Add 'host' role only if applying for host
+    if (user.applyingForHost) {
+      user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+    }
+
     await user.save();
     res.json({ message: 'Approved' });
   } catch (err) {

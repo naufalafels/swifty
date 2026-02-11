@@ -488,7 +488,9 @@ export async function getKycUploadUrls(req, res) {
   }
 }
 
-// Become a host
+// UPDATED: Become a host - Set applying flag, save payout, create vehicle if provided
+import Car from '../models/carModel.js';
+
 export async function becomeHost(req, res) {
   try {
     const userId = req.user?.id;
@@ -496,13 +498,13 @@ export async function becomeHost(req, res) {
 
     const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
     const notes = String(req.body.notes || '').trim();
+    const vehicle = req.body.vehicle || {};  // Vehicle data from frontend
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
-    user.roles = roles;
-
+    // Set applying flag (no role yet)
+    user.applyingForHost = true;
     user.hostProfile = {
       payoutProvider: 'razorpay_curlec_my',
       payoutAccountRef,
@@ -510,11 +512,32 @@ export async function becomeHost(req, res) {
       onboardingCompletedAt: new Date(),
     };
 
-    await user.save();
+    // Create vehicle if provided
+    if (vehicle.make && vehicle.model && vehicle.year) {
+      const imageUrl = req.file ? buildCarImageUrl(req.file) : (vehicle.image || '');
+      const car = new Car({
+        make: vehicle.make,
+        model: vehicle.model,
+        year: Number(vehicle.year),
+        color: vehicle.color || '',
+        category: vehicle.category || 'Sedan',
+        seats: Number(vehicle.seats) || 4,
+        transmission: vehicle.transmission || 'Automatic',
+        fuelType: vehicle.fuelType || 'Gasoline',
+        petrolType: vehicle.fuelType === 'Petrol' ? (vehicle.petrolType || []) : [],
+        mileage: Number(vehicle.mileage) || 0,
+        dailyRate: Number(vehicle.dailyRate) || 0,
+        image: imageUrl,
+        status: 'available',
+        companyId: userId,  // Host's userId as companyId
+      });
+      await car.save();
+    }
 
+    await user.save();
     return res.json({
       success: true,
-      message: 'Host role enabled. You can now list cars; renter KYC will be shown to you for in-person validation.',
+      message: 'Host application submitted. You will become a host after admin approval.',
       user: userResponse(user),
     });
   } catch (err) {

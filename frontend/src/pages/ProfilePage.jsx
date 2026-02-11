@@ -467,38 +467,40 @@ const ProfilePage = () => {
 
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 flex gap-4">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner">
-                {user?.name?.[0]?.toUpperCase() || 'U'}
+          <div className="flex-1 flex flex-col gap-4">
+            <div className="flex gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner">
+                  {user?.name?.[0]?.toUpperCase() || 'U'}
+                </div>
               </div>
-              <div className="absolute -bottom-2 -right-2">
-                {isVerified ? (
-                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-600 text-white text-xs font-semibold border border-slate-900 shadow">
-                    <FaCheckCircle className="text-sm" /> Verified
-                  </div>
-                ) : (
-                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-600 text-white text-xs font-semibold border border-slate-900 shadow">
-                    <FaTimesCircle className="text-sm" /> Unverified
-                  </div>
-                )}
-                {isHost && (
-                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-600 text-white text-xs font-semibold border border-slate-900 shadow mt-1">
-                    <FaRocket className="text-sm" /> Host
-                  </div>
-                )}
+              <div className="space-y-2">
+                <div className="text-xl font-semibold text-white">{user?.name || 'Unnamed user'}</div>
+                <div className="text-sm text-slate-300 flex items-center gap-2">
+                  <FaMapMarkerAlt className="text-emerald-400" />
+                  {user?.city && user?.country ? `${user.city}, ${user.country}` : 'Location hidden'}
+                </div>
+                <div className="text-sm text-slate-200">
+                  <span className="font-semibold">About me: </span>
+                  {user?.about || 'Tell others about you.'}
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <div className="text-xl font-semibold text-white">{user?.name || 'Unnamed user'}</div>
-              <div className="text-sm text-slate-300 flex items-center gap-2">
-                <FaMapMarkerAlt className="text-emerald-400" />
-                {user?.city && user?.country ? `${user.city}, ${user.country}` : 'Location hidden'}
-              </div>
-              <div className="text-sm text-slate-200">
-                <span className="font-semibold">About me: </span>
-                {user?.about || 'Tell others about you.'}
-              </div>
+            <div className="flex gap-2">
+              {isVerified ? (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-600 text-white text-xs font-semibold border border-slate-900 shadow">
+                  <FaCheckCircle className="text-sm" /> Verified
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-600 text-white text-xs font-semibold border border-slate-900 shadow">
+                  <FaTimesCircle className="text-sm" /> Unverified
+                </div>
+              )}
+              {isHost && (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-600 text-white text-xs font-semibold border border-slate-900 shadow">
+                  <FaRocket className="text-sm" /> Host
+                </div>
+              )}
             </div>
           </div>
 

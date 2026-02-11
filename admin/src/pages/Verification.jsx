@@ -21,10 +21,12 @@ const Verification = () => {
     try {
       const kycRes = await axios.get(`${API_BASE}/api/admin/kyc`, { headers: authHeader });
       const allKyc = kycRes.data || [];
-      setUsers(allKyc.filter(item => item.status === 'pending'));
-      const approvedHosts = allKyc.filter(item => item.status === 'approved');
+      // Users: pending + approved non-hosts
+      setUsers(allKyc.filter(item => item.status !== 'approved' || !item.isHost));
+      // Hosts: approved hosts only
+      const approvedHosts = allKyc.filter(item => item.status === 'approved' && item.isHost);
       setHosts(approvedHosts);
-      // prefill payout edits with existing payoutReference if present
+      // prefill payout edits
       const initialPayouts = {};
       approvedHosts.forEach((h) => {
         if (h.id) initialPayouts[h.id] = h.payoutReference || '';
@@ -42,7 +44,7 @@ const Verification = () => {
   }, [fetchData]);
 
   const handleAction = async (id, type, action) => {
-    const endpoint = type === 'hosts' ? `/api/admin/kyc/${id}/${action}` : `/api/admin/verifications/${type}/${id}/${action}`;
+    const endpoint = `/api/admin/kyc/${id}/${action}`;
     try {
       await axios.post(
         `${API_BASE}${endpoint}`,

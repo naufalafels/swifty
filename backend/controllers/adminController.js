@@ -318,6 +318,8 @@ export const getKycList = async (req, res) => {
         status: kyc.status || 'pending',
         frontImageUrl: frontUrl,
         backImageUrl: backUrl,
+        payoutReference: user.hostProfile?.payoutAccountRef || '',
+        isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
       };
     }));
     res.json(result);

@@ -499,9 +499,8 @@ export async function becomeHost(req, res) {
 
     const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
     const notes = String(req.body.notes || '').trim();
-    const companyName = String(req.body.companyName || '').trim();  // NEW
-    const ssmNumber = String(req.body.ssmNumber || '').trim();      // NEW
-    const nricNumber = String(req.body.nricNumber || '').trim();    // NEW
+    const companyName = String(req.body.companyName || '').trim(); 
+    const ssmNumber = String(req.body.ssmNumber || '').trim();     
     const vehicle = req.body.vehicle || {};  // Vehicle data from frontend
 
     const user = await User.findById(userId);
@@ -514,9 +513,8 @@ export async function becomeHost(req, res) {
       payoutAccountRef,
       notes,
       onboardingCompletedAt: new Date(),
-      companyName,  // NEW
-      ssmNumber,    // NEW
-      nricNumber,   // NEW
+      companyName, 
+      ssmNumber,    
     };
 
     // Create vehicle if provided

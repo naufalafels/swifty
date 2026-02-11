@@ -47,9 +47,8 @@ const hostProfileSchema = new mongoose.Schema(
     payoutAccountRef: { type: String, default: "" },  // e.g., bank/Curlec mandate ref
     notes: { type: String, default: "" },
     onboardingCompletedAt: { type: Date, default: null },
-    companyName: { type: String, default: "" },  // NEW
-    ssmNumber: { type: String, default: "" },    // NEW
-    nricNumber: { type: String, default: "" },   // NEW
+    companyName: { type: String, default: "" }, 
+    ssmNumber: { type: String, default: "" },    
   },
   { _id: false }
 );

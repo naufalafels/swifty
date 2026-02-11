@@ -321,11 +321,10 @@ export const getKycList = async (req, res) => {
         statusReason: kyc.statusReason || '',
         payoutReference: user.hostProfile?.payoutAccountRef || '',
         isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
-        isApplyingForHost: !!user.applyingForHost,  // NEW: Flag for host applications
+        isApplyingForHost: !!user.applyingForHost,  // Flag for host applications
         hostStatus: user.applyingForHost ? 'pending' : (Array.isArray(user.roles) && user.roles.includes('host') ? 'approved' : 'none'),  // NEW
-        companyName: user.hostProfile?.companyName || '',  // NEW
-        ssmNumber: user.hostProfile?.ssmNumber || '',      // NEW
-        nricNumber: user.hostProfile?.nricNumber || '',    // NEW
+        companyName: user.hostProfile?.companyName || '',  
+        ssmNumber: user.hostProfile?.ssmNumber || '',     
       };
     }));
     res.json(result);

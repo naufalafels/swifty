@@ -22,7 +22,7 @@ const HostOnboardPage = () => {
     payoutAccountRef: '',
     companyName: '',
     ssmNumber: '',
-    nricNumber: '',
+    // Removed nricNumber
     notes: '',
   });
 
@@ -75,7 +75,7 @@ const HostOnboardPage = () => {
     const missing = [];
     if (isEmpty(company.companyName)) missing.push('Company name');
     if (isEmpty(company.ssmNumber)) missing.push('SSM number');
-    if (isEmpty(company.nricNumber)) missing.push('NRIC number');
+    // Removed nricNumber validation
     if (isEmpty(company.payoutAccountRef)) missing.push('Payout account reference');
     if (missing.length) {
       const msg = 'Complete first step before moving on';
@@ -122,6 +122,9 @@ const HostOnboardPage = () => {
       const formData = new FormData();
       formData.append('payoutAccountRef', company.payoutAccountRef);
       formData.append('notes', company.notes);
+      formData.append('companyName', company.companyName);  // NEW
+      formData.append('ssmNumber', company.ssmNumber);      // NEW
+      // Removed nricNumber
       formData.append('vehicle', JSON.stringify({
         make: vehicle.make,
         model: vehicle.model,
@@ -258,14 +261,7 @@ const HostOnboardPage = () => {
                 required
               />
             </label>
-            <label className="text-sm text-slate-200">NRIC number
-              <input
-                value={company.nricNumber}
-                onChange={(e) => setCompany({ ...company, nricNumber: e.target.value })}
-                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
-                required
-              />
-            </label>
+            {/* Removed NRIC number input */}
             <label className="text-sm text-slate-200">Payout account reference (Razorpay Curlec)
               <input
                 value={company.payoutAccountRef}
@@ -503,7 +499,7 @@ const HostOnboardPage = () => {
               <div className="font-semibold text-white mb-1">Company</div>
               <div>Company name: {company.companyName || '—'}</div>
               <div>SSM: {company.ssmNumber || '—'}</div>
-              <div>NRIC: {company.nricNumber || '—'}</div>
+              {/* Removed NRIC */}
               <div>Payout ref: {company.payoutAccountRef || '—'}</div>
               <div>
                 Location:{' '}

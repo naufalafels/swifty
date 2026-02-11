@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 import { CheckCircle, XCircle, Eye, WalletCards } from 'lucide-react';
 import { getAdminToken } from '../utils/auth';
+import { toast } from 'react-toastify';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
@@ -58,8 +59,12 @@ const Verification = () => {
         { headers: authHeader }
       );
       await fetchData();
+      if (action === 'approve') {
+        toast.success('Approved! The user can now access Host Centre after refreshing their browser.');
+      }
     } catch (err) {
       console.error('Action failed', err);
+      toast.error('Action failed.');
     }
   };
 

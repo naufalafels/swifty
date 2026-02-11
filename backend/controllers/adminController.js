@@ -346,6 +346,7 @@ export const approveKyc = async (req, res) => {
     // Add 'host' role only if applying for host
     if (user.applyingForHost) {
       user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+      user.applyingForHost = false;  // NEW: Clear flag after approval
     }
 
     await user.save();

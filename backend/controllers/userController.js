@@ -517,8 +517,8 @@ export async function becomeHost(req, res) {
       ssmNumber,    
     };
 
-    // Set user as company_admin for car management
-    user.role = 'company_admin';
+    // Set user as host for car management (not company_admin)
+    user.role = 'host';
     user.companyId = userId;
 
     // Create vehicle if provided

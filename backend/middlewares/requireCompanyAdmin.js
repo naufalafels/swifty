@@ -3,7 +3,7 @@ export default function requireCompanyAdmin(req, res, next) {
     const user = req.user;
     if (!user || !user.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    if (user.role === 'company_admin' || user.role === 'superadmin') return next();
+    if (user.role === 'company_admin' || user.role === 'superadmin' || user.role === 'host') return next();
     return res.status(403).json({ success: false, message: 'Forbidden: admin access required' });
   } catch (err) {
     console.error('requireCompanyAdmin error', err);

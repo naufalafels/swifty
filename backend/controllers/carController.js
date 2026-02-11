@@ -225,7 +225,7 @@ export const updateCar = async (req, res, next) => {
         car.image = "";
       } else if (req.body.image) {
         // allow setting image path string (e.g., existing path)
-        car.image = req.body.image;
+        car.image = body.image;
       }
     }
 

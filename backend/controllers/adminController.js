@@ -311,9 +311,12 @@ export const getKycList = async (req, res) => {
         idNum = kyc.idNumber || 'N/A';
       }
 
-      // NEW: Fetch first car for host applicants
-      const cars = await Car.find({ companyId: user._id }).lean();
-      const firstCar = cars[0];
+      // UPDATED: Fetch car from user.initialCar (pending) or Cars collection (approved)
+      let firstCar = user.initialCar;
+      if (!firstCar && user.roles && user.roles.includes('host')) {
+        const cars = await Car.find({ companyId: user._id }).lean();
+        firstCar = cars[0];
+      }
 
       return {
         id: user._id,
@@ -354,7 +357,17 @@ export const approveKyc = async (req, res) => {
     // Add 'host' role only if applying for host
     if (user.applyingForHost) {
       user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
-      user.applyingForHost = false;  // NEW: Clear flag after approval
+      user.applyingForHost = false;
+
+      // NEW: Create actual car from initialCar if exists
+      if (user.initialCar) {
+        await Car.create({
+          ...user.initialCar,
+          companyId: user._id,
+          status: 'available',
+        });
+        user.initialCar = null;  // Clear temp data
+      }
     }
 
     await user.save();

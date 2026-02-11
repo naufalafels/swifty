@@ -489,9 +489,7 @@ export async function getKycUploadUrls(req, res) {
   }
 }
 
-// UPDATED: Become a host - Set applying flag, save payout, create vehicle if provided
-import Car from '../models/carModel.js';
-
+// UPDATED: Become a host - Set applying flag, save payout, store initial vehicle in user
 export async function becomeHost(req, res) {
   try {
     const userId = req.user?.id;
@@ -517,14 +515,9 @@ export async function becomeHost(req, res) {
       ssmNumber,    
     };
 
-    // Set user as host for car management (not company_admin)
-    user.role = 'host';
-    user.companyId = userId;
-
-    // Create vehicle if provided
+    // Store initial car details in user (temp)
     if (vehicle.make && vehicle.model && vehicle.year) {
-      const imageUrl = req.file ? buildCarImageUrl(req.file) : (vehicle.image || '');
-      const car = new Car({
+      user.initialCar = {
         make: vehicle.make,
         model: vehicle.model,
         year: Number(vehicle.year),
@@ -536,11 +529,8 @@ export async function becomeHost(req, res) {
         petrolType: vehicle.fuelType === 'Petrol' ? (vehicle.petrolType || []) : [],
         mileage: Number(vehicle.mileage) || 0,
         dailyRate: Number(vehicle.dailyRate) || 0,
-        image: imageUrl,
-        status: 'available',
-        companyId: userId,  // Host's userId as companyId
-      });
-      await car.save();
+        image: req.file ? buildCarImageUrl(req.file) : (vehicle.image || ''),
+      };
     }
 
     await user.save();

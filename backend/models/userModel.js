@@ -53,6 +53,25 @@ const hostProfileSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// NEW: Initial car schema for temp storage
+const initialCarSchema = new mongoose.Schema(
+  {
+    make: { type: String, default: '' },
+    model: { type: String, default: '' },
+    year: { type: Number, default: null },
+    color: { type: String, default: '' },
+    category: { type: String, default: 'Sedan' },
+    seats: { type: Number, default: 4 },
+    transmission: { type: String, default: 'Automatic' },
+    fuelType: { type: String, default: 'Gasoline' },
+    petrolType: { type: [String], default: [] },
+    mileage: { type: Number, default: 0 },
+    dailyRate: { type: Number, default: 0 },
+    image: { type: String, default: '' },  // Uploaded image URL or key
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -80,6 +99,8 @@ const userSchema = new mongoose.Schema(
     kyc: { type: kycSubSchema, default: () => ({}) },
 
     hostProfile: { type: hostProfileSchema, default: () => ({}) },
+
+    initialCar: { type: initialCarSchema, default: null },  // NEW: Temp car details
 
     applyingForHost: { type: Boolean, default: false },  // NEW: Flag for host application
   },

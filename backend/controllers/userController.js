@@ -372,12 +372,13 @@ export async function updateProfile(req, res) {
   }
 }
 
-// UPDATED: submitKycMultipart - Accept keys in body
+// UPDATED: submitKycMultipart - Accept keys in body, backKey optional
 export async function submitKycMultipart(req, res) {
   try {
     const { idType = 'passport', idNumber = '', idCountry = 'MY', frontKey, backKey } = req.body || {};
     if (!idNumber.trim()) return res.status(400).json({ success: false, message: 'idNumber required' });
-    if (!frontKey || !backKey) return res.status(400).json({ success: false, message: 'frontKey and backKey required' });
+    if (!frontKey) return res.status(400).json({ success: false, message: 'frontKey required' });
+    // backKey is optional
 
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -390,7 +391,7 @@ export async function submitKycMultipart(req, res) {
       idNumber: encryptedIdNumber,
       idCountry: idCountry || 'MY',
       frontImageUrl: frontKey,
-      backImageUrl: backKey,
+      backImageUrl: backKey || '',
       status: 'pending',
       statusReason: '',
       submittedAt: new Date(),

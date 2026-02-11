@@ -318,6 +318,7 @@ export const getKycList = async (req, res) => {
         status: kyc.status || 'pending',
         frontImageUrl: frontUrl,
         backImageUrl: backUrl,
+        statusReason: kyc.statusReason || '',
         payoutReference: user.hostProfile?.payoutAccountRef || '',
         isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
       };

@@ -13,6 +13,9 @@ const Verification = () => {
   const [payoutEdits, setPayoutEdits] = useState({});
   const [savingPayout, setSavingPayout] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const authHeader = { Authorization: `Bearer ${getAdminToken()}` };
 
@@ -43,12 +46,12 @@ const Verification = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleAction = async (id, type, action) => {
+  const handleAction = async (id, type, action, extraBody = {}) => {
     const endpoint = `/api/admin/kyc/${id}/${action}`;
     try {
       await axios.post(
         `${API_BASE}${endpoint}`,
-        {},
+        extraBody,
         { headers: authHeader }
       );
       await fetchData();
@@ -115,7 +118,9 @@ const Verification = () => {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 font-medium text-gray-900">{item.fullName}</td>
                 <td className="px-6 py-4 text-gray-700">{item.idNumber}</td>
-                <td className="px-6 py-4 text-gray-700 capitalize">{item.status}</td>
+                <td className="px-6 py-4 text-gray-700 capitalize">
+                  {item.status === 'rejected' ? (item.statusReason || 'Rejected') : item.status}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-2">
                     {item.frontImageUrl && (
@@ -171,7 +176,11 @@ const Verification = () => {
                     Approve
                   </button>
                   <button
-                    onClick={() => handleAction(item.id, type, 'reject')}
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setShowRejectModal(true);
+                      setRejectReason('');
+                    }}
                     disabled={item.status !== 'pending'}
                     className="inline-flex items-center gap-1 rounded bg-red-500 px-3 py-1 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-60"
                   >
@@ -230,6 +239,51 @@ const Verification = () => {
           )}
         </div>
       </div>
+
+      {/* Reject Reason Modal */}
+      {showRejectModal && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-4">Reject KYC Submission</h3>
+            <p className="mb-4 text-gray-600">Provide a reason for rejection:</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter rejection reason..."
+              className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              rows={4}
+              required
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setSelectedItem(null);
+                  setRejectReason('');
+                }}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!rejectReason.trim()) {
+                    alert('Please provide a rejection reason.');
+                    return;
+                  }
+                  handleAction(selectedItem.id, activeTab === 'users' ? 'users' : 'hosts', 'reject', { reason: rejectReason.trim() });
+                  setShowRejectModal(false);
+                  setSelectedItem(null);
+                  setRejectReason('');
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-400"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image Zoom Modal */}
       {selectedImage && (

@@ -517,6 +517,10 @@ export async function becomeHost(req, res) {
       ssmNumber,    
     };
 
+    // Set user as company_admin for car management
+    user.role = 'company_admin';
+    user.companyId = userId;
+
     // Create vehicle if provided
     if (vehicle.make && vehicle.model && vehicle.year) {
       const imageUrl = req.file ? buildCarImageUrl(req.file) : (vehicle.image || '');
@@ -525,9 +529,9 @@ export async function becomeHost(req, res) {
         model: vehicle.model,
         year: Number(vehicle.year),
         color: vehicle.color || '',
-        category: vehicle.category || 'Sedan',
+        category: vehicle.carType || 'Sedan',
         seats: Number(vehicle.seats) || 4,
-        transmission: vehicle.transmission || 'Automatic',
+        transmission: vehicle.shiftType || 'Automatic',
         fuelType: vehicle.fuelType || 'Gasoline',
         petrolType: vehicle.fuelType === 'Petrol' ? (vehicle.petrolType || []) : [],
         mileage: Number(vehicle.mileage) || 0,

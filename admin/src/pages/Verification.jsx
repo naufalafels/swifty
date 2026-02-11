@@ -108,6 +108,7 @@ const Verification = () => {
                 <>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSM Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Car Details</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center gap-2">
                     <WalletCards className="w-4 h-4" />
                     Payout Reference
@@ -128,7 +129,7 @@ const Verification = () => {
               <tr>
                 <td
                   className="px-6 py-6 text-center text-sm text-gray-500"
-                  colSpan={isHostsKyc ? 8 : isHost ? 6 : 5}
+                  colSpan={isHostsKyc ? 9 : isHost ? 6 : 5}
                 >
                   No records found.
                 </td>
@@ -168,6 +169,20 @@ const Verification = () => {
                   <>
                     <td className="px-6 py-4 text-gray-700">{item.companyName}</td>
                     <td className="px-6 py-4 text-gray-700">{item.ssmNumber}</td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {item.carId ? (
+                        <a
+                          href={`/cars/${item.carId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          View {item.carMake} {item.carModel}
+                        </a>
+                      ) : (
+                        'No car'
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-gray-700">{item.payoutReference}</td>
                   </>
                 )}

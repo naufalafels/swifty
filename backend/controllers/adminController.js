@@ -310,6 +310,11 @@ export const getKycList = async (req, res) => {
       } catch (err) {
         idNum = kyc.idNumber || 'N/A';
       }
+
+      // NEW: Fetch first car for host applicants
+      const cars = await Car.find({ companyId: user._id }).lean();
+      const firstCar = cars[0];
+
       return {
         id: user._id,
         userId: user._id,
@@ -325,6 +330,9 @@ export const getKycList = async (req, res) => {
         hostStatus: user.applyingForHost ? 'pending' : (Array.isArray(user.roles) && user.roles.includes('host') ? 'approved' : 'none'),  // NEW
         companyName: user.hostProfile?.companyName || '',  
         ssmNumber: user.hostProfile?.ssmNumber || '',     
+        carId: firstCar?._id || null,
+        carMake: firstCar?.make || '',
+        carModel: firstCar?.model || '',
       };
     }));
     res.json(result);

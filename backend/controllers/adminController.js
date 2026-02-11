@@ -281,28 +281,35 @@ export const getKycList = async (req, res) => {
     const result = await Promise.all(users.map(async (user) => {
       const kyc = user.kyc || {};
       let frontUrl = null;
-      try {
-        frontUrl = kyc.frontImageUrl ? await generateDownloadUrl(kyc.frontImageUrl) : null;
-      } catch (err) {
-        console.error('Error generating front URL for user', user._id, err);
+      if (kyc.frontImageUrl) {
+        if (kyc.frontImageUrl.startsWith('http')) {
+          frontUrl = kyc.frontImageUrl;  // Old local URL
+        } else {
+          try {
+            frontUrl = await generateDownloadUrl(kyc.frontImageUrl);  // New S3 key
+          } catch (err) {
+            console.error('Error generating front URL', err);
+          }
+        }
       }
       let backUrl = null;
-      try {
-        backUrl = kyc.backImageUrl ? await generateDownloadUrl(kyc.backImageUrl) : null;
-      } catch (err) {
-        console.error('Error generating back URL for user', user._id, err);
+      if (kyc.backImageUrl) {
+        if (kyc.backImageUrl.startsWith('http')) {
+          backUrl = kyc.backImageUrl;
+        } else {
+          try {
+            backUrl = await generateDownloadUrl(kyc.backImageUrl);
+          } catch (err) {
+            console.error('Error generating back URL', err);
+          }
+        }
       }
-      console.log('Processing user', user._id, 'ID', kyc.idNumber);
       let idNum = 'N/A';
       try {
         idNum = kyc.idNumber ? decrypt(kyc.idNumber) : 'N/A';
-        console.log('Decrypted to', idNum);
       } catch (err) {
-        console.error('Decrypt error for user', user._id, err);
         idNum = kyc.idNumber || 'N/A';
-        console.log('Returning original', idNum);
       }
-      console.log('Front key', kyc.frontImageUrl);
       return {
         id: user._id,
         userId: user._id,

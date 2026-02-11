@@ -19,15 +19,14 @@ const Verification = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [userRes, hostRes] = await Promise.all([
-        axios.get(`${API_BASE}/api/admin/verifications/users`, { headers: authHeader }),
-        axios.get(`${API_BASE}/api/admin/kyc`, { headers: authHeader }),
-      ]);
-      setUsers(userRes.data || []);
-      setHosts(hostRes.data || []);
+      const kycRes = await axios.get(`${API_BASE}/api/admin/kyc`, { headers: authHeader });
+      const allKyc = kycRes.data || [];
+      setUsers(allKyc.filter(item => item.status === 'pending'));
+      const approvedHosts = allKyc.filter(item => item.status === 'approved');
+      setHosts(approvedHosts);
       // prefill payout edits with existing payoutReference if present
       const initialPayouts = {};
-      (hostRes.data || []).forEach((h) => {
+      approvedHosts.forEach((h) => {
         if (h.id) initialPayouts[h.id] = h.payoutReference || '';
       });
       setPayoutEdits(initialPayouts);
@@ -213,7 +212,7 @@ const Verification = () => {
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {tab === 'users' ? 'Users' : 'Hosts (KYC + Payout)'}
+                {tab === 'users' ? 'Users (KYC)' : 'Hosts (Payout)'}
               </button>
             ))}
           </div>

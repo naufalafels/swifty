@@ -48,7 +48,7 @@ const Metric = ({ label, value, icon: Icon }) => (
     </div>
     <div>
       <div className="text-xs text-slate-400">{label}</div>
-      <div className="text-2xl font-semibold text-white">{value}</div>
+      <div className="text-2xl font-bold text-white">{value}</div>
     </div>
   </div>
 );
@@ -405,6 +405,10 @@ const ProfilePage = () => {
     if (loading) return;
     if (!isVerified) {
       toast.error('You must be verified to become a host.');
+      return;
+    }
+    if (user.applyingForHost) {
+      toast.info('Your application is pending approval.');
       return;
     }
     navigate(isHost ? '/host/dashboard' : '/host/onboard');
@@ -827,7 +831,7 @@ const ProfilePage = () => {
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <FaLock /> Verify to edit {passwordCheckField}
               </h2>
-              <button onClick={() => setIsPasswordModalOpen(false)} className="text-slate-500 hover-text-slate-800">✕</button>
+              <button onClick={() => setIsPasswordModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
             </div>
             <label className="text-sm font-semibold text-slate-800">Password
               <input type="password" value={passwordValue} onChange={(e) => setPasswordValue(e.target.value)} className="w-full mt-1 p-2 border rounded" placeholder="Enter your password" />
@@ -934,10 +938,10 @@ const ProfilePage = () => {
         <button
           onClick={handleHostNavigate}
           className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-70"
-          disabled={loading}
-          aria-label={isHost ? 'Go to Host Centre' : 'Become a Host'}
+          disabled={loading || user.applyingForHost}
+          aria-label={isHost ? 'Go to Host Centre' : user.applyingForHost ? 'Host Pending' : 'Become a Host'}
         >
-          <FaRocket /> {isHost ? 'Host Centre' : 'Become a Host'}
+          <FaRocket /> {isHost ? 'Host Centre' : user.applyingForHost ? 'Host Pending' : 'Become a Host'}
         </button>
         <button onClick={() => setIsPersonalModalOpen(true)} className="flex items-center justify-center gap-2 px-3 py-3 rounded-xl bg-slate-900/70 border border-slate-800 text-white hover:bg-slate-800">
           <FaUserCog /> Personal Information

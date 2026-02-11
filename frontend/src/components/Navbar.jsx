@@ -185,6 +185,9 @@ const Navbar = () => {
       navigate("/login", { replace: false, state: { from: "/host/dashboard" } });
     } else if (!isVerified) {
       toast.error('You must be verified to become a host.');  // Added toast for unverified
+    } else if (user.applyingForHost) {
+      toast.info('Your application is pending approval.');
+      return;
     } else if (isHost) {
       navigate("/host/dashboard");
     } else {
@@ -338,9 +341,10 @@ const Navbar = () => {
 
                 <button
                   onClick={goHost}
-                  className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 transition"
+                  disabled={user?.applyingForHost}
+                  className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200 hover:bg-amber-200 transition disabled:opacity-50"
                 >
-                  {isHost ? "Host Centre" : "Become a Host"}
+                  {isHost ? "Host Centre" : user?.applyingForHost ? "Host Pending" : "Become a Host"}
                 </button>
 
                 <div className={styles.userActions}>
@@ -420,9 +424,10 @@ const Navbar = () => {
             <div className="pt-1 space-y-2">
               <button
                 onClick={() => { setIsOpen(false); goHost(); }}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-amber-100 text-amber-900 font-semibold border border-amber-200"
+                disabled={user?.applyingForHost}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 bg-amber-100 text-amber-900 font-semibold border border-amber-200 disabled:opacity-50"
               >
-                {isHost ? "Host Centre" : "Become a Host"}
+                {isHost ? "Host Centre" : user?.applyingForHost ? "Host Pending" : "Become a Host"}
               </button>
 
               {isLoggedIn ? (

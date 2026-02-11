@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe, FaInfoCircle, FaImage } from 'react-icons/fa';
 import * as authService from '../utils/authService';
 import { toast } from 'react-toastify';
@@ -6,6 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { LoadScript, StandaloneSearchBox } from '@react-google-maps/api';
 
 const HostOnboardPage = () => {
+  // Use authService directly instead of context
+  const [user, setUser] = useState(() => {
+    try {
+      return authService.getCurrentUser?.() || null;
+    } catch {
+      return null;
+    }
+  });
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -46,6 +54,14 @@ const HostOnboardPage = () => {
 
   const searchBoxRef = useRef(null);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  // Guard: Redirect if applying for host
+  useEffect(() => {
+    if (user?.applyingForHost) {
+      toast.info('Your application is pending approval.');
+      navigate('/profile');
+    }
+  }, [user?.applyingForHost, navigate]);
 
   const isEmpty = (v) => !v || String(v).trim() === '';
 
@@ -120,8 +136,11 @@ const HostOnboardPage = () => {
       if (vehicle.image) formData.append('vehicleImage', vehicle.image);
 
       await authService.becomeHost(formData); // Assuming authService.becomeHost accepts FormData
+      // Update user state locally (since no context)
+      setUser(prev => prev ? { ...prev, applyingForHost: true } : null);
+      authService.setCurrentUser({ ...user, applyingForHost: true }); // Update globally
       toast.success('Host onboarding submitted. Admin will review.');
-      navigate('/host/dashboard');
+      navigate('/profile');
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to submit host onboarding');
     } finally {

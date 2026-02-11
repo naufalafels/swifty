@@ -243,6 +243,22 @@ const Navbar = () => {
     };
   }, []);
 
+  // Add system notifications from user.notifications
+  useEffect(() => {
+    if (user?.notifications && user.notifications.length > 0) {
+      setNotifItems((prev) => [
+        ...user.notifications.map((n) => ({
+          type: "system",
+          text: n,
+          from: "System",
+          ts: new Date().toISOString(),
+        })),
+        ...prev,
+      ]);
+      setNotifCount((n) => n + user.notifications.length);
+    }
+  }, [user?.notifications]);
+
   return (
     <nav
       className={`${styles.nav.base} ${

@@ -103,6 +103,11 @@ const userSchema = new mongoose.Schema(
     initialCar: { type: initialCarSchema, default: null },  // NEW: Temp car details
 
     applyingForHost: { type: Boolean, default: false },  // NEW: Flag for host application
+
+    // NEW: Host status tracking
+    hostStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
+    rejectionReason: { type: String, default: '' },
+    notifications: { type: [String], default: [] },  // Array of notification messages for navbar
   },
   {
     timestamps: true,

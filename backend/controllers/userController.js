@@ -510,8 +510,9 @@ export async function becomeHost(req, res) {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Set applying flag (no role yet)
+    // Set applying flag and status
     user.applyingForHost = true;
+    user.hostStatus = 'pending';  // NEW: Set pending status
     user.hostProfile = {
       payoutProvider: 'razorpay_curlec_my',
       payoutAccountRef,
@@ -587,3 +588,166 @@ export async function hostGetRenterKyc(req, res) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
+
+// UPDATED: KYC list for admin - Fetch from User model
+// import { generateDownloadUrl } from '../services/s3Service.js';  // REMOVED: Already imported at top
+import { decrypt } from '../services/cryptoService.js';
+
+export const getKycList = async (req, res) => {
+  try {
+    const users = await User.find({ 'kyc.status': { $exists: true } }).lean();
+    const result = await Promise.all(users.map(async (user) => {
+      const kyc = user.kyc || {};
+      let frontUrl = null;
+      if (kyc.frontImageUrl) {
+        if (kyc.frontImageUrl.startsWith('http')) {
+          frontUrl = kyc.frontImageUrl;  // Old local URL
+        } else {
+          try {
+            frontUrl = await generateDownloadUrl(kyc.frontImageUrl);  // New S3 key
+          } catch (err) {
+            console.error('Error generating front URL', err);
+          }
+        }
+      }
+      let backUrl = null;
+      if (kyc.backImageUrl) {
+        if (kyc.backImageUrl.startsWith('http')) {
+          backUrl = kyc.backImageUrl;
+        } else {
+          try {
+            backUrl = await generateDownloadUrl(kyc.backImageUrl);
+          } catch (err) {
+            console.error('Error generating back URL', err);
+          }
+        }
+      }
+      let idNum = 'N/A';
+      try {
+        idNum = kyc.idNumber ? decrypt(kyc.idNumber) : 'N/A';
+      } catch (err) {
+        idNum = kyc.idNumber || 'N/A';
+      }
+
+      // UPDATED: Fetch car from user.initialCar (pending) or Cars collection (approved)
+      let firstCar = user.initialCar;
+      if (!firstCar && user.roles && user.roles.includes('host')) {
+        const cars = await Car.find({ companyId: user._id }).lean();
+        firstCar = cars[0];
+      }
+
+      return {
+        id: user._id,
+        userId: user._id,
+        fullName: user.name,
+        idNumber: idNum,
+        status: kyc.status || 'pending',
+        kycStatus: kyc.status || 'pending',  // NEW: Separate KYC status for filtering
+        frontImageUrl: frontUrl,
+        backImageUrl: backUrl,
+        statusReason: kyc.statusReason || '',
+        payoutReference: user.hostProfile?.payoutAccountRef || '',
+        isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
+        isApplyingForHost: !!user.applyingForHost,  // Flag for host applications
+        hostStatus: user.hostStatus || 'none',  // UPDATED: Use the hostStatus field
+        companyName: user.hostProfile?.companyName || '',  
+        ssmNumber: user.hostProfile?.ssmNumber || '',     
+        carId: firstCar?._id || null,
+        carMake: firstCar?.make || '',
+        carModel: firstCar?.model || '',
+        carYear: firstCar?.year || '',
+        carColor: firstCar?.color || '',
+        carCategory: firstCar?.category || '',
+        carSeats: firstCar?.seats || '',
+        carTransmission: firstCar?.transmission || '',
+        carFuelType: firstCar?.fuelType || '',
+        carPetrolType: firstCar?.petrolType || [],
+        carMileage: firstCar?.mileage || '',
+        carDailyRate: firstCar?.dailyRate || '',
+        carImage: firstCar?.image || '',
+      };
+    }));
+    res.json(result);
+  } catch (err) {
+    console.error('getKycList error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// NEW: Approve host application (KYC remains approved)
+export const approveHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user || !user.applyingForHost) return res.status(404).json({ message: 'Host application not found' });
+    user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+    user.applyingForHost = false;
+    user.hostStatus = 'approved';
+    user.notifications.push('Your host application has been approved! You are now a host.');
+    if (user.initialCar) {
+      const Car = mongoose.model('Car');  // Assume Car model is imported or available
+      await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
+      user.initialCar = null;
+    }
+    await user.save();
+    res.json({ message: 'Host approved' });
+  } catch (err) {
+    console.error('approveHost error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// NEW: Reject host application (KYC remains approved)
+export const rejectHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const user = await User.findById(id);
+    if (!user || !user.applyingForHost) return res.status(404).json({ message: 'Host application not found' });
+    user.applyingForHost = false;
+    user.hostStatus = 'rejected';
+    user.rejectionReason = reason || 'Rejected by admin';
+    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);
+    await user.save();
+    res.json({ message: 'Host rejected' });
+  } catch (err) {
+    console.error('rejectHost error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// UPDATED: approveKyc - Approve KYC (for users)
+export async function approveKyc(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'approved';
+    user.kyc.reviewedAt = new Date();
+    await user.save();
+    res.json({ message: 'KYC Approved' });
+  } catch (err) {
+    console.error('approveKyc error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// UPDATED: rejectKyc - Reject KYC (for users)
+export async function rejectKyc(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'KYC not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'rejected';
+    user.kyc.statusReason = reason || 'Rejected by admin';
+    user.kyc.reviewedAt = new Date();
+    await user.save();
+    res.json({ message: 'KYC Rejected' });
+  } catch (err) {
+    console.error('rejectKyc error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

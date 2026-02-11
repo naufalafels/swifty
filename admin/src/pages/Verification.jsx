@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { CheckCircle, XCircle, Eye, WalletCards, Car } from 'lucide-react';  // Added Car icon
 import { getAdminToken } from '../utils/auth';
@@ -29,8 +29,8 @@ const Verification = () => {
       const allKyc = kycRes.data || [];
       // Users: KYC users not applying for host or not host
       setUsers(allKyc.filter(item => !item.isApplyingForHost && !item.isHost));
-      // Hosts (KYC): Users applying for host
-      setHostsKyc(allKyc.filter(item => item.isApplyingForHost && !item.isHost));
+      // Hosts (KYC): Users applying for host AND KYC approved
+      setHostsKyc(allKyc.filter(item => item.isApplyingForHost && item.kycStatus === 'approved'));
       // Hosts: Approved hosts only
       const approvedHosts = allKyc.filter(item => item.isHost);
       setHosts(approvedHosts);
@@ -52,7 +52,12 @@ const Verification = () => {
   }, [fetchData]);
 
   const handleAction = async (id, type, action, extraBody = {}) => {
-    const endpoint = `/api/admin/kyc/${id}/${action}`;
+    let endpoint;
+    if (type === 'hosts-kyc') {
+      endpoint = `/api/admin/host/${id}/${action}`;  // NEW: Use host endpoints for hosts-kyc
+    } else {
+      endpoint = `/api/admin/kyc/${id}/${action}`;  // Use KYC endpoints for users
+    }
     try {
       await axios.post(
         `${API_BASE}${endpoint}`,
@@ -62,6 +67,8 @@ const Verification = () => {
       await fetchData();
       if (action === 'approve') {
         toast.success('Approved! The user can now access Host Centre after refreshing their browser.');
+      } else if (action === 'reject') {
+        toast.success('Rejected with reason.');
       }
     } catch (err) {
       console.error('Action failed', err);
@@ -375,7 +382,7 @@ const Verification = () => {
                   <img
                     src={selectedCar.carImage}
                     alt="Car"
-                    className="w-full h-48 object-cover rounded mt-2 border"
+                    className="w-full h-48 object-contain rounded mt-2 border"  // Changed to object-contain for full image display
                   />
                 </div>
               )}

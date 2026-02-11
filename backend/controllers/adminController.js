@@ -330,7 +330,7 @@ export const getKycList = async (req, res) => {
         payoutReference: user.hostProfile?.payoutAccountRef || '',
         isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
         isApplyingForHost: !!user.applyingForHost,  // Flag for host applications
-        hostStatus: user.applyingForHost ? 'pending' : (Array.isArray(user.roles) && user.roles.includes('host') ? 'approved' : 'none'),  // NEW
+        hostStatus: user.hostStatus || 'none',  // UPDATED: Use the hostStatus field
         companyName: user.hostProfile?.companyName || '',  
         ssmNumber: user.hostProfile?.ssmNumber || '',     
         carId: firstCar?._id || null,
@@ -364,10 +364,12 @@ export const approveKyc = async (req, res) => {
     user.kyc.status = 'approved';
     user.kyc.reviewedAt = new Date();
 
-    // Add 'host' role only if applying for host
+    // Add 'host' role and update status
     if (user.applyingForHost) {
       user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
       user.applyingForHost = false;
+      user.hostStatus = 'approved';  // UPDATED: Set host status
+      user.notifications.push('Your host application has been approved! You are now a host.');  // UPDATED: Notify
 
       // NEW: Create actual car from initialCar if exists
       if (user.initialCar) {
@@ -398,6 +400,10 @@ export const rejectKyc = async (req, res) => {
     user.kyc.status = 'rejected';
     user.kyc.statusReason = reason || 'Rejected by admin';
     user.kyc.reviewedAt = new Date();
+    user.hostStatus = 'rejected';  // UPDATED: Set host status
+    user.rejectionReason = reason || 'Rejected by admin';  // UPDATED: Store reason
+    user.applyingForHost = false;  // Clear flag
+    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);  // UPDATED: Notify
     await user.save();
     res.json({ message: 'Rejected' });
   } catch (err) {

@@ -107,6 +107,7 @@ function userResponse(user) {
     roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
     companyId: user.companyId || null,
     isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
+    applyingForHost: user.applyingForHost || false,  // NEW: Include flag
     legalName: user.legalName || '',
     preferredName: user.preferredName || '',
     birthdate: user.birthdate || '',
@@ -498,6 +499,9 @@ export async function becomeHost(req, res) {
 
     const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
     const notes = String(req.body.notes || '').trim();
+    const companyName = String(req.body.companyName || '').trim();  // NEW
+    const ssmNumber = String(req.body.ssmNumber || '').trim();      // NEW
+    const nricNumber = String(req.body.nricNumber || '').trim();    // NEW
     const vehicle = req.body.vehicle || {};  // Vehicle data from frontend
 
     const user = await User.findById(userId);
@@ -510,6 +514,9 @@ export async function becomeHost(req, res) {
       payoutAccountRef,
       notes,
       onboardingCompletedAt: new Date(),
+      companyName,  // NEW
+      ssmNumber,    // NEW
+      nricNumber,   // NEW
     };
 
     // Create vehicle if provided

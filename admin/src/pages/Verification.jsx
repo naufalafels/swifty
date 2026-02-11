@@ -7,6 +7,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:7889';
 
 const Verification = () => {
   const [users, setUsers] = useState([]);
+  const [hostsKyc, setHostsKyc] = useState([]);  // NEW: State for hosts (KYC)
   const [hosts, setHosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('users');
@@ -24,10 +25,12 @@ const Verification = () => {
     try {
       const kycRes = await axios.get(`${API_BASE}/api/admin/kyc`, { headers: authHeader });
       const allKyc = kycRes.data || [];
-      // Users: pending + approved non-hosts
-      setUsers(allKyc.filter(item => item.status !== 'approved' || !item.isHost));
-      // Hosts: approved hosts only
-      const approvedHosts = allKyc.filter(item => item.status === 'approved' && item.isHost);
+      // Users: KYC users not applying for host or not host
+      setUsers(allKyc.filter(item => !item.isApplyingForHost && !item.isHost));
+      // Hosts (KYC): Users applying for host
+      setHostsKyc(allKyc.filter(item => item.isApplyingForHost && !item.isHost));
+      // Hosts: Approved hosts only
+      const approvedHosts = allKyc.filter(item => item.isHost);
       setHosts(approvedHosts);
       // prefill payout edits
       const initialPayouts = {};
@@ -82,6 +85,7 @@ const Verification = () => {
   };
 
   const renderTable = (data, type) => {
+    const isHostsKyc = type === 'hosts-kyc';
     const isHost = type === 'hosts';
     const hasData = (data || []).length > 0;
 
@@ -92,8 +96,19 @@ const Verification = () => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Full Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Number</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              {isHostsKyc && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Host Status</th>}
+              {!isHostsKyc && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pictures</th>
+              {isHostsKyc && (
+                <>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SSM Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center gap-2">
+                    <WalletCards className="w-4 h-4" />
+                    Payout Reference
+                  </th>
+                </>
+              )}
               {isHost && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase flex items-center gap-2">
                   <WalletCards className="w-4 h-4" />
@@ -108,7 +123,7 @@ const Verification = () => {
               <tr>
                 <td
                   className="px-6 py-6 text-center text-sm text-gray-500"
-                  colSpan={isHost ? 6 : 5}
+                  colSpan={isHostsKyc ? 8 : isHost ? 6 : 5}
                 >
                   No records found.
                 </td>
@@ -119,7 +134,7 @@ const Verification = () => {
                 <td className="px-6 py-4 font-medium text-gray-900">{item.fullName}</td>
                 <td className="px-6 py-4 text-gray-700">{item.idNumber}</td>
                 <td className="px-6 py-4 text-gray-700 capitalize">
-                  {item.status === 'rejected' ? (item.statusReason || 'Rejected') : item.status}
+                  {isHostsKyc ? item.hostStatus : (item.status === 'rejected' ? (item.statusReason || 'Rejected') : item.status)}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-2">
@@ -144,6 +159,13 @@ const Verification = () => {
                     )}
                   </div>
                 </td>
+                {isHostsKyc && (
+                  <>
+                    <td className="px-6 py-4 text-gray-700">{item.companyName}</td>
+                    <td className="px-6 py-4 text-gray-700">{item.ssmNumber}</td>
+                    <td className="px-6 py-4 text-gray-700">{item.payoutReference}</td>
+                  </>
+                )}
                 {isHost && (
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-2">
@@ -169,7 +191,7 @@ const Verification = () => {
                 <td className="px-6 py-4 space-x-2">
                   <button
                     onClick={() => handleAction(item.id, type, 'approve')}
-                    disabled={item.status !== 'pending'}
+                    disabled={item.status !== 'pending' && (!isHostsKyc || item.hostStatus !== 'pending')}
                     className="inline-flex items-center gap-1 rounded bg-green-500 px-3 py-1 text-sm font-semibold text-white hover:bg-green-400 disabled:opacity-60"
                   >
                     <CheckCircle size={16} />
@@ -181,7 +203,7 @@ const Verification = () => {
                       setShowRejectModal(true);
                       setRejectReason('');
                     }}
-                    disabled={item.status !== 'pending'}
+                    disabled={item.status !== 'pending' && (!isHostsKyc || item.hostStatus !== 'pending')}
                     className="inline-flex items-center gap-1 rounded bg-red-500 px-3 py-1 text-sm font-semibold text-white hover:bg-red-400 disabled:opacity-60"
                   >
                     <XCircle size={16} />
@@ -213,17 +235,21 @@ const Verification = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-3xl font-bold text-gray-900">Verification</h1>
           <div className="inline-flex rounded-lg border bg-white p-1 shadow-sm">
-            {['users', 'hosts'].map((tab) => (
+            {[
+              { key: 'users', label: 'Users (KYC)' },
+              { key: 'hosts-kyc', label: 'Hosts (KYC)' },
+              { key: 'hosts', label: 'Hosts (Payout)' },
+            ].map((tab) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
                 className={`px-4 py-2 text-sm font-semibold rounded-md transition ${
-                  activeTab === tab
+                  activeTab === tab.key
                     ? 'bg-indigo-600 text-white shadow'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
-                {tab === 'users' ? 'Users (KYC)' : 'Hosts (Payout)'}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -234,6 +260,8 @@ const Verification = () => {
             <div className="text-sm text-gray-600">Loading verifications…</div>
           ) : activeTab === 'users' ? (
             renderTable(users, 'users')
+          ) : activeTab === 'hosts-kyc' ? (
+            renderTable(hostsKyc, 'hosts-kyc')
           ) : (
             renderTable(hosts, 'hosts')
           )}
@@ -271,7 +299,7 @@ const Verification = () => {
                     alert('Please provide a rejection reason.');
                     return;
                   }
-                  handleAction(selectedItem.id, activeTab === 'users' ? 'users' : 'hosts', 'reject', { reason: rejectReason.trim() });
+                  handleAction(selectedItem.id, activeTab === 'users' ? 'users' : activeTab === 'hosts-kyc' ? 'hosts-kyc' : 'hosts', 'reject', { reason: rejectReason.trim() });
                   setShowRejectModal(false);
                   setSelectedItem(null);
                   setRejectReason('');

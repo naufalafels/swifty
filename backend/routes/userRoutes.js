@@ -17,8 +17,15 @@ import {
 import authMiddleware from '../middlewares/auth.js';
 // REMOVE: import { uploadKyc } from '../middlewares/uploadKyc.js';
 import { loginLimiter } from '../middlewares/rateLimit.js';
+import multer from 'multer';
 
 const userRouter = express.Router();
+
+// Multer for vehicle image
+const vehicleUpload = multer({
+  dest: 'uploads/vehicle-images/',
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
 
 // Public
 userRouter.post('/login', loginLimiter, login);
@@ -40,7 +47,7 @@ userRouter.post('/kyc', authMiddleware, submitKyc);  // JSON submission
 userRouter.get('/kyc', authMiddleware, getKyc);
 
 // Protected: become host
-userRouter.post('/host/onboard', authMiddleware, becomeHost);
+userRouter.post('/host/onboard', authMiddleware, vehicleUpload.single('vehicleImage'), becomeHost);
 
 // Protected: host fetch renter KYC by userId
 userRouter.get('/host/kyc/:userId', authMiddleware, hostGetRenterKyc);

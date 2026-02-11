@@ -499,7 +499,8 @@ export async function becomeHost(req, res) {
     const notes = String(req.body.notes || '').trim();
     const companyName = String(req.body.companyName || '').trim(); 
     const ssmNumber = String(req.body.ssmNumber || '').trim();     
-    const vehicle = req.body.vehicle || {};  // Vehicle data from frontend
+    // Parse vehicle from JSON string
+    const vehicle = req.body.vehicle ? JSON.parse(req.body.vehicle) : {};  // FIX: Parse the string
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });

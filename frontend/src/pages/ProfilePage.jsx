@@ -482,6 +482,11 @@ const ProfilePage = () => {
                     <FaTimesCircle className="text-sm" /> Unverified
                   </div>
                 )}
+                {isHost && (
+                  <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-purple-600 text-white text-xs font-semibold border border-slate-900 shadow mt-1">
+                    <FaRocket className="text-sm" /> Host
+                  </div>
+                )}
               </div>
             </div>
             <div className="space-y-2">

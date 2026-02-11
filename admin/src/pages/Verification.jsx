@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import { CheckCircle, XCircle, Eye, WalletCards } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, WalletCards, Car } from 'lucide-react';  // Added Car icon
 import { getAdminToken } from '../utils/auth';
 import { toast } from 'react-toastify';
 
@@ -18,6 +18,7 @@ const Verification = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [selectedCar, setSelectedCar] = useState(null);  // NEW: For car details modal
 
   const authHeader = { Authorization: `Bearer ${getAdminToken()}` };
 
@@ -179,6 +180,14 @@ const Verification = () => {
                         >
                           View {item.carMake} {item.carModel}
                         </a>
+                      ) : item.carMake && item.carModel ? (
+                        <button
+                          onClick={() => setSelectedCar(item)}
+                          className="inline-flex items-center gap-1 px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                        >
+                          <Car size={14} />
+                          {item.carMake} {item.carModel}
+                        </button>
                       ) : (
                         'No car'
                       )}
@@ -327,6 +336,56 @@ const Verification = () => {
                 className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-400"
               >
                 Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Car Details Modal */}
+      {selectedCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Car Details for {selectedCar.fullName}</h3>
+              <button
+                onClick={() => setSelectedCar(null)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><strong>Make:</strong> {selectedCar.carMake || 'N/A'}</div>
+                <div><strong>Model:</strong> {selectedCar.carModel || 'N/A'}</div>
+                <div><strong>Year:</strong> {selectedCar.carYear || 'N/A'}</div>
+                <div><strong>Color:</strong> {selectedCar.carColor || 'N/A'}</div>
+                <div><strong>Category:</strong> {selectedCar.carCategory || 'N/A'}</div>
+                <div><strong>Seats:</strong> {selectedCar.carSeats || 'N/A'}</div>
+                <div><strong>Transmission:</strong> {selectedCar.carTransmission || 'N/A'}</div>
+                <div><strong>Fuel Type:</strong> {selectedCar.carFuelType || 'N/A'}</div>
+                <div><strong>Petrol Type:</strong> {selectedCar.carPetrolType ? selectedCar.carPetrolType.join(', ') : 'N/A'}</div>
+                <div><strong>Mileage:</strong> {selectedCar.carMileage || 'N/A'}</div>
+                <div><strong>Daily Rate:</strong> {selectedCar.carDailyRate ? `MYR ${selectedCar.carDailyRate}` : 'N/A'}</div>
+              </div>
+              {selectedCar.carImage && (
+                <div>
+                  <strong>Image:</strong>
+                  <img
+                    src={selectedCar.carImage}
+                    alt="Car"
+                    className="w-full h-48 object-cover rounded mt-2 border"
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setSelectedCar(null)}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+              >
+                Close
               </button>
             </div>
           </div>

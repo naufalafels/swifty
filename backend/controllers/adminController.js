@@ -336,6 +336,16 @@ export const getKycList = async (req, res) => {
         carId: firstCar?._id || null,
         carMake: firstCar?.make || '',
         carModel: firstCar?.model || '',
+        carYear: firstCar?.year || '',
+        carColor: firstCar?.color || '',
+        carCategory: firstCar?.category || '',
+        carSeats: firstCar?.seats || '',
+        carTransmission: firstCar?.transmission || '',
+        carFuelType: firstCar?.fuelType || '',
+        carPetrolType: firstCar?.petrolType || [],
+        carMileage: firstCar?.mileage || '',
+        carDailyRate: firstCar?.dailyRate || '',
+        carImage: firstCar?.image || '',
       };
     }));
     res.json(result);

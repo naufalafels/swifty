@@ -23,7 +23,7 @@ const userRouter = express.Router();
 
 // Multer for vehicle image
 const vehicleUpload = multer({
-  dest: 'uploads/vehicle-images/',
+  dest: 'uploads/car-images/',  // Match buildCarImageUrl
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 

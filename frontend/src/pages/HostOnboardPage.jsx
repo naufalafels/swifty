@@ -36,6 +36,7 @@ const HostOnboardPage = () => {
     fuelType: '',
     petrolType: [],
     carType: '',
+    mileage: '',  // Added mileage
     image: null,
   });
 
@@ -96,6 +97,7 @@ const HostOnboardPage = () => {
     if (isEmpty(vehicle.shiftType)) missing.push('Shift type');
     if (isEmpty(vehicle.fuelType)) missing.push('Fuel type');
     if (isEmpty(vehicle.carType)) missing.push('Car type');
+    if (isEmpty(vehicle.mileage)) missing.push('Mileage');  // Added mileage validation
     if (vehicle.fuelType === 'Petrol' && (!vehicle.petrolType || vehicle.petrolType.length === 0)) missing.push('Petrol type');
     if (!vehicle.image) missing.push('Vehicle image');
     if (missing.length) {
@@ -135,6 +137,7 @@ const HostOnboardPage = () => {
         fuelType: vehicle.fuelType,
         petrolType: vehicle.petrolType,
         carType: vehicle.carType,
+        mileage: vehicle.mileage,  // Added mileage
       }));
       if (vehicle.image) formData.append('vehicleImage', vehicle.image);
 
@@ -395,6 +398,15 @@ const HostOnboardPage = () => {
                 required
               />
             </label>
+            <label className="text-sm text-slate-200">Mileage (km)  {/* Added Mileage input */}
+              <input
+                value={vehicle.mileage}
+                onChange={(e) => setVehicle({ ...vehicle, mileage: e.target.value })}
+                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder="e.g., 50000"
+                required
+              />
+            </label>
             <label className="text-sm text-slate-200">Seats
               <select
                 value={vehicle.seats}
@@ -515,6 +527,7 @@ const HostOnboardPage = () => {
                 {vehicle.make || 'Make'} {vehicle.model || 'Model'} {vehicle.year ? `(${vehicle.year})` : ''}
               </div>
               <div>Daily rate: {vehicle.dailyRate || '—'}</div>
+              <div>Mileage: {vehicle.mileage || '—'}</div>  {/* Added Mileage to summary */}
               <div>Seats: {vehicle.seats || '—'} | Shift: {vehicle.shiftType || '—'}</div>
               <div>Fuel: {vehicle.fuelType || '—'} {vehicle.fuelType === 'Petrol' && vehicle.petrolType.length > 0 ? `(${vehicle.petrolType.join(', ')})` : ''}</div>
               <div>Type: {vehicle.carType || '—'}</div>

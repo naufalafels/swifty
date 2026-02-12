@@ -125,7 +125,7 @@ function userResponse(user) {
     about: user.about || '',
     privacy: user.privacy || { showCity: true, showAbout: true },
     kyc: user.kyc || { status: 'not_submitted' },
-    notifications: user.notifications || [],  // NEW: Include notifications
+    notifications: (user.notifications || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),  // UPDATED: Latest first
     createdAt: user.createdAt,
   };
 }
@@ -498,6 +498,14 @@ export async function becomeHost(req, res) {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // NEW: Check KYC approval
+    if (!user.kyc || user.kyc.status !== 'approved') {
+      return res.status(403).json({ success: false, message: 'KYC must be approved to become a host.' });
+    }
+
     // Parse vehicle from JSON string or use as object
     let vehicle = {};
     if (req.body.vehicle) {
@@ -524,9 +532,6 @@ export async function becomeHost(req, res) {
     const notes = String(req.body.notes || '').trim();
     const companyName = String(req.body.companyName || '').trim(); 
     const ssmNumber = String(req.body.ssmNumber || '').trim();     
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     // Set applying flag and status
     user.applyingForHost = true;
@@ -695,6 +700,60 @@ export const getKycList = async (req, res) => {
   }
 };
 
+// UPDATED: approveKyc - Approve KYC (for users)
+export async function approveKyc(req, res) {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'approved';
+    user.kyc.reviewedAt = new Date();
+
+    // Add 'host' role and update status
+    if (user.applyingForHost) {
+      user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+      user.applyingForHost = false;
+      user.hostStatus = 'approved';  // UPDATED: Set host status
+      user.notifications.unshift({ message: 'Your host application has been approved! You are now a host.', read: false, createdAt: new Date() });  // UPDATED: Add to top as object
+    }
+
+    await user.save();
+    res.json({ message: 'Approved' });
+  } catch (err) {
+    console.error('approveKyc error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// UPDATED: rejectKyc - Reject KYC (for users)
+export async function rejectKyc(req, res) {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
+    user.kyc.status = 'rejected';
+    user.kyc.statusReason = reason || 'Rejected by admin';
+    user.kyc.reviewedAt = new Date();
+
+    // UPDATED: If applying for host, reject and notify
+    if (user.applyingForHost) {
+      user.applyingForHost = false;
+      user.hostStatus = 'rejected';
+      user.rejectionReason = reason || 'Rejected by admin';
+      user.notifications.unshift({ message: `Your host application was rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });  // UPDATED: Add to top as object
+    }
+
+    await user.save();
+    res.json({ message: 'Rejected' });
+  } catch (err) {
+    console.error('rejectKyc error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // NEW: Approve host application (KYC remains approved)
 export const approveHost = async (req, res) => {
   try {
@@ -704,18 +763,28 @@ export const approveHost = async (req, res) => {
     user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
     user.applyingForHost = false;
     user.hostStatus = 'approved';
-    user.notifications.push('Host Application is Approved: Host Centre is available.');
+    user.notifications.unshift({ message: 'Host Application is Approved: Host Centre is available.', read: false, createdAt: new Date() });  // UPDATED: Add to top as object
     if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
       try {
         const carData = {
-          ...user.initialCar,
+          make: user.initialCar.make,
+          model: user.initialCar.model,
+          year: user.initialCar.year,
+          dailyRate: user.initialCar.dailyRate,
+          color: user.initialCar.color || '',
+          category: user.initialCar.category || 'Sedan',
+          seats: user.initialCar.seats || 4,
+          transmission: user.initialCar.transmission || 'Automatic',
+          fuelType: user.initialCar.fuelType || 'Gasoline',
+          petrolType: user.initialCar.petrolType || [],
+          mileage: user.initialCar.mileage || 0,
+          image: user.initialCar.image || '',
           companyId: user._id,
           status: 'available',
-          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] },  // Use hostProfile location
+          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] },
         };
         await Car.create(carData);
         user.initialCar = null;
-        console.log('Car created successfully for user:', user._id);
       } catch (carError) {
         console.error('Failed to create car for user:', user._id, carError.message);
         // Continue approving the host even if car creation fails
@@ -741,7 +810,7 @@ export const rejectHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'rejected';
     user.rejectionReason = reason || 'Rejected by admin';
-    user.notifications.push(`Host Application is Rejected: ${reason || 'Rejected by admin'}`);
+    user.notifications.unshift({ message: `Host Application is Rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });  // UPDATED: Add to top as object
     await user.save();
     res.json({ message: 'Host rejected' });
   } catch (err) {
@@ -750,38 +819,30 @@ export const rejectHost = async (req, res) => {
   }
 };
 
-// UPDATED: approveKyc - Approve KYC (for users)
-export async function approveKyc(req, res) {
+// NEW: Mark notifications as read (clears badge)
+export async function markNotificationsAsRead(req, res) {
   try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
-    user.kyc.status = 'approved';
-    user.kyc.reviewedAt = new Date();
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    user.notifications.forEach(n => n.read = true);
     await user.save();
-    res.json({ message: 'KYC Approved' });
+    return res.json({ success: true, message: 'Notifications marked as read' });
   } catch (err) {
-    console.error('approveKyc error', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('markNotificationsAsRead error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// UPDATED: rejectKyc - Reject KYC (for users)
-export async function rejectKyc(req, res) {
+// NEW: Clear user notifications
+export async function clearNotifications(req, res) {
   try {
-    const { id } = req.params;
-    const { reason } = req.body;
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ message: 'KYC not found' });
-    if (!user.kyc) return res.status(404).json({ message: 'KYC not found' });
-    user.kyc.status = 'rejected';
-    user.kyc.statusReason = reason || 'Rejected by admin';
-    user.kyc.reviewedAt = new Date();
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    user.notifications = [];
     await user.save();
-    res.json({ message: 'KYC Rejected' });
+    return res.json({ success: true, message: 'Notifications cleared' });
   } catch (err) {
-    console.error('rejectKyc error', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('clearNotifications error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };

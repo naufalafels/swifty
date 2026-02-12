@@ -111,7 +111,11 @@ const userSchema = new mongoose.Schema(
     // NEW: Host status tracking
     hostStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
     rejectionReason: { type: String, default: '' },
-    notifications: { type: [String], default: [] },  // Array of notification messages for navbar
+    notifications: [{
+      message: { type: String, required: true },
+      read: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now }
+    }],  // UPDATED: Array of objects with read status
   },
   {
     timestamps: true,

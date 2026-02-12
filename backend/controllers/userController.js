@@ -124,6 +124,7 @@ function userResponse(user) {
     about: user.about || '',
     privacy: user.privacy || { showCity: true, showAbout: true },
     kyc: user.kyc || { status: 'not_submitted' },
+    notifications: user.notifications || [],  // NEW: Include notifications
     createdAt: user.createdAt,
   };
 }
@@ -500,12 +501,24 @@ export async function becomeHost(req, res) {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
+    // Parse vehicle from JSON string or use as object
+    let vehicle = {};
+    if (req.body.vehicle) {
+      if (typeof req.body.vehicle === 'string') {
+        vehicle = JSON.parse(req.body.vehicle);
+      } else {
+        vehicle = req.body.vehicle;
+      }
+    }
+
+    console.log('req.body.vehicle:', req.body.vehicle);  // DEBUG
+    console.log('vehicle after parsing:', vehicle);  // DEBUG
+    console.log('vehicle.make:', vehicle.make);  // DEBUG
+
     const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
     const notes = String(req.body.notes || '').trim();
     const companyName = String(req.body.companyName || '').trim(); 
     const ssmNumber = String(req.body.ssmNumber || '').trim();     
-    // Parse vehicle from JSON string
-    const vehicle = req.body.vehicle ? JSON.parse(req.body.vehicle) : {};  // FIX: Parse the string
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
@@ -522,8 +535,8 @@ export async function becomeHost(req, res) {
       ssmNumber,    
     };
 
-    // Store initial car details in user (temp)
-    if (vehicle.make && vehicle.model && vehicle.year) {
+    // Store initial car details in user (temp) with validation
+    if (vehicle.make && vehicle.model && vehicle.year && vehicle.dailyRate) {
       const imageUrl = req.file ? buildCarImageUrl(req.file) : (vehicle.image || '');
       user.initialCar = {
         make: vehicle.make,
@@ -539,6 +552,8 @@ export async function becomeHost(req, res) {
         dailyRate: Number(vehicle.dailyRate) || 0,
         image: imageUrl,
       };
+    } else {
+      return res.status(400).json({ success: false, message: 'Vehicle make, model, year, and dailyRate are required.' });
     }
 
     await user.save();
@@ -683,7 +698,7 @@ export const approveHost = async (req, res) => {
     user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
     user.applyingForHost = false;
     user.hostStatus = 'approved';
-    user.notifications.push('Your host application has been approved! You are now a host.');
+    user.notifications.push('Host Application is Approved: Host Centre is available.');
     if (user.initialCar) {
       const Car = mongoose.model('Car');  // Assume Car model is imported or available
       await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
@@ -707,7 +722,7 @@ export const rejectHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'rejected';
     user.rejectionReason = reason || 'Rejected by admin';
-    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);
+    user.notifications.push(`Host Application is Rejected: ${reason || 'Rejected by admin'}`);
     await user.save();
     res.json({ message: 'Host rejected' });
   } catch (err) {

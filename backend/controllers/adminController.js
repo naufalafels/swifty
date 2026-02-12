@@ -421,11 +421,17 @@ export const approveHost = async (req, res) => {
     user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
     user.applyingForHost = false;
     user.hostStatus = 'approved';
-    user.notifications.push('Your host application has been approved! You are now a host.');
-    if (user.initialCar) {
-      const Car = mongoose.model('Car');  // Assume Car model is imported or available
-      await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
-      user.initialCar = null;
+    user.notifications.push('Host Application is Approved: Host Centre is available.');
+    if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
+      try {
+        await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
+        user.initialCar = null;
+      } catch (carError) {
+        console.error('Failed to create car for user:', user._id, carError.message);
+        // Continue approving the host even if car creation fails
+      }
+    } else {
+      console.error('Invalid initialCar data for user:', user._id);
     }
     await user.save();
     res.json({ message: 'Host approved' });
@@ -445,7 +451,7 @@ export const rejectHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'rejected';
     user.rejectionReason = reason || 'Rejected by admin';
-    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);
+    user.notifications.push(`Host Application is Rejected: ${reason || 'Rejected by admin'}`);
     await user.save();
     res.json({ message: 'Host rejected' });
   } catch (err) {

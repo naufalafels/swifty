@@ -30,7 +30,10 @@ const Verification = () => {
       // Users: KYC users not applying for host or not host
       setUsers(allKyc.filter(item => !item.isApplyingForHost && !item.isHost));
       // Hosts (KYC): Users applying for host AND KYC approved
-      setHostsKyc(allKyc.filter(item => item.isApplyingForHost && item.kycStatus === 'approved'));
+      const filteredHostsKyc = allKyc.filter(item => {
+        return item.isApplyingForHost && item.status === 'approved';
+      });
+      setHostsKyc(filteredHostsKyc);
       // Hosts: Approved hosts only
       const approvedHosts = allKyc.filter(item => item.isHost);
       setHosts(approvedHosts);
@@ -308,7 +311,9 @@ const Verification = () => {
       {showRejectModal && selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Reject KYC Submission</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              {activeTab === 'hosts-kyc' ? 'Reject Host Application' : 'Reject KYC Submission'}
+            </h3>
             <p className="mb-4 text-gray-600">Provide a reason for rejection:</p>
             <textarea
               value={rejectReason}

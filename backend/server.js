@@ -33,6 +33,7 @@ import { uploadKyc } from './middlewares/uploadKyc.js';  // Keep if used elsewhe
 import { submitKycMultipart } from './controllers/userController.js';
 import multer from 'multer';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { approveHost, rejectHost } from './controllers/adminController.js';  // NEW
 
 const app = express();
 const PORT = process.env.PORT || 7889;
@@ -111,6 +112,10 @@ app.use('/api/companies', companyRouter);
 app.use('/api/host', hostRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/reviews', reviewRouter);
+
+// NEW: Host approval/rejection routes
+app.post('/api/admin/host/:id/approve', authMiddleware, approveHost);
+app.post('/api/admin/host/:id/reject', authMiddleware, rejectHost);
 
 // UPDATED: KYC route (client-side S3 upload, no files/multer)
 app.post(

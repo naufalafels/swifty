@@ -411,3 +411,45 @@ export const rejectKyc = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// NEW: Approve host application (KYC remains approved)
+export const approveHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user || !user.applyingForHost) return res.status(404).json({ message: 'Host application not found' });
+    user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
+    user.applyingForHost = false;
+    user.hostStatus = 'approved';
+    user.notifications.push('Your host application has been approved! You are now a host.');
+    if (user.initialCar) {
+      const Car = mongoose.model('Car');  // Assume Car model is imported or available
+      await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
+      user.initialCar = null;
+    }
+    await user.save();
+    res.json({ message: 'Host approved' });
+  } catch (err) {
+    console.error('approveHost error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// NEW: Reject host application (KYC remains approved)
+export const rejectHost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const user = await User.findById(id);
+    if (!user || !user.applyingForHost) return res.status(404).json({ message: 'Host application not found' });
+    user.applyingForHost = false;
+    user.hostStatus = 'rejected';
+    user.rejectionReason = reason || 'Rejected by admin';
+    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);
+    await user.save();
+    res.json({ message: 'Host rejected' });
+  } catch (err) {
+    console.error('rejectHost error', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};

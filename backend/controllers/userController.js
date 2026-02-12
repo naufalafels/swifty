@@ -6,6 +6,7 @@ import User from '../models/userModel.js';
 import RefreshToken from '../models/refreshTokenModel.js';
 import { generateUploadUrl, generateDownloadUrl } from '../services/s3Service.js';  // NEW: S3 service
 import { encrypt } from '../services/cryptoService.js';  // NEW: Crypto service
+import Car from '../models/carModel.js';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 dotenv.config();
@@ -471,17 +472,13 @@ export async function getKyc(req, res) {
 export async function getKycUploadUrls(req, res) {
   try {
     const userId = req.user.id;
-    console.log('Generating URLs for user:', userId);
     const frontKey = `kyc/${userId}/front-${Date.now()}.jpg`;
     const backKey = `kyc/${userId}/back-${Date.now()}.jpg`;
-    console.log('Front key:', frontKey);
-    console.log('Back key:', backKey);
 
     const urls = {
       front: await generateUploadUrl(frontKey, 'image/jpeg'),
       back: await generateUploadUrl(backKey, 'image/jpeg'),
     };
-    console.log('URLs generated successfully');
 
     const keys = {
       front: frontKey,
@@ -511,9 +508,17 @@ export async function becomeHost(req, res) {
       }
     }
 
-    console.log('req.body.vehicle:', req.body.vehicle);  // DEBUG
-    console.log('vehicle after parsing:', vehicle);  // DEBUG
-    console.log('vehicle.make:', vehicle.make);  // DEBUG
+    // NEW: Collect location lat/lng
+    const rawLat = req.body.location_lat ?? req.body.lat ?? req.body.latitude;
+    const rawLng = req.body.location_lng ?? req.body.lng ?? req.body.longitude;
+    let hostLocation;
+    if (rawLat !== undefined && rawLng !== undefined && rawLat !== '' && rawLng !== '') {
+      const lat = parseFloat(rawLat);
+      const lng = parseFloat(rawLng);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        hostLocation = { type: 'Point', coordinates: [lng, lat] };
+      }
+    }
 
     const payoutAccountRef = String(req.body.payoutAccountRef || '').trim();
     const notes = String(req.body.notes || '').trim();
@@ -532,7 +537,8 @@ export async function becomeHost(req, res) {
       notes,
       onboardingCompletedAt: new Date(),
       companyName, 
-      ssmNumber,    
+      ssmNumber,
+      location: hostLocation || { type: 'Point', coordinates: [101.6869, 3.1390] },  // Default if not provided
     };
 
     // Store initial car details in user (temp) with validation
@@ -699,10 +705,23 @@ export const approveHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'approved';
     user.notifications.push('Host Application is Approved: Host Centre is available.');
-    if (user.initialCar) {
-      const Car = mongoose.model('Car');  // Assume Car model is imported or available
-      await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
-      user.initialCar = null;
+    if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
+      try {
+        const carData = {
+          ...user.initialCar,
+          companyId: user._id,
+          status: 'available',
+          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] },  // Use hostProfile location
+        };
+        await Car.create(carData);
+        user.initialCar = null;
+        console.log('Car created successfully for user:', user._id);
+      } catch (carError) {
+        console.error('Failed to create car for user:', user._id, carError.message);
+        // Continue approving the host even if car creation fails
+      }
+    } else {
+      console.error('Invalid initialCar data for user:', user._id);
     }
     await user.save();
     res.json({ message: 'Host approved' });

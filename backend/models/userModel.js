@@ -48,7 +48,11 @@ const hostProfileSchema = new mongoose.Schema(
     notes: { type: String, default: "" },
     onboardingCompletedAt: { type: Date, default: null },
     companyName: { type: String, default: "" }, 
-    ssmNumber: { type: String, default: "" },    
+    ssmNumber: { type: String, default: "" },
+    location: {
+      type: { type: String, default: 'Point' },
+      coordinates: [Number],
+    },
   },
   { _id: false }
 );

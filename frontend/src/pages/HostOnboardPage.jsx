@@ -76,8 +76,9 @@ const HostOnboardPage = () => {
     const missing = [];
     if (isEmpty(company.companyName)) missing.push('Company name');
     if (isEmpty(company.ssmNumber)) missing.push('SSM number');
-    // Removed nricNumber validation
     if (isEmpty(company.payoutAccountRef)) missing.push('Payout account reference');
+    // NEW: Require location coordinates
+    if (!location.latitude || !location.longitude) missing.push('Location coordinates');
     if (missing.length) {
       const msg = 'Complete first step before moving on';
       toast.error(`Step 1: ${missing.join(', ')}`);
@@ -124,9 +125,13 @@ const HostOnboardPage = () => {
       const formData = new FormData();
       formData.append('payoutAccountRef', company.payoutAccountRef);
       formData.append('notes', company.notes);
-      formData.append('companyName', company.companyName);  // NEW
-      formData.append('ssmNumber', company.ssmNumber);      // NEW
-      // Removed nricNumber
+      formData.append('companyName', company.companyName); 
+      formData.append('ssmNumber', company.ssmNumber);      
+
+      formData.append('location_lat', location.latitude);
+      formData.append('location_lng', location.longitude);
+
+
       formData.append('vehicle', JSON.stringify({
         make: vehicle.make,
         model: vehicle.model,

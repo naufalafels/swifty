@@ -424,8 +424,26 @@ export const approveHost = async (req, res) => {
     user.notifications.push('Host Application is Approved: Host Centre is available.');
     if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
       try {
-        await Car.create({ ...user.initialCar, companyId: user._id, status: 'available' });
+        const carData = {
+          make: user.initialCar.make,
+          model: user.initialCar.model,
+          year: user.initialCar.year,
+          dailyRate: user.initialCar.dailyRate,
+          color: user.initialCar.color || '',
+          category: user.initialCar.category || 'Sedan',
+          seats: user.initialCar.seats || 4,
+          transmission: user.initialCar.transmission || 'Automatic',
+          fuelType: user.initialCar.fuelType || 'Gasoline',
+          petrolType: user.initialCar.petrolType || [],
+          mileage: user.initialCar.mileage || 0,
+          image: user.initialCar.image || '',
+          companyId: user._id,
+          status: 'available',
+          location: user.hostProfile.location || { type: 'Point', coordinates: [101.6869, 3.1390] },
+        };
+        await Car.create(carData);
         user.initialCar = null;
+        console.log('Car created successfully for user:', user._id);
       } catch (carError) {
         console.error('Failed to create car for user:', user._id, carError.message);
         // Continue approving the host even if car creation fails

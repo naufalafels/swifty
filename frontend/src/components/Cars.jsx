@@ -888,8 +888,6 @@ const Cars = () => {
               const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
               const companyState = car.company?.address?.state || "";
 
-              console.log('Car ID:', car._id, 'Company Name:', car.companyName);  // DEBUG
-
               return (
                 <div key={id} className={carPageStyles.carCard}>
                   <div className={carPageStyles.glowEffect}></div>

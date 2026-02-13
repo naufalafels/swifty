@@ -13,20 +13,10 @@ export const getClientCars = async (req, res) => {
       .lean();
 
     const carsWithDetails = await Promise.all(cars.map(async (car) => {  // MAKE ASYNC
-      let companyName = 'Unknown Company';
-      if (car.companyId) {
-        if (car.companyId.hostProfile?.companyName) {
-          // Host car
-          companyName = car.companyId.hostProfile.companyName;
-        } else if (car.companyId.name) {
-          // Admin car (Company)
-          companyName = car.companyId.name;
-        } else {
-          // Fallback: try to fetch Company directly
-          const company = await Company.findById(car.companyId).lean();
-          companyName = company?.name || 'Unknown Company';
-        }
-      }
+        let companyName = car.companyName || 'Unknown Company';
+        if (car.companyId?.name) {
+        companyName = car.companyId.name;  // Prioritize the populated Company name if available
+    }
 
       const carLat = car.location?.coordinates[1];
       const carLng = car.location?.coordinates[0];

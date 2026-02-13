@@ -1,4 +1,3 @@
-// src/components/Navbar.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBars, FaTimes, FaUser, FaSignOutAlt, FaBell } from "react-icons/fa";
@@ -245,13 +244,13 @@ const Navbar = () => {
 
   // Add system notifications from user.notifications
   useEffect(() => {
-    if (user?.notifications && user.notifications.length > 0) {
+    if (user?.notifications && Array.isArray(user.notifications) && user.notifications.length > 0) {
       setNotifItems((prev) => [
         ...user.notifications.map((n) => ({
           type: "system",
-          text: n,
+          text: n.message,  // FIXED: Use n.message instead of n (object)
           from: "System",
-          ts: new Date().toISOString(),
+          ts: n.createdAt || new Date().toISOString(),  // FIXED: Use n.createdAt
         })),
         ...prev,
       ]);

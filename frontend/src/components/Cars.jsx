@@ -136,6 +136,7 @@ const Cars = () => {
       if (isCanceled) return;
       console.error("Failed to fetch cars:", err);
       setError(err?.response?.data?.message || err.message || "Failed to load cars");
+      // DON'T SET CARS TO [] ON ERROR TO PREVENT VANISHING
     } finally {
       setLoading(false);
     }

@@ -1,17 +1,33 @@
 import Car from '../models/carModel.js';
+import User from '../models/userModel.js';
+import Company from '../models/companyModel.js';  // ADD
 
 export const getClientCars = async (req, res) => {
   try {
-    // Use location from query params, or default to KL
     const userLat = req.query.lat ? parseFloat(req.query.lat) : 3.1390;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : 101.6869;
 
     const cars = await Car.find({ status: 'available' })
-      .populate({ path: 'companyId', select: 'hostProfile' })
+      .populate({ path: 'companyId', select: 'hostProfile name' })  // ADD 'name' for Company
       .limit(req.query.limit ? parseInt(req.query.limit) : 10)
       .lean();
 
-    const carsWithDetails = cars.map(car => {
+    const carsWithDetails = await Promise.all(cars.map(async (car) => {  // MAKE ASYNC
+      let companyName = 'Unknown Company';
+      if (car.companyId) {
+        if (car.companyId.hostProfile?.companyName) {
+          // Host car
+          companyName = car.companyId.hostProfile.companyName;
+        } else if (car.companyId.name) {
+          // Admin car (Company)
+          companyName = car.companyId.name;
+        } else {
+          // Fallback: try to fetch Company directly
+          const company = await Company.findById(car.companyId).lean();
+          companyName = company?.name || 'Unknown Company';
+        }
+      }
+
       const carLat = car.location?.coordinates[1];
       const carLng = car.location?.coordinates[0];
       let distance = null;
@@ -23,19 +39,13 @@ export const getClientCars = async (req, res) => {
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         distance = (R * c).toFixed(1);
       }
+
       return {
         ...car,
-        companyName: car.companyId?.hostProfile?.companyName || 'Unknown Company',
+        companyName,
         distance: distance ? `${distance} km away` : 'Distance unknown',
       };
-    });
-
-    // Sort by distance for nearest/cheapest (optional, based on Cars.jsx logic)
-    carsWithDetails.sort((a, b) => {
-      const aDist = parseFloat(a.distance) || Infinity;
-      const bDist = parseFloat(b.distance) || Infinity;
-      return aDist - bDist;
-    });
+    }));
 
     return res.json({ success: true, data: carsWithDetails });
   } catch (err) {

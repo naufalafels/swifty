@@ -149,6 +149,7 @@ export const createAdminCar = async (req, res) => {
       image: imageUrl,
       status: body.status || 'available',
       companyId,
+      companyName: company.name,
       location: carLocation ? carLocation : undefined
     });
 
@@ -369,17 +370,8 @@ export const approveKyc = async (req, res) => {
       user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
       user.applyingForHost = false;
       user.hostStatus = 'approved';  // UPDATED: Set host status
-      user.notifications.push('Your host application has been approved! You are now a host.');  // UPDATED: Notify
-
-      // NEW: Create actual car from initialCar if exists
-      if (user.initialCar) {
-        await Car.create({
-          ...user.initialCar,
-          companyId: user._id,
-          status: 'available',
-        });
-        user.initialCar = null;  // Clear temp data
-      }
+      if (!user.notifications) user.notifications = [];  // ADD
+      user.notifications.unshift({ message: 'Your host application has been approved! You are now a host.', read: false, createdAt: new Date() });  // UPDATED: Add to top as object
     }
 
     await user.save();
@@ -400,10 +392,16 @@ export const rejectKyc = async (req, res) => {
     user.kyc.status = 'rejected';
     user.kyc.statusReason = reason || 'Rejected by admin';
     user.kyc.reviewedAt = new Date();
-    user.hostStatus = 'rejected';  // UPDATED: Set host status
-    user.rejectionReason = reason || 'Rejected by admin';  // UPDATED: Store reason
-    user.applyingForHost = false;  // Clear flag
-    user.notifications.push(`Your host application was rejected: ${reason || 'Rejected by admin'}`);  // UPDATED: Notify
+
+    // UPDATED: If applying for host, reject and notify
+    if (user.applyingForHost) {
+      user.applyingForHost = false;
+      user.hostStatus = 'rejected';
+      user.rejectionReason = reason || 'Rejected by admin';
+      if (!user.notifications) user.notifications = [];  // ADD
+      user.notifications.unshift({ message: `Your host application was rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });  // UPDATED: Add to top as object
+    }
+
     await user.save();
     res.json({ message: 'Rejected' });
   } catch (err) {
@@ -421,7 +419,8 @@ export const approveHost = async (req, res) => {
     user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
     user.applyingForHost = false;
     user.hostStatus = 'approved';
-    user.notifications.push('Host Application is Approved: Host Centre is available.');
+    if (!user.notifications) user.notifications = [];  // ADD
+    user.notifications.unshift({ message: 'Host Application is Approved: Host Centre is available.', read: false, createdAt: new Date() });
     if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
       try {
         const carData = {
@@ -438,8 +437,9 @@ export const approveHost = async (req, res) => {
           mileage: user.initialCar.mileage || 0,
           image: user.initialCar.image || '',
           companyId: user._id,
+          companyName: user.hostProfile.companyName || '',
           status: 'available',
-          location: user.hostProfile.location || { type: 'Point', coordinates: [101.6869, 3.1390] },
+          location: user.hostProfile.location || { type: 'Point', coordinates: [101.6869, 3.1390] }, // Default to KL if missing
         };
         await Car.create(carData);
         user.initialCar = null;
@@ -469,7 +469,8 @@ export const rejectHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'rejected';
     user.rejectionReason = reason || 'Rejected by admin';
-    user.notifications.push(`Host Application is Rejected: ${reason || 'Rejected by admin'}`);
+    if (!user.notifications) user.notifications = [];  // ADD
+    user.notifications.unshift({ message: `Host Application is Rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });
     await user.save();
     res.json({ message: 'Host rejected' });
   } catch (err) {

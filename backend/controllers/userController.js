@@ -780,8 +780,9 @@ export const approveHost = async (req, res) => {
           mileage: user.initialCar.mileage || 0,
           image: user.initialCar.image || '',
           companyId: user._id,
+          companyName: user.hostProfile?.companyName || '',  // ADDED: Company name for host cars
           status: 'available',
-          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] },
+          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] }, // Default to KL if missing
         };
         await Car.create(carData);
         user.initialCar = null;
@@ -824,6 +825,7 @@ export async function markNotificationsAsRead(req, res) {
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user.notifications) user.notifications = [];  // ADD
     user.notifications.forEach(n => n.read = true);
     await user.save();
     return res.json({ success: true, message: 'Notifications marked as read' });

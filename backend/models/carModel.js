@@ -27,6 +27,7 @@ const carSchema = new Schema({
 
   // Multi-tenant: which company owns this car
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
+  companyName: { type: String, default: '' },
 
   // optional pickup location
   location: {

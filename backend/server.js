@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { connectDB } from './config/db.js';
 
 import userRouter from './routes/userRoutes.js';
-import carRouter from './routes/carRoutes.js';
+// import carRouter from './routes/carRoutes.js';  // REMOVED: No longer needed
 import bookingRouter from './routes/bookingRoutes.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
@@ -25,6 +25,7 @@ import hostRouter from './routes/hostRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
 import reviewRouter from './routes/reviewRoutes.js';
 import profileRouter from './routes/profileRoutes.js';
+import clientRoutes from './routes/clientRoutes.js';  // ADDED: Import client routes
 
 import { generalLimiter } from './middlewares/rateLimit.js';
 import authMiddleware from './middlewares/auth.js';
@@ -104,7 +105,7 @@ app.use('/api', generalLimiter);
 // ROUTES
 app.use('/api/auth', userRouter);
 app.use('/api/profile', profileRouter);
-app.use('/api/cars', carRouter);
+app.use('/api/cars', clientRoutes);  // UPDATED: Use clientRoutes for /api/cars
 app.use('/api/bookings', bookingRouter);
 app.use('/api/payments', paymentRouter);
 app.use('/api/admin', adminRouter);

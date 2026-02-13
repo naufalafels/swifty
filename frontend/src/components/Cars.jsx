@@ -99,6 +99,12 @@ const Cars = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (userCoords) {
+      fetchCars();  // Refetch when user location changes
+    }
+  }, [userCoords]);
+
   const fetchCars = async () => {
     setLoading(true);
     setError("");
@@ -111,13 +117,17 @@ const Cars = () => {
     abortControllerRef.current = controller;
 
     try {
+      const params = { limit };
+      if (userCoords) {
+        params.lat = userCoords[0];
+        params.lng = userCoords[1];
+      }
       const res = await axios.get(`${base}/api/cars`, {
-        params: { limit },
+        params,
         signal: controller.signal,
         headers: { Accept: "application/json" },
       });
-      const json = res.data;
-      setCars(Array.isArray(json.data) ? json.data : json.data ?? json);
+      setCars(res.data?.data || []);
     } catch (err) {
       const isCanceled =
         err?.code === "ERR_CANCELED" ||
@@ -738,7 +748,7 @@ const Cars = () => {
                       <input
                         type="checkbox"
                         checked={!!selectedTypes[t]}
-                        onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[type] }))}
+                        onChange={() => toggleType(t)}
                         className="w-4 h-4 accent-orange-500"
                       />
                       <span className="text-gray-200">{t}</span>
@@ -758,7 +768,7 @@ const Cars = () => {
                       <input
                         type="checkbox"
                         checked={!!selectedSeats[s]}
-                        onChange={() => setSelectedSeats((prev) => ({ ...prev, [s]: !prev[s] }))}
+                        onChange={() => toggleSeat(s)}
                         className="w-4 h-4 accent-orange-500"
                       />
                       <span className="text-gray-200">{s} Seats</span>

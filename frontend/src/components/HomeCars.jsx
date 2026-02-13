@@ -409,9 +409,6 @@ const HomeCars = () => {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className={styles.carName}>{carName}</h3>
-                      <p className="text-sm text-gray-600 mb-2">
-                        <span className="font-medium">{car.companyName}</span> • {car.distance}
-                      </p>
                       <p className={styles.carInfoContainer}>
                         <span className={styles.carTypeBadge}>
                           {car.category || "Sedan"}

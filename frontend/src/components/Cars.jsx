@@ -505,7 +505,7 @@ const Cars = () => {
   const companyMarkers = useMemo(() => {
     const companies = {};
     filteredCars.forEach((car) => {
-      const companyKey = car.companyId?.name || car.companyId?.id || "Unknown";
+      const companyKey = car.companyId?.hostProfile?.companyName || car.companyId?.name || "Unknown";
       if (!companies[companyKey]) {
         companies[companyKey] = {
           company: car.companyId,
@@ -810,10 +810,10 @@ const Cars = () => {
                 )}
                 {companyMarkers.map((companyData) => (
                   <Marker
-                    key={companyData.company?.name || "unknown"}
+                    key={companyData.company?.hostProfile?.companyName || companyData.company?.name || "unknown"}
                     position={{ lat: companyData.location[0], lng: companyData.location[1] }}
                     onClick={() => setSelectedMarker(companyData)}
-                    title={companyData.company?.name || "Company"}
+                    title={companyData.company?.hostProfile?.companyName || companyData.company?.name || "Company"}
                   />
                 ))}
                 {selectedMarker && (
@@ -822,8 +822,8 @@ const Cars = () => {
                     onCloseClick={() => setSelectedMarker(null)}
                   >
                     <div>
-                      <h3>{selectedMarker.company?.name || "Company"}</h3>
-                      <p>{selectedMarker.company?.address?.city || selectedMarker.company?.hostProfile?.address?.city || ""}</p>
+                      <h3>{selectedMarker.company?.hostProfile?.companyName || selectedMarker.company?.name || "Company"}</h3>
+                      <p>{selectedMarker.company?.hostProfile?.address?.city || ""}</p>
                       <h4>Cars Available:</h4>
                       <ul>
                         {selectedMarker.cars.map((car) => (
@@ -889,7 +889,7 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
-              const companyName = car.companyId?.name || car.companyName || "Unknown Company";
+              const companyName = car.companyId?.hostProfile?.companyName || car.companyId?.name || car.companyName || "Unknown Company";
               const companyCity = car.companyId?.address?.city || car.companyId?.address?.cityName || car.companyId?.hostProfile?.address?.city || car.companyId?.hostProfile?.address?.cityName || "";
               const companyState = car.companyId?.address?.state || car.companyId?.hostProfile?.address?.state || "";
 
@@ -924,7 +924,7 @@ const Cars = () => {
                           <FaBuilding className="text-gray-400" />
                           <span className="truncate">
                             {companyName}
-                            {companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ""}
+                            {companyCity ? ` - ${companyCity}` : companyState ? ` - ${companyState}` : ""}
                           </span>
                         </div>
                       </div>

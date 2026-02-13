@@ -356,6 +356,9 @@ const Cars = () => {
       car.company?.address?.stateName,
       car.state,
       car.company?.state,
+      car.company?.hostProfile?.address?.state,  // Fallback for host cars
+      car.company?.hostProfile?.address?.region,
+      car.company?.hostProfile?.address?.stateName,
     ]
       .filter(Boolean)
       .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
@@ -372,6 +375,8 @@ const Cars = () => {
       car.city,
       car.pickupLocation,
       car.locationName,
+      car.company?.hostProfile?.address?.city,  // Fallback for host cars
+      car.company?.hostProfile?.address?.cityName,
     ]
       .filter(Boolean)
       .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
@@ -818,7 +823,7 @@ const Cars = () => {
                   >
                     <div>
                       <h3>{selectedMarker.company?.name || "Company"}</h3>
-                      <p>{selectedMarker.company?.address?.city || ""}</p>
+                      <p>{selectedMarker.company?.address?.city || selectedMarker.company?.hostProfile?.address?.city || ""}</p>
                       <h4>Cars Available:</h4>
                       <ul>
                         {selectedMarker.cars.map((car) => (
@@ -885,8 +890,8 @@ const Cars = () => {
               const disabled = isBookDisabled(car);
 
               const companyName = car.companyName || car.company?.name || car.ownerName || "Unknown Company";
-              const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
-              const companyState = car.company?.address?.state || "";
+              const companyCity = car.company?.address?.city || car.company?.address?.cityName || car.company?.hostProfile?.address?.city || car.company?.hostProfile?.address?.cityName || "";
+              const companyState = car.company?.address?.state || car.company?.hostProfile?.address?.state || "";
 
               return (
                 <div key={id} className={carPageStyles.carCard}>

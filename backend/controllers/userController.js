@@ -544,6 +544,13 @@ export async function becomeHost(req, res) {
       companyName, 
       ssmNumber,
       location: hostLocation || { type: 'Point', coordinates: [101.6869, 3.1390] },  // Default if not provided
+      address: {
+        street: req.body.address_street || '',
+        city: req.body.address_city || '',
+        state: req.body.address_state || '',
+        zipCode: req.body.address_zipCode || '',
+        country: req.body.address_country || 'Malaysia',
+      },
     };
 
     // Store initial car details in user (temp) with validation

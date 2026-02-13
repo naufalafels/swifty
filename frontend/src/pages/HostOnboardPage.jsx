@@ -48,6 +48,11 @@ const HostOnboardPage = () => {
     latitude: '',
     longitude: '',
     useCoords: false,
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
   });
 
   const [floaty, setFloaty] = useState('');
@@ -131,6 +136,12 @@ const HostOnboardPage = () => {
       formData.append('location_lat', location.latitude);
       formData.append('location_lng', location.longitude);
 
+      // NEW: Append address fields
+      formData.append('address_street', location.street);
+      formData.append('address_city', location.city);
+      formData.append('address_state', location.state);
+      formData.append('address_zipCode', location.zipCode);
+      formData.append('address_country', location.country);
 
       formData.append('vehicle', JSON.stringify({
         make: vehicle.make,
@@ -179,6 +190,21 @@ const HostOnboardPage = () => {
       lng = place.geometry.location.lng()?.toFixed(6) || '';
     }
 
+    // NEW: Extract address components
+    const comps = place.address_components || [];
+    let street = '';
+    let city = '';
+    let state = '';
+    let zipCode = '';
+    let country = '';
+    comps.forEach((c) => {
+      if (c.types.includes('street_number') || c.types.includes('route')) street = (street + ' ' + c.long_name).trim();
+      if (c.types.includes('locality')) city = c.long_name;
+      if (c.types.includes('administrative_area_level_1')) state = c.long_name;
+      if (c.types.includes('postal_code')) zipCode = c.long_name;
+      if (c.types.includes('country')) country = c.long_name;
+    });
+
     setLocation((p) => ({
       ...p,
       search: formatted,
@@ -186,6 +212,11 @@ const HostOnboardPage = () => {
       latitude: lat,
       longitude: lng,
       useCoords: false,
+      street,
+      city,
+      state,
+      zipCode,
+      country,
     }));
   };
 

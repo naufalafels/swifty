@@ -53,6 +53,13 @@ const hostProfileSchema = new mongoose.Schema(
       type: { type: String, default: 'Point' },
       coordinates: [Number],
     },
+    address: {
+      city: { type: String, default: "" },
+      state: { type: String, default: "" },
+      street: { type: String, default: "" },
+      zipCode: { type: String, default: "" },
+      country: { type: String, default: "Malaysia" },
+    },
   },
   { _id: false }
 );

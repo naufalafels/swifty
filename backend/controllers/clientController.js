@@ -8,7 +8,7 @@ export const getClientCars = async (req, res) => {
     const userLng = req.query.lng ? parseFloat(req.query.lng) : 101.6869;
 
     const cars = await Car.find({ status: 'available' })
-      .populate({ path: 'companyId', select: 'hostProfile name' })  // ADD 'name' for Company
+      .populate({ path: 'companyId', select: 'hostProfile name address' })  // ADD 'name' for Company, include address for location filtering
       .limit(req.query.limit ? parseInt(req.query.limit) : 10)
       .lean();
 

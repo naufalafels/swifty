@@ -212,10 +212,8 @@ const Cars = () => {
     }
   };
 
-  const plural = (n, singular, pluralForm) => {
-    if (n === 1) return `1 ${singular}`;
-    return `${n} ${pluralForm ?? singular + "s"}`;
-  };
+  const plural = (n, singular, pluralForm) =>
+    n === 1 ? `1 ${singular}` : `${n} ${pluralForm ?? singular + "s"}`;
 
   // availability helpers
   const computeEffectiveAvailability = (car) => {
@@ -230,9 +228,13 @@ const Cars = () => {
           return { pickup: new Date(pickup), return: new Date(ret) };
         })
         .filter(Boolean)
-        .filter((b) => startOfDay(b.pickup) <= startOfDay(today) && startOfDay(today) <= startOfDay(b.return));
+        .filter(
+          (b) =>
+            startOfDay(b.pickup) <= startOfDay(today) &&
+            startOfDay(today) <= startOfDay(b.return)
+        );
 
-      if (overlapping.length > 0) {
+      if (overlapping.length) {
         overlapping.sort((a, b) => b.return - a.return);
         return {
           state: "booked",
@@ -719,7 +721,7 @@ const Cars = () => {
 
           {geoError && (
             <div className="mt-4 bg-red-900/50 border border-red-800 rounded-xl p-4">
-              <p className="text-red-300 text-sm">{geoError}</p>
+              <p className="text-red-400 text-sm">{geoError}</p>
             </div>
           )}
 
@@ -736,7 +738,7 @@ const Cars = () => {
                       <input
                         type="checkbox"
                         checked={!!selectedTypes[t]}
-                        onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[t] }))}
+                        onChange={() => setSelectedTypes((prev) => ({ ...prev, [t]: !prev[type] }))}
                         className="w-4 h-4 accent-orange-500"
                       />
                       <span className="text-gray-200">{t}</span>
@@ -871,7 +873,7 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
-              const companyName = car.company?.name || car.companyName || car.ownerName || "";
+              const companyName = car.companyName || car.company?.name || car.ownerName || "";
               const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
               const companyState = car.company?.address?.state || "";
 
@@ -913,7 +915,7 @@ const Cars = () => {
                         ) : null}
                       </div>
                       <div className="text-right text-sm text-gray-300">
-                        {car._distanceKm ? <div className="text-xs text-gray-400">{car._distanceKm} km</div> : null}
+                        {car.distance ? <div className="text-xs text-gray-400">{car.distance}</div> : null}
                       </div>
                     </div>
 

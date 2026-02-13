@@ -92,6 +92,46 @@ export const getAdminCars = async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
 };
 
+// NEW: Get cars for renters (with company name and distance)
+export const getRenterCars = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const user = userId ? await User.findById(userId).lean() : null;
+    const userLat = user?.location?.coordinates[1] || 3.1390;  // Default KL lat
+    const userLng = user?.location?.coordinates[0] || 101.6869;  // Default KL lng
+
+    const cars = await Car.find({ status: 'available' })
+      .populate({ path: 'companyId', select: 'hostProfile.companyName' })  // Populate companyName
+      .limit(req.query.limit ? parseInt(req.query.limit) : 10)
+      .lean();
+
+    const carsWithDetails = cars.map(car => {
+      const carLat = car.location?.coordinates[1];
+      const carLng = car.location?.coordinates[0];
+      let distance = null;
+      if (carLat !== undefined && carLng !== undefined) {
+        // Haversine formula for distance in km
+        const R = 6371;
+        const dLat = (carLat - userLat) * Math.PI / 180;
+        const dLng = (carLng - userLng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(userLat * Math.PI / 180) * Math.cos(carLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        distance = (R * c).toFixed(1);
+      }
+      return {
+        ...car,
+        companyName: car.companyId?.hostProfile?.companyName || 'Unknown Company',
+        distance: distance ? `${distance} km away` : 'Distance unknown',
+      };
+    });
+
+    return res.json({ success: true, data: carsWithDetails });
+  } catch (err) {
+    console.error('getRenterCars error', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // create car for company (accepts image on req.file)
 // Updated: when request doesn't provide a valid location, fall back to company's location (if any)
 export const createAdminCar = async (req, res) => {

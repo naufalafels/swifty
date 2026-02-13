@@ -84,13 +84,20 @@ export const getCars = async (req, res, next) => {
 
     const total = await Car.countDocuments(query);
 
-    // populate company data (name, slug, logo, address, location) so frontend can filter by company.city/location
+    // Query cars without populate first
     let cars = await Car.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate({ path: 'companyId', select: 'name slug logo address location' })
       .lean();
+
+    console.log('Model has companyName?', Car.schema.path('companyName') ? 'Yes' : 'No');
+    console.log('DB name:', mongoose.connection.db.databaseName);
+    cars.forEach(car => {
+      if (car._id.toString() === '698e933fb204efd32c048775') {
+        console.log('Car from DB query:', car);
+      }
+    });
 
     let carsWithAvailability = cars;
     if (Array.isArray(cars) && cars.length && typeof Car.computeAvailabilityForCars === "function") {
@@ -104,17 +111,22 @@ export const getCars = async (req, res, next) => {
 
     // Ensure each returned car includes company info normalized under `company` and,
     // if car.location is missing, copy company.location into car.location so client filtering works.
-    const normalized = carsWithAvailability.map((c) => {
+    const normalized = await Promise.all(carsWithAvailability.map(async (c) => {
       const car = { ...c };
-      if (car.companyId && typeof car.companyId === 'object') {
-        car.company = {
-          id: car.companyId._id || car.companyId.id,
-          name: car.companyId.name,
-          slug: car.companyId.slug,
-          logo: car.companyId.logo,
-          address: car.companyId.address || {},
-          location: car.companyId.location || null,
-        };
+      if (car.companyId) {
+        const company = await Company.findById(car.companyId).select('name slug logo address location').lean();
+        if (company) {
+          car.company = {
+            id: company._id,
+            name: company.name,
+            slug: company.slug,
+            logo: company.logo,
+            address: company.address || {},
+            location: company.location || null,
+          };
+        } else {
+          car.company = null;
+        }
       } else {
         car.company = null;
       }
@@ -127,7 +139,7 @@ export const getCars = async (req, res, next) => {
       // remove companyId to avoid confusion
       delete car.companyId;
       return car;
-    });
+    }));
 
     return res.json({
       page,

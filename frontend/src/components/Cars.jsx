@@ -884,9 +884,11 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
-              const companyName = car.companyName || car.company?.name || car.ownerName || "";
+              const companyName = car.companyName || car.company?.name || car.ownerName || "Unknown Company";
               const companyCity = car.company?.address?.city || car.company?.address?.cityName || "";
               const companyState = car.company?.address?.state || "";
+
+              console.log('Car ID:', car._id, 'Company Name:', car.companyName);  // DEBUG
 
               return (
                 <div key={id} className={carPageStyles.carCard}>
@@ -915,15 +917,13 @@ const Cars = () => {
                         <h3 className={carPageStyles.carName}>{carName}</h3>
                         <p className={carPageStyles.carType}>{car.category ?? car.type ?? "Sedan"}</p>
 
-                        {companyName ? (
-                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
-                            <FaBuilding className="text-gray-400" />
-                            <span className="truncate">
-                              {companyName}
-                              {companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ""}
-                            </span>
-                          </div>
-                        ) : null}
+                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
+                          <FaBuilding className="text-gray-400" />
+                          <span className="truncate">
+                            {companyName}
+                            {companyCity ? ` — ${companyCity}` : companyState ? ` — ${companyState}` : ""}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-right text-sm text-gray-300">
                         {car.distance ? <div className="text-xs text-gray-400">{car.distance}</div> : null}

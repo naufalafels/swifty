@@ -25,8 +25,12 @@ const carSchema = new Schema({
   status: { type: String, enum: ['available','rented','maintenance'], default: 'available' },
   image: String,
 
-  // Multi-tenant: which company owns this car
-  companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
+  // Always owned by a User (Host)
+  companyId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',  // Direct ref to User
+    default: null,
+  },
   companyName: { type: String, default: '' },
 
   // optional pickup location

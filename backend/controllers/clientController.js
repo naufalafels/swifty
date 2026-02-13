@@ -1,6 +1,5 @@
 import Car from '../models/carModel.js';
 import User from '../models/userModel.js';
-import Company from '../models/companyModel.js';  // ADD
 
 export const getClientCars = async (req, res) => {
   try {
@@ -8,14 +7,14 @@ export const getClientCars = async (req, res) => {
     const userLng = req.query.lng ? parseFloat(req.query.lng) : 101.6869;
 
     const cars = await Car.find({ status: 'available' })
-      .populate({ path: 'companyId', select: 'hostProfile name address' })  // ADD 'name' for Company, include address for location filtering
+      .populate({ path: 'companyId', select: 'hostProfile name' })  // Populate from User, select hostProfile and name
       .limit(req.query.limit ? parseInt(req.query.limit) : 10)
       .lean();
 
     const carsWithDetails = await Promise.all(cars.map(async (car) => {  // MAKE ASYNC
         let companyName = car.companyName || 'Unknown Company';
         if (car.companyId?.name) {
-        companyName = car.companyId.name;  // Prioritize the populated Company name if available
+        companyName = car.companyId.name;  // Prioritize the populated User name if available
     }
 
       const carLat = car.location?.coordinates[1];

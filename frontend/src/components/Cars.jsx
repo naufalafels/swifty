@@ -322,7 +322,7 @@ const Cars = () => {
   };
 
   const getCarCoordinates = (car) => {
-    const loc = car.location ?? car.company?.location ?? null;
+    const loc = car.location ?? car.companyId?.location ?? null;
     if (loc && Array.isArray(loc.coordinates) && loc.coordinates.length >= 2) {
       return [Number(loc.coordinates[1]), Number(loc.coordinates[0])];
     }
@@ -351,14 +351,14 @@ const Cars = () => {
     if (!state) return true;
     const q = state.trim().toLowerCase();
     const candidates = [
-      car.company?.address?.state,
-      car.company?.address?.region,
-      car.company?.address?.stateName,
+      car.companyId?.address?.state,
+      car.companyId?.address?.region,
+      car.companyId?.address?.stateName,
       car.state,
-      car.company?.state,
-      car.company?.hostProfile?.address?.state,  // Fallback for host cars
-      car.company?.hostProfile?.address?.region,
-      car.company?.hostProfile?.address?.stateName,
+      car.companyId?.state,
+      car.companyId?.hostProfile?.address?.state,  // Fallback for host cars
+      car.companyId?.hostProfile?.address?.region,
+      car.companyId?.hostProfile?.address?.stateName,
     ]
       .filter(Boolean)
       .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
@@ -369,14 +369,14 @@ const Cars = () => {
     if (!city) return true;
     const c = city.trim().toLowerCase();
     const candidates = [
-      car.company?.address?.city,
-      car.company?.address?.cityName,
+      car.companyId?.address?.city,
+      car.companyId?.address?.cityName,
       car.city,
       car.city,
       car.pickupLocation,
       car.locationName,
-      car.company?.hostProfile?.address?.city,  // Fallback for host cars
-      car.company?.hostProfile?.address?.cityName,
+      car.companyId?.hostProfile?.address?.city,  // Fallback for host cars
+      car.companyId?.hostProfile?.address?.cityName,
     ]
       .filter(Boolean)
       .map((s) => (typeof s === "string" ? s.toLowerCase() : JSON.stringify(s).toLowerCase()));
@@ -505,10 +505,10 @@ const Cars = () => {
   const companyMarkers = useMemo(() => {
     const companies = {};
     filteredCars.forEach((car) => {
-      const companyKey = car.company?.name || car.company?.id || "Unknown";
+      const companyKey = car.companyId?.name || car.companyId?.id || "Unknown";
       if (!companies[companyKey]) {
         companies[companyKey] = {
-          company: car.company,
+          company: car.companyId,
           location: getCarCoordinates(car),
           cars: [],
         };
@@ -889,9 +889,9 @@ const Cars = () => {
               const imageSrc = buildImageSrc(car.image) || fallbackImage;
               const disabled = isBookDisabled(car);
 
-              const companyName = car.companyName || car.company?.name || car.ownerName || "Unknown Company";
-              const companyCity = car.company?.address?.city || car.company?.address?.cityName || car.company?.hostProfile?.address?.city || car.company?.hostProfile?.address?.cityName || "";
-              const companyState = car.company?.address?.state || car.company?.hostProfile?.address?.state || "";
+              const companyName = car.companyId?.name || car.companyName || "Unknown Company";
+              const companyCity = car.companyId?.address?.city || car.companyId?.address?.cityName || car.companyId?.hostProfile?.address?.city || car.companyId?.hostProfile?.address?.cityName || "";
+              const companyState = car.companyId?.address?.state || car.companyId?.hostProfile?.address?.state || "";
 
               return (
                 <div key={id} className={carPageStyles.carCard}>

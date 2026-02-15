@@ -146,6 +146,8 @@ export const createAdminCar = async (req, res) => {
       fuelType: body.fuelType || 'Gasoline',
       mileage: Number(body.mileage) || 0,
       dailyRate: Number(body.dailyRate || 0),
+      deposit: Number(body.deposit || 0),  // Added for consistency
+      gasUsage: body.gasUsage || '',       // Added for consistency
       image: imageUrl,
       status: body.status || 'available',
       companyId,
@@ -172,7 +174,7 @@ export const updateAdminCar = async (req, res) => {
     if (!car.companyId || car.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
 
     const body = req.body || {};
-    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','status','location'];
+    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','deposit','gasUsage','status','location'];  // Added deposit and gasUsage
     allowed.forEach(k => { if (body[k] !== undefined) car[k] = body[k]; });
 
     if (req.file) {
@@ -346,6 +348,8 @@ export const getKycList = async (req, res) => {
         carPetrolType: firstCar?.petrolType || [],
         carMileage: firstCar?.mileage || '',
         carDailyRate: firstCar?.dailyRate || '',
+        carDeposit: firstCar?.deposit || '',      // Added for display
+        carGasUsage: firstCar?.gasUsage || '',    // Added for display
         carImage: firstCar?.image || '',
       };
     }));
@@ -435,11 +439,13 @@ export const approveHost = async (req, res) => {
           fuelType: user.initialCar.fuelType || 'Gasoline',
           petrolType: user.initialCar.petrolType || [],
           mileage: user.initialCar.mileage || 0,
+          deposit: user.initialCar.deposit || 0,      // ADDED
+          gasUsage: user.initialCar.gasUsage || "",  // ADDED
           image: user.initialCar.image || '',
           companyId: user._id,
-          companyName: user.hostProfile.companyName || '',
+          companyName: user.hostProfile?.companyName || '',  // ADDED optional chaining
           status: 'available',
-          location: user.hostProfile.location || { type: 'Point', coordinates: [101.6869, 3.1390] }, // Default to KL if missing
+          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] }, // Default to KL if missing
         };
         await Car.create(carData);
         user.initialCar = null;

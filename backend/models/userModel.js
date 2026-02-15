@@ -78,6 +78,8 @@ const initialCarSchema = new mongoose.Schema(
     petrolType: { type: [String], default: [] },
     mileage: { type: Number, default: 0 },
     dailyRate: { type: Number, default: 0 },
+    deposit: { type: Number, default: 0 }, 
+    gasUsage: { type: String, default: '' },  
     image: { type: String, default: '' },  // Uploaded image URL or key
   },
   { _id: false }

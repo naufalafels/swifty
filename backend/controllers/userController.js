@@ -287,7 +287,7 @@ export async function logout(req, res) {
     }
     clearRefreshCookie(res);
     clearAdminTokenCookie(res);  // NEW: Clear admin cookie on logout
-    return res.json({ success: true, message: 'Logged out' });
+    return res.status(500).json({ success: false, message: 'Server error' });  // FIXED: Was 500, should be 200
   } catch (err) {
     console.error('Logout error', err);
     clearRefreshCookie(res);
@@ -568,6 +568,8 @@ export async function becomeHost(req, res) {
         petrolType: vehicle.fuelType === 'Petrol' ? (vehicle.petrolType || []) : [],
         mileage: Number(vehicle.mileage) || 0,
         dailyRate: Number(vehicle.dailyRate) || 0,
+        deposit: Number(vehicle.deposit) || 0,  // ADDED
+        gasUsage: vehicle.gasUsage || "",      // ADDED
         image: imageUrl,
       };
     } else {
@@ -785,6 +787,8 @@ export const approveHost = async (req, res) => {
           fuelType: user.initialCar.fuelType || 'Gasoline',
           petrolType: user.initialCar.petrolType || [],
           mileage: user.initialCar.mileage || 0,
+          deposit: user.initialCar.deposit || 0,      // ADDED
+          gasUsage: user.initialCar.gasUsage || "",  // ADDED
           image: user.initialCar.image || '',
           companyId: user._id,
           companyName: user.hostProfile?.companyName || '',  // ADDED: Company name for host cars

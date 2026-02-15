@@ -36,7 +36,9 @@ const HostOnboardPage = () => {
     fuelType: '',
     petrolType: [],
     carType: '',
-    mileage: '',  // Added mileage
+    mileage: '',
+    deposit: '',  // Added
+    gasUsage: '', // Added
     image: null,
   });
 
@@ -99,11 +101,13 @@ const HostOnboardPage = () => {
     if (isEmpty(vehicle.model)) missing.push('Model');
     if (isEmpty(vehicle.year)) missing.push('Manufactured year');
     if (isEmpty(vehicle.dailyRate)) missing.push('Daily rate');
+    if (isEmpty(vehicle.deposit)) missing.push('Deposit');  // Added
+    if (isEmpty(vehicle.mileage)) missing.push('Mileage');
+    if (isEmpty(vehicle.gasUsage)) missing.push('Gas Usage');  // Added
     if (isEmpty(vehicle.seats)) missing.push('Seats');
     if (isEmpty(vehicle.shiftType)) missing.push('Shift type');
     if (isEmpty(vehicle.fuelType)) missing.push('Fuel type');
     if (isEmpty(vehicle.carType)) missing.push('Car type');
-    if (isEmpty(vehicle.mileage)) missing.push('Mileage');  // Added mileage validation
     if (vehicle.fuelType === 'Petrol' && (!vehicle.petrolType || vehicle.petrolType.length === 0)) missing.push('Petrol type');
     if (!vehicle.image) missing.push('Vehicle image');
     if (missing.length) {
@@ -153,7 +157,9 @@ const HostOnboardPage = () => {
         fuelType: vehicle.fuelType,
         petrolType: vehicle.petrolType,
         carType: vehicle.carType,
-        mileage: vehicle.mileage,  // Added mileage
+        mileage: vehicle.mileage,
+        deposit: vehicle.deposit,  // Added
+        gasUsage: vehicle.gasUsage, // Added
       }));
 
       // FIX: Ensure vehicle.image is a valid File before appending to avoid sending {} (empty object)
@@ -412,6 +418,7 @@ const HostOnboardPage = () => {
                 value={vehicle.make}
                 onChange={(e) => setVehicle({ ...vehicle, make: e.target.value })}
                 className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder="e.g., Toyota, Honda, Perodua"
                 required
               />
             </label>
@@ -420,6 +427,7 @@ const HostOnboardPage = () => {
                 value={vehicle.model}
                 onChange={(e) => setVehicle({ ...vehicle, model: e.target.value })}
                 className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder="e.g., Corolla, Civic, Myvi"
                 required
               />
             </label>
@@ -441,12 +449,31 @@ const HostOnboardPage = () => {
                 required
               />
             </label>
-            <label className="text-sm text-slate-200">Mileage (km)  {/* Added Mileage input */}
+            <label className="text-sm text-slate-200">Deposit (MYR)
+              <input
+                value={vehicle.deposit}
+                onChange={(e) => setVehicle({ ...vehicle, deposit: e.target.value })}
+                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder="Flexible pricing supported"
+                type="number"
+                required
+              />
+            </label>
+            <label className="text-sm text-slate-200">Mileage (km)
               <input
                 value={vehicle.mileage}
                 onChange={(e) => setVehicle({ ...vehicle, mileage: e.target.value })}
                 className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
                 placeholder="e.g., 50000"
+                required
+              />
+            </label>
+            <label className="text-sm text-slate-200">Gas Usage
+              <input
+                value={vehicle.gasUsage}
+                onChange={(e) => setVehicle({ ...vehicle, gasUsage: e.target.value })}
+                className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                placeholder="e.g., 18.9 km/l"
                 required
               />
             </label>
@@ -570,7 +597,9 @@ const HostOnboardPage = () => {
                 {vehicle.make || 'Make'} {vehicle.model || 'Model'} {vehicle.year ? `(${vehicle.year})` : ''}
               </div>
               <div>Daily rate: {vehicle.dailyRate || '—'}</div>
-              <div>Mileage: {vehicle.mileage || '—'}</div>  {/* Added Mileage to summary */}
+              <div>Deposit: {vehicle.deposit || '—'}</div>  {/* Added */}
+              <div>Mileage: {vehicle.mileage || '—'}</div>
+              <div>Gas Usage: {vehicle.gasUsage || '—'}</div>  {/* Added */}
               <div>Seats: {vehicle.seats || '—'} | Shift: {vehicle.shiftType || '—'}</div>
               <div>Fuel: {vehicle.fuelType || '—'} {vehicle.fuelType === 'Petrol' && vehicle.petrolType.length > 0 ? `(${vehicle.petrolType.join(', ')})` : ''}</div>
               <div>Type: {vehicle.carType || '—'}</div>

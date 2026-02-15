@@ -1,14 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaCheckCircle, FaChevronDown, FaImage, FaList, FaRocket } from "react-icons/fa";
 import { createHostCar } from "../services/hostService";
 import { toast } from "react-toastify";
-
-const seatOptions = ["2 Seater", "4 Seater", "5 Seater", "7 Seater", "8 Seater", "9 Seater", "12 Seater (Van)"];
-const shiftOptions = ["Automatic", "Manual", "CVT", "Dual-clutch", "Semi-automatic"];
-const carTypeOptions = ["Hatchback", "Sedan", "SUV", "MPV", "Truck", "Van", "Luxury", "Classic", "Coupe", "Convertible"];
-const fuelOptions = ["Petrol", "Diesel", "Hybrid", "Electric"];
-const petrolTypes = ["RON95", "RON97", "RON100", "Ethanol", "E85"];
 
 const HostAddCars = () => {
   const navigate = useNavigate();
@@ -20,14 +14,14 @@ const HostAddCars = () => {
     model: "",
     year: "",
     dailyRate: "",
-    deposit: "",
-    seats: "5 Seater",
+    deposit: "",  // Added
+    seats: "",
     transmission: "Automatic",
     fuelType: "Petrol",
-    petrolType: "RON95",
+    petrolType: [],  // Changed to array
     mileage: "",
     category: "Sedan",
-    gasUsage: "",
+    gasUsage: "",  // Added
     image: null,
   });
 
@@ -39,7 +33,7 @@ const HostAddCars = () => {
     requiredFields.forEach((f) => {
       if (!car[f] || `${car[f]}`.trim() === "") next[f] = "Required";
     });
-    if (petrolEnabled && (!car.petrolType || `${car.petrolType}`.trim() === "")) {
+    if (petrolEnabled && (!car.petrolType || car.petrolType.length === 0)) {
       next.petrolType = "Required for Petrol";
     }
     setErrors(next);
@@ -63,7 +57,9 @@ const HostAddCars = () => {
     try {
       const form = new FormData();
       Object.entries(car).forEach(([k, v]) => {
-        if (v !== null && v !== undefined && v !== "") {
+        if (k === "petrolType") {
+          form.append(k, JSON.stringify(v));  // Send as JSON array
+        } else if (v !== null && v !== undefined && v !== "") {
           form.append(k, v);
         }
       });
@@ -107,106 +103,161 @@ const HostAddCars = () => {
               <FaList /> Car details
             </div>
 
-            <div className="grid md:grid-cols-[1fr_1fr] gap-4">
-              <div className="space-y-3">
-                {[
-                  ["make", "Make (Toyota, Honda, etc)"],
-                  ["model", "Model (Camry, Civic, etc)"],
-                  ["year", "Manufactured Year"],
-                  ["dailyRate", "Daily Rate (MYR) — flexible pricing applies"],
-                  ["deposit", "Deposit (MYR) — flexible pricing applies"],
-                  ["mileage", "Mileage (km)"],
-                  ["gasUsage", "Gas Usage (e.g., 18.9 km/l)"],
-                ].map(([key, label]) => (
-                  <label key={key} className="text-sm text-slate-200 space-y-1">
-                    {label}
-                    <input
-                      value={car[key]}
-                      onChange={(e) => setCar((c) => ({ ...c, [key]: e.target.value }))}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-                    />
-                    {fieldError(key)}
-                  </label>
-                ))}
-
-                <label className="text-sm text-slate-200 space-y-1">
-                  Category (Car Type)
-                  <ScrollableSelect
-                    value={car.category}
-                    options={carTypeOptions}
-                    onChange={(v) => setCar((c) => ({ ...c, category: v }))}
-                  />
-                  {fieldError("category")}
-                </label>
-
-                <label className="text-sm text-slate-200 space-y-1">
-                  Seats
-                  <ScrollableSelect
-                    value={car.seats}
-                    options={seatOptions}
-                    onChange={(v) => setCar((c) => ({ ...c, seats: v }))}
-                  />
-                  {fieldError("seats")}
-                </label>
-
-                <label className="text-sm text-slate-200 space-y-1">
-                  Shift Type
-                  <ScrollableSelect
-                    value={car.transmission}
-                    options={shiftOptions}
-                    onChange={(v) => setCar((c) => ({ ...c, transmission: v }))}
-                  />
-                  {fieldError("transmission")}
-                </label>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm text-slate-200 space-y-1">
-                  Fuel
-                  <ScrollableSelect
-                    value={car.fuelType}
-                    options={fuelOptions}
-                    onChange={(v) => setCar((c) => ({ ...c, fuelType: v }))}
-                  />
-                  {fieldError("fuelType")}
-                </label>
-
-                {petrolEnabled && (
-                  <label className="text-sm text-slate-200 space-y-1">
-                    Petrol Type (only if Petrol)
-                    <ScrollableSelect
-                      value={car.petrolType}
-                      options={petrolTypes}
-                      onChange={(v) => setCar((c) => ({ ...c, petrolType: v }))}
-                    />
-                    {fieldError("petrolType")}
-                  </label>
-                )}
-
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-200 flex items-center gap-2">
-                    <FaImage /> Upload Vehicle Image
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <div className="w-24 h-16 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center overflow-hidden">
-                      {car.image ? (
-                        <img
-                          src={URL.createObjectURL(car.image)}
-                          alt="preview"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xs text-slate-500">Preview</span>
-                      )}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-sm text-slate-200">Make
+                <input
+                  value={car.make}
+                  onChange={(e) => setCar((c) => ({ ...c, make: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., Toyota, Honda, Perodua"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Model
+                <input
+                  value={car.model}
+                  onChange={(e) => setCar((c) => ({ ...c, model: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., Corolla, Civic, Myvi"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Manufactured year
+                <input
+                  value={car.year}
+                  onChange={(e) => setCar((c) => ({ ...c, year: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="2023"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Daily rate (MYR)
+                <input
+                  value={car.dailyRate}
+                  onChange={(e) => setCar((c) => ({ ...c, dailyRate: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="Flexible pricing supported"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Deposit (MYR)
+                <input
+                  value={car.deposit}
+                  onChange={(e) => setCar((c) => ({ ...c, deposit: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="Flexible pricing supported"
+                  type="number"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Mileage (km)
+                <input
+                  value={car.mileage}
+                  onChange={(e) => setCar((c) => ({ ...c, mileage: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., 50000"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Gas Usage
+                <input
+                  value={car.gasUsage}
+                  onChange={(e) => setCar((c) => ({ ...c, gasUsage: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                  placeholder="e.g., 18.9 km/l"
+                  required
+                />
+              </label>
+              <label className="text-sm text-slate-200">Seats
+                <select
+                  value={car.seats}
+                  onChange={(e) => setCar((c) => ({ ...c, seats: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option value="">Select</option>
+                  {[2, 4, 5, 7, 8, 12].map((s) => (
+                    <option key={s} value={s}>
+                      {s} seater
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-slate-200">Shift type
+                <select
+                  value={car.transmission}
+                  onChange={(e) => setCar((c) => ({ ...c, transmission: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option value="">Select</option>
+                  <option>Automatic</option>
+                  <option>Manual</option>
+                </select>
+              </label>
+              <label className="text-sm text-slate-200">Fuel type
+                <select
+                  value={car.fuelType}
+                  onChange={(e) => setCar((c) => ({ ...c, fuelType: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option value="">Select</option>
+                  <option>Petrol</option>
+                  <option>Diesel</option>
+                  <option>Hybrid</option>
+                  <option>Electric</option>
+                </select>
+              </label>
+              {car.fuelType === 'Petrol' && (
+                <div className="col-span-2">
+                  <label className="text-sm text-slate-200">Petrol type (check all that apply)
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {['Ron95', 'Ron97', 'Ron100', 'Ethanol', 'E85'].map(type => (
+                        <label key={type} className="flex items-center gap-2 text-sm text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={Array.isArray(car.petrolType) ? car.petrolType.includes(type) : false}
+                            onChange={(e) => {
+                              const current = Array.isArray(car.petrolType) ? car.petrolType : [];
+                              const updated = e.target.checked
+                                ? [...current, type]
+                                : current.filter(t => t !== type);
+                              setCar((c) => ({ ...c, petrolType: updated }));
+                            }}
+                            className="accent-emerald-500"
+                          />
+                          {type}
+                        </label>
+                      ))}
                     </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFile}
-                      className="text-sm"
-                    />
-                  </div>
+                  </label>
                 </div>
+              )}
+              <label className="text-sm text-slate-200">Car type
+                <select
+                  value={car.category}
+                  onChange={(e) => setCar((c) => ({ ...c, category: e.target.value }))}
+                  className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option value="">Select</option>
+                  {['Hatchback', 'Sedan', 'SUV', 'MPV', 'Truck', 'Van', 'Luxury', 'Classic'].map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="col-span-2">
+                <label className="text-sm text-slate-200">Vehicle image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFile}
+                    className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
+                    required
+                  />
+                </label>
+                {car.image && (
+                  <div className="mt-2">
+                    <img src={URL.createObjectURL(car.image)} alt="Vehicle Preview" className="w-32 h-32 object-cover rounded border" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -233,7 +284,7 @@ const HostAddCars = () => {
               {Object.entries(car).filter(([k]) => k !== "image").map(([k, v]) => (
                 <div key={k} className="flex justify-between border-b border-slate-800 py-1">
                   <span className="capitalize text-slate-400">{k}</span>
-                  <span>{v || "-"}</span>
+                  <span>{Array.isArray(v) ? v.join(', ') : v || "-"}</span>
                 </div>
               ))}
               <div className="flex justify-between border-b border-slate-800 py-1">
@@ -260,58 +311,6 @@ const HostAddCars = () => {
           </div>
         )}
       </div>
-    </div>
-  );
-};
-
-const ScrollableSelect = ({ value, options, onChange, disabled = false }) => {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(
-    () => options.filter((o) => o.toLowerCase().includes(query.toLowerCase())),
-    [options, query]
-  );
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-left text-white flex items-center justify-between ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-      >
-        <span>{value || "Select"}</span>
-        <FaChevronDown className="text-slate-400" />
-      </button>
-      {open && !disabled && (
-        <div className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-800 rounded-lg shadow-lg">
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type to filter"
-            className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white"
-          />
-          <div className="max-h-48 overflow-auto">
-            {filtered.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => {
-                  onChange(opt);
-                  setOpen(false);
-                  setQuery("");
-                }}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-800 text-white flex items-center justify-between"
-              >
-                <span>{opt}</span>
-              </button>
-            ))}
-            {filtered.length === 0 && (
-              <div className="px-3 py-2 text-sm text-slate-400">No matches</div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

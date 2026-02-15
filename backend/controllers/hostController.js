@@ -83,7 +83,7 @@ export const createHostCar = async (req, res) => {
 
     const imagePath = req.file ? `car-images/${req.file.filename}` : (body.image || body.imageUrl || "");
 
-    const car = await Car.create({
+        const car = await Car.create({
       make: body.make,
       model: body.model,
       year: Number(body.year),
@@ -103,6 +103,8 @@ export const createHostCar = async (req, res) => {
       ownerId: hostId,
       createdBy: hostId,
       companyId: companyId || undefined,
+      location: req.user?.hostProfile?.location || { type: 'Point', coordinates: [0, 0] },
+      companyName: req.user?.hostProfile?.companyName || "",
       flexiblePricing: {
         baseDailyRate: Number(body.dailyRate || 0),
         baseDeposit: Number(body.deposit || 0),

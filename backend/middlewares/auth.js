@@ -5,7 +5,7 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 
-// Verifies token and attaches req.user = { id, name, email, role, roles, companyId }
+// Verifies token and attaches req.user = { id, name, email, role, roles, companyId, hostProfile }
 export default async function authMiddleware(req, res, next) {
   try {
     const auth = req.headers?.authorization || req.headers?.Authorization;
@@ -34,7 +34,8 @@ export default async function authMiddleware(req, res, next) {
         email: payload.email || null,
         role: payload.role || 'user',
         roles: payload.roles || ['renter'],
-        companyId: payload.companyId || null
+        companyId: payload.companyId || null,
+        hostProfile: payload.hostProfile || null  // Added for consistency if JWT includes it
       };
       return next();
     }
@@ -51,7 +52,8 @@ export default async function authMiddleware(req, res, next) {
       email: user.email,
       role: user.role || 'user',
       roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
-      companyId: user.companyId || null
+      companyId: user.companyId || null,
+      hostProfile: user.hostProfile || null  // Added to make hostProfile available in req.user
     };
 
     return next();

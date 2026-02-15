@@ -7,7 +7,7 @@ const bookingSubSchema = new Schema({
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
   pickupDate: Date,
   returnDate: Date,
-  status: { type: String, enum: ['pending','active','completed','cancelled','upcoming'], default: 'pending' }
+  status: { type: String, enum: ['awaiting_payment','pending','active','completed','cancelled','upcoming'], default: 'awaiting_payment' }
 }, { _id: false });
 
 const carSchema = new Schema({

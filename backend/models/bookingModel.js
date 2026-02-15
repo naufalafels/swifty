@@ -43,7 +43,7 @@ const bookingSchema = new Schema({
   pickupDate: { type: Date, required: true },
   returnDate: { type: Date, required: true },
   bookingDate: { type: Date, default: Date.now },
-  status: { type: String, enum: ['pending', 'active', 'completed', 'cancelled', 'upcoming'], default: 'pending' },
+   status: { type: String, enum: ['awaiting_payment', 'pending', 'active', 'completed', 'cancelled', 'upcoming'], default: 'awaiting_payment' },
 
   amount: { type: Number, default: 0 },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded', 'refund_failed'], default: 'pending' },

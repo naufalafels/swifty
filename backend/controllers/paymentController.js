@@ -117,7 +117,8 @@ export const createRazorpayOrder = async (req, res) => {
       address,
       carImage,
       currency,
-      kyc
+      kyc,
+      kycFromProfile
     } = req.body;
 
     const total = Number(amount);
@@ -167,18 +168,9 @@ export const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Valid car id is required" });
     }
 
-    // Overlap guard
-    const conflict = await Booking.findOne({
-      "car.id": new mongoose.Types.ObjectId(carIdStr),
-      status: { $in: BLOCKING_STATUSES },
-      pickupDate: { $lte: rd },
-      returnDate: { $gte: pd },
-    }).session(session).lean();
-
-    if (conflict) {
-      await session.abortTransaction(); session.endSession();
-      return res.status(409).json({ success: false, message: "Car is not available for the selected dates" });
-    }
+    // No overlap guard here — first-pay-first-serve.
+    // Multiple users can create awaiting_payment bookings for the same dates.
+    // The real conflict check happens in verifyRazorpayPayment after payment succeeds.
 
     let finalUserId = tokenUserId || providedUserId || null;
     if (!finalUserId) {
@@ -205,15 +197,36 @@ export const createRazorpayOrder = async (req, res) => {
       console.warn('createRazorpayOrder: failed to fetch canonical Car for companyId:', e?.message || e);
     }
 
-    const kycFront = req.files?.kycFront?.[0] || null;
-    const kycBack = req.files?.kycBack?.[0] || null;
-    const toUrl = (fileObj) => fileObj ? `/uploads/${path.basename(fileObj.path)}` : '';
+    // --- KYC handling: skip upload for approved users ---
+    let normalizedKyc;
 
-    const normalizedKyc = {
-      ...(typeof kyc === 'string' ? (() => { try { return JSON.parse(kyc); } catch { return {}; } })() : (kyc || {})),
-      frontImageUrl: kycFront ? toUrl(kycFront) : (kyc?.frontImageUrl || ''),
-      backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
-    };
+    if (kycFromProfile === 'true' && finalUserId) {
+      // Approved user — pull KYC from their profile
+      const userDoc = await User.findById(finalUserId).select('kyc').lean();
+      if (userDoc?.kyc?.status === 'approved') {
+        normalizedKyc = {
+          idType: userDoc.kyc.idType || 'passport',
+          idNumber: userDoc.kyc.idNumber || '',
+          idCountry: userDoc.kyc.idCountry || 'MY',
+          frontImageUrl: userDoc.kyc.frontImageUrl || '',
+          backImageUrl: userDoc.kyc.backImageUrl || '',
+        };
+      } else {
+        await session.abortTransaction(); session.endSession();
+        return res.status(400).json({ success: false, message: 'KYC not approved. Please submit your ID.' });
+      }
+    } else {
+      // Guest or unapproved user — use uploaded files
+      const kycFront = req.files?.kycFront?.[0] || null;
+      const kycBack = req.files?.kycBack?.[0] || null;
+      const toUrl = (fileObj) => fileObj ? `/uploads/${path.basename(fileObj.path)}` : '';
+
+      normalizedKyc = {
+        ...(typeof kyc === 'string' ? (() => { try { return JSON.parse(kyc); } catch { return {}; } })() : (kyc || {})),
+        frontImageUrl: kycFront ? toUrl(kycFront) : (kyc?.frontImageUrl || ''),
+        backImageUrl: kycBack ? toUrl(kycBack) : (kyc?.backImageUrl || ''),
+      };
+    }
 
     const bookingInput = {
       userId: finalUserId,
@@ -228,7 +241,7 @@ export const createRazorpayOrder = async (req, res) => {
       paymentStatus: "pending",
       details: typeof details === "string" ? JSON.parse(details) : (details || {}),
       address: typeof address === "string" ? JSON.parse(address) : (address || {}),
-      status: "pending",
+      status: "awaiting_payment",
       currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
       paymentBreakdown: typeof paymentBreakdown === "string" ? JSON.parse(paymentBreakdown) : (paymentBreakdown || {}),
       kyc: {
@@ -305,7 +318,7 @@ export const createRazorpayOrder = async (req, res) => {
   }
 };
 
-// Optional client-side verification (in addition to webhook)
+// Client-side verification — FIRST-PAY-FIRST-SERVE overlap check lives here
 export const verifyRazorpayPayment = async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body || {};
@@ -322,49 +335,75 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid payment signature' });
     }
 
-    const filter = {
-      _id: bookingId,
-      $or: [
-        { razorpayPaymentId: { $exists: false } },
-        { razorpayPaymentId: { $ne: razorpay_payment_id } },
-        { paymentStatus: { $ne: 'paid' } }
-      ]
-    };
-
-    const bookingDoc = await Booking.findById(bookingId).lean();
+    // --- Fetch the booking and validate it is still awaiting payment ---
+    const bookingDoc = await Booking.findById(bookingId);
     if (!bookingDoc) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
-    const postStatus = computePostPaymentStatus(bookingDoc.pickupDate);
 
-    const update = {
-      $set: {
-        paymentStatus: 'paid',
-        status: postStatus,
-        razorpayOrderId: razorpay_order_id,
-        razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature
-      }
-    };
-
-    const updated = await Booking.findOneAndUpdate(filter, update, { new: true }).exec();
-    if (!updated) {
-      const maybe = await Booking.findById(bookingId).lean().exec();
-      if (!maybe) {
-        return res.status(404).json({ success: false, message: 'Booking not found' });
-      }
+    // If already paid, return early (idempotent)
+    if (bookingDoc.paymentStatus === 'paid') {
       return res.json({ success: true, message: 'Payment already recorded' });
     }
 
-    const carId = updated?.car?.id;
+    // Only allow verification for awaiting_payment bookings
+    if (bookingDoc.status !== 'awaiting_payment') {
+      return res.status(400).json({ success: false, message: 'Booking is not awaiting payment' });
+    }
+
+    // --- FIRST-PAY-FIRST-SERVE: check if someone else paid first ---
+    const conflict = await Booking.findOne({
+      _id: { $ne: bookingDoc._id },
+      "car.id": bookingDoc.car.id,
+      status: { $in: BLOCKING_STATUSES },
+      pickupDate: { $lte: bookingDoc.returnDate },
+      returnDate: { $gte: bookingDoc.pickupDate },
+    }).lean();
+
+    if (conflict) {
+      // Someone else completed payment first — cancel and refund this booking
+      bookingDoc.status = 'cancelled';
+      bookingDoc.paymentStatus = 'refunded';
+      bookingDoc.razorpayOrderId = razorpay_order_id;
+      bookingDoc.razorpayPaymentId = razorpay_payment_id;
+      bookingDoc.razorpaySignature = razorpay_signature;
+      await bookingDoc.save();
+
+      // Auto-refund via Razorpay
+      try {
+        const razorpay = getRazorpay();
+        await razorpay.payments.refund(razorpay_payment_id, { speed: 'normal' });
+      } catch (refundErr) {
+        console.error('Auto-refund failed, manual refund needed for payment:', razorpay_payment_id, refundErr);
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: 'Sorry, this car was just booked by another user for the selected dates. Your payment will be refunded.',
+        refund: true,
+      });
+    }
+
+    // --- No conflict — first to pay wins. Promote to blocking status. ---
+    const postStatus = computePostPaymentStatus(bookingDoc.pickupDate);
+
+    bookingDoc.paymentStatus = 'paid';
+    bookingDoc.status = postStatus;
+    bookingDoc.razorpayOrderId = razorpay_order_id;
+    bookingDoc.razorpayPaymentId = razorpay_payment_id;
+    bookingDoc.razorpaySignature = razorpay_signature;
+    await bookingDoc.save();
+
+    // Push to car's bookings array and update car status
+    const carId = bookingDoc.car?.id;
     if (carId) {
       await Car.updateOne(
-        { _id: carId, "bookings.bookingId": { $ne: updated._id } },
-        { $push: { bookings: { bookingId: updated._id, pickupDate: updated.pickupDate, returnDate: updated.returnDate, status: postStatus } } }
+        { _id: carId, "bookings.bookingId": { $ne: bookingDoc._id } },
+        { $push: { bookings: { bookingId: bookingDoc._id, pickupDate: bookingDoc.pickupDate, returnDate: bookingDoc.returnDate, status: postStatus } } }
       ).catch(() => {});
       await Car.updateOne(
-        { _id: carId, "bookings.bookingId": updated._id },
-        { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": updated.pickupDate, "bookings.$.returnDate": updated.returnDate } }
+        { _id: carId, "bookings.bookingId": bookingDoc._id },
+        { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": bookingDoc.pickupDate, "bookings.$.returnDate": bookingDoc.returnDate } }
       ).catch(() => {});
       await updateCarStatusBasedOnBookings(carId);
     }
@@ -396,7 +435,11 @@ export const markPaymentFailed = async (req, res) => {
 
     const carId = updated?.car?.id;
     if (carId) {
-      await Car.updateOne({ _id: carId }, { $pull: { bookings: { bookingId: updated._id } } }).catch(() => {});
+      // Remove from car's bookings array entirely
+      await Car.updateOne(
+        { _id: carId },
+        { $pull: { bookings: { bookingId: mongoose.Types.ObjectId(bookingId) } } }
+      ).catch(() => {});
       await updateCarStatusBasedOnBookings(carId);
     }
 

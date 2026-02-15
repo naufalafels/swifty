@@ -14,6 +14,7 @@ import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 
 import { connectDB } from './config/db.js';
+import { startStaleBookingCleanup } from './utils/cleanupStaleBookings.js';
 
 import userRouter from './routes/userRoutes.js';
 // import carRouter from './routes/carRoutes.js';  // REMOVED: No longer needed
@@ -61,7 +62,12 @@ const io = new Server(server, { cors: { origin: "*", credentials: true } });
 // Attach io to app for use in routes
 app.set('io', io);
 
-connectDB();
+// Connect to DB, then start stale booking cleanup
+connectDB().then(() => {
+  startStaleBookingCleanup();
+}).catch((err) => {
+  console.error('DB connection failed:', err);
+});
 
 app.use(cookieParser());
 

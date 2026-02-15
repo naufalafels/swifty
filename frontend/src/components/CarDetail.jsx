@@ -136,6 +136,22 @@ const CarDetail = () => {
   const currentUser = authService.getCurrentUser();
   const emailPrefill = currentUser?.email || "";
 
+  // --- ISSUE 2 FIX: Track whether user's KYC is already approved ---
+  const [userKycApproved, setUserKycApproved] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      api.get('/api/user/me')
+        .then(res => {
+          const userData = res.data?.user || res.data;
+          if (userData?.kyc?.status === 'approved') {
+            setUserKycApproved(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUser]);
+
   const [formData, setFormData] = useState({
     pickupDate: initialPickup,
     returnDate: initialReturn,
@@ -430,13 +446,17 @@ const CarDetail = () => {
       toast.error("Please provide a phone number.");
       return;
     }
-    if (!formData.idCountry) {
-      toast.error("Please provide your ID issuing country.");
-      return;
-    }
-    if (!frontFile || !backFile) {
-      toast.error("Please upload front and back ID images.");
-      return;
+
+    // --- ISSUE 2 FIX: Only require KYC fields if user is NOT already approved ---
+    if (!userKycApproved) {
+      if (!formData.idCountry) {
+        toast.error("Please provide your ID issuing country.");
+        return;
+      }
+      if (!frontFile || !backFile) {
+        toast.error("Please upload front and back ID images.");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -487,11 +507,17 @@ const CarDetail = () => {
         companyId: car.companyId || car.company?.id || null,
         companyName: car.company?.name || car.companyName || "",
       }));
-      form.append("kyc[idType]", formData.idType === "other" ? "passport" : formData.idType);
-      form.append("kyc[idNumber]", formData.idNumber || "provided_at_pickup");
-      form.append("kyc[idCountry]", countryCode);
-      form.append("kycFront", frontFile);
-      form.append("kycBack", backFile);
+
+      // --- ISSUE 2 FIX: Send kycFromProfile flag or upload files ---
+      if (userKycApproved) {
+        form.append("kycFromProfile", "true");
+      } else {
+        form.append("kyc[idType]", formData.idType === "other" ? "passport" : formData.idType);
+        form.append("kyc[idNumber]", formData.idNumber || "provided_at_pickup");
+        form.append("kyc[idCountry]", countryCode);
+        form.append("kycFront", frontFile);
+        form.append("kycBack", backFile);
+      }
 
       await loadRazorpayScript();
 
@@ -519,6 +545,7 @@ const CarDetail = () => {
           pickupDate: formData.pickupDate,
           returnDate: formData.returnDate,
         },
+        // --- ISSUE 1 FIX: Handle 409 conflict (someone else paid first) ---
         handler: async (response) => {
           toast.success("Payment captured. Finalizing booking...", { autoClose: 1200 });
           try {
@@ -528,16 +555,31 @@ const CarDetail = () => {
               razorpay_signature: response.razorpay_signature,
               bookingId: res.bookingId,
             });
+            navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
           } catch (e) {
-            console.warn("Client verification failed (webhook will handle):", e);
+            if (e?.response?.status === 409) {
+              toast.error(e.response.data?.message || "Car was booked by someone else. You will be refunded.");
+              navigate(`/cancel?booking_id=${res.bookingId}&payment_status=refunded`, { replace: true });
+            } else {
+              console.warn("Client verification failed (webhook will handle):", e);
+              navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
+            }
           }
-          navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
         },
         modal: {
+          // --- ISSUE 1 FIX: Retry markPaymentFailed up to 3 times ---
           ondismiss: async () => {
             toast.info("Payment was cancelled.");
             if (res?.bookingId) {
-              try { await markPaymentFailed({ bookingId: res.bookingId }); } catch (e) { console.warn("Failed to mark payment failed", e); }
+              for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                  await markPaymentFailed({ bookingId: res.bookingId });
+                  break;
+                } catch (e) {
+                  console.warn(`markPaymentFailed attempt ${attempt + 1} failed:`, e);
+                  if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+                }
+              }
             }
             navigate(`/cancel?booking_id=${res.bookingId}&payment_status=cancelled`, { replace: true });
           },
@@ -637,7 +679,7 @@ const CarDetail = () => {
                 { Icon: FaTachometerAlt, label: "Mileage", value: car.mileage ? `${car.mileage} kmpl` : "—", color: "text-yellow-400" },
                 { Icon: FaCheckCircle, label: "Transmission", value: transmissionLabel, color: "text-purple-400" },
               ].map((spec, i) => (
-                <div key= {i} className={carDetailStyles.specCard}>
+                <div key={i} className={carDetailStyles.specCard}>
                   <spec.Icon className={`${spec.color} ${carDetailStyles.specIcon}`} />
                   <p className={carDetailStyles.aboutText + " " + carDetailStyles.specLabel}>{spec.label}</p>
                   <p className={carDetailStyles.specValue}>{spec.value}</p>
@@ -682,7 +724,7 @@ const CarDetail = () => {
                     minDate={new Date()}
                     rangeColors={["#f97316"]}
                     direction="horizontal"
-                    months={1}           // single-month view
+                    months={1}
                     showDateDisplay={false}
                     disabledDates={disabledDates}
                   />
@@ -833,96 +875,109 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaPassport className="text-orange-400" />
-                    <h3 className="text-sm font-semibold text-gray-100">KYC (Passport / NRIC)</h3>
+                {/* --- ISSUE 2 FIX: Show verified badge OR KYC form --- */}
+                {userKycApproved ? (
+                  <div className="mt-4 p-3 rounded-xl border border-emerald-700/50 bg-emerald-900/20">
+                    <div className="flex items-center gap-2">
+                      <FaCheckCircle className="text-emerald-400" />
+                      <span className="text-sm text-emerald-300 font-semibold">Identity Verified</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Your KYC has been approved. No additional verification needed.
+                    </p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className={carDetailStyles.formLabel}>ID Type</label>
-                      <select
-                        name="idType"
-                        value={formData.idType}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("idType")}
-                        onBlur={() => setActiveField(null)}
-                        className={carDetailStyles.textInputField + " bg-gray-800"}
-                      >
-                        <option value="passport">Passport</option>
-                        <option value="nric">Malaysian NRIC</option>
-                        <option value="other">Other</option>
-                      </select>
+                ) : (
+                  <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FaPassport className="text-orange-400" />
+                      <h3 className="text-sm font-semibold text-gray-100">KYC (Passport / NRIC)</h3>
                     </div>
-                    <div>
-                      <label className={carDetailStyles.formLabel}>ID Number (optional)</label>
-                      <input
-                        type="text"
-                        name="idNumber"
-                        placeholder="e.g. A1234567"
-                        value={formData.idNumber}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("idNumber")}
-                        onBlur={() => setActiveField(null)}
-                        className={carDetailStyles.textInputField}
-                      />
-                    </div>
-                    <div>
-                      <label className={carDetailStyles.formLabel}>Issuing Country</label>
-                      <select
-                        name="idCountry"
-                        value={formData.idCountry}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("idCountry")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField + " bg-gray-800"}
-                      >
-                        {countryOptions.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                    <div>
-                      <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
-                      <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
-                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          name="frontImage"
-                          onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
-                          onFocus={() => setActiveField("frontImage")}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className={carDetailStyles.formLabel}>ID Type</label>
+                        <select
+                          name="idType"
+                          value={formData.idType}
+                          onChange={handleInputChange}
+                          onFocus={() => setActiveField("idType")}
                           onBlur={() => setActiveField(null)}
-                          required
+                          className={carDetailStyles.textInputField + " bg-gray-800"}
+                        >
+                          <option value="passport">Passport</option>
+                          <option value="nric">Malaysian NRIC</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={carDetailStyles.formLabel}>ID Number (optional)</label>
+                        <input
+                          type="text"
+                          name="idNumber"
+                          placeholder="e.g. A1234567"
+                          value={formData.idNumber}
+                          onChange={handleInputChange}
+                          onFocus={() => setActiveField("idNumber")}
+                          onBlur={() => setActiveField(null)}
                           className={carDetailStyles.textInputField}
                         />
                       </div>
-                    </div>
-                    <div>
-                      <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
-                      <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
-                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          name="backImage"
-                          onChange={(e) => setBackFile(e.target.files?.[0] || null)}
-                          onFocus={() => setActiveField("backImage")}
+                      <div>
+                        <label className={carDetailStyles.formLabel}>Issuing Country</label>
+                        <select
+                          name="idCountry"
+                          value={formData.idCountry}
+                          onChange={handleInputChange}
+                          onFocus={() => setActiveField("idCountry")}
                           onBlur={() => setActiveField(null)}
                           required
-                          className={carDetailStyles.textInputField}
-                        />
+                          className={carDetailStyles.textInputField + " bg-gray-800"}
+                        >
+                          {countryOptions.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      <div>
+                        <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
+                        <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
+                          <div className={carDetailStyles.inputIcon}><FaImage /></div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            name="frontImage"
+                            onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
+                            onFocus={() => setActiveField("frontImage")}
+                            onBlur={() => setActiveField(null)}
+                            required
+                            className={carDetailStyles.textInputField}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
+                        <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
+                          <div className={carDetailStyles.inputIcon}><FaImage /></div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            name="backImage"
+                            onChange={(e) => setBackFile(e.target.files?.[0] || null)}
+                            onFocus={() => setActiveField("backImage")}
+                            onBlur={() => setActiveField(null)}
+                            required
+                            className={carDetailStyles.textInputField}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
+                      <FaShieldAlt className="mt-0.5" />
+                      <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
-                    <FaShieldAlt className="mt-0.5" />
-                    <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
-                  </div>
-                </div>
+                )}
 
                 <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
                   <div className="flex items-center gap-2 mb-2">

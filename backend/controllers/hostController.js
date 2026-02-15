@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
+import User from "../models/userModel.js"; // Added import for User model
 import { malaysiaHolidays, holidayByDate } from "../utils/holidaysMY.js";
 
 function asObjectId(v) {
@@ -81,6 +82,9 @@ export const createHostCar = async (req, res) => {
       }
     }
 
+    // Fetch the latest user data from DB to ensure hostProfile is up-to-date
+    const user = await User.findById(hostId).select('hostProfile.location hostProfile.companyName');
+
     const imagePath = req.file ? `car-images/${req.file.filename}` : (body.image || body.imageUrl || "");
 
         const car = await Car.create({
@@ -103,8 +107,8 @@ export const createHostCar = async (req, res) => {
       ownerId: hostId,
       createdBy: hostId,
       companyId: companyId || undefined,
-      location: req.user?.hostProfile?.location || { type: 'Point', coordinates: [0, 0] },
-      companyName: req.user?.hostProfile?.companyName || "",
+      location: user?.hostProfile?.location || { type: 'Point', coordinates: [0, 0] },
+      companyName: user?.hostProfile?.companyName || "",
       flexiblePricing: {
         baseDailyRate: Number(body.dailyRate || 0),
         baseDeposit: Number(body.deposit || 0),

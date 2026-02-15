@@ -34,8 +34,6 @@ import { carDetailStyles } from "../assets/dummyStyles.js";
 import { createRazorpayOrder, verifyRazorpayPayment, markPaymentFailed } from "../services/paymentService";
 import io from "socket.io-client";
 import { LoadScript, StandaloneSearchBox } from "@react-google-maps/api";
-
-// Airbnb-style date range picker
 import { DateRange } from "react-date-range";
 import { addDays, eachDayOfInterval, format } from "date-fns";
 import "react-date-range/dist/styles.css";
@@ -170,7 +168,8 @@ const CarDetail = () => {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
 
-  const deposit = 500;
+  // Updated: Use car.deposit if available, else fallback to 500
+  const deposit = car?.deposit || 500;
   const emailReadOnly = !!emailPrefill;
 
   const [activeField, setActiveField] = useState(null);
@@ -565,7 +564,8 @@ const CarDetail = () => {
   };
 
   const transmissionLabel = car.transmission ? String(car.transmission).toLowerCase() : "standard";
-  const companyName = car.company?.name || car.companyName || car.ownerName || "";
+  // Updated: Prioritize car.companyName, then fallbacks
+  const companyName = car.companyId?.hostProfile?.companyName || car.companyId?.name || car.companyName || "Unknown Company";
   const companyAddress = (() => {
     const addr = car.company?.address || {};
     const parts = [];

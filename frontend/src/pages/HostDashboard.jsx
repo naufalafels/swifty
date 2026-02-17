@@ -51,12 +51,20 @@ const formatDate = (value) => {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// BUG 4 FIX: Handle booking.car as an embedded object { make, model, ... } not a string
+const getCarLabel = (booking) => {
+  if (typeof booking.car === "string") return booking.car;
+  if (booking.car?.make && booking.car?.model) return `${booking.car.make} ${booking.car.model}`;
+  if (booking.carId?.make && booking.carId?.model) return `${booking.carId.make} ${booking.carId.model}`;
+  return "Car";
+};
+
 const BookingCard = ({ booking }) => (
   <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
     <div className="flex items-center justify-between gap-2">
       <div className="font-semibold text-white flex items-center gap-2">
         <FaCar className="text-amber-400" />
-        {booking.car || (booking.carId?.make && booking.carId?.model ? `${booking.carId.make} ${booking.carId.model}` : "Car")}
+        {getCarLabel(booking)}
       </div>
       <Pill tone="blue">{booking.status}</Pill>
     </div>
@@ -234,6 +242,7 @@ const PricingCard = ({ car, pricing, onSave }) => {
 };
 
 // Build fallback dayCars and today summaries from bookings if API omitted them
+// BUG 4 FIX: Handle b.car as an embedded object, use b.car.id, and filter by status
 const buildDayCarsAndToday = (bookings) => {
   const dayCars = {};
   const now = new Date();
@@ -241,19 +250,23 @@ const buildDayCarsAndToday = (bookings) => {
   const pickupsToday = [];
   const returnsToday = [];
 
+  const relevantStatuses = ["active", "pending", "upcoming", "completed"];
+
   bookings.forEach((b) => {
     const start = new Date(b.pickupDate);
     const end = new Date(b.returnDate || b.pickupDate);
-    const carName = b.car || (b.carId?.make && b.carId?.model ? `${b.carId.make} ${b.carId.model}` : "Car");
+    const carName = getCarLabel(b);
     const docType = b.verificationDocType || b.userId?.docType || (b.userId?.passportNumber ? "Passport" : b.userId?.nricNumber ? "NRIC" : null);
     const docId = b.verificationIdNumber || b.userId?.passportNumber || b.userId?.nricNumber || b.userId?.idNumber || null;
+
+    const isRelevant = relevantStatuses.includes(b.status);
 
     let cur = start;
     while (cur <= end) {
       const isoDate = format(cur, "yyyy-MM-dd");
       if (!dayCars[isoDate]) dayCars[isoDate] = [];
       dayCars[isoDate].push({
-        carId: b.carId?._id || null,
+        carId: b.car?.id || b.carId?._id || null,
         car: carName,
         bookingId: b._id,
         status: b.status,
@@ -263,10 +276,12 @@ const buildDayCarsAndToday = (bookings) => {
       cur = addDays(cur, 1);
     }
 
-    const pickupIso = format(start, "yyyy-MM-dd");
-    const returnIso = format(end, "yyyy-MM-dd");
-    if (pickupIso === todayIso) pickupsToday.push(b);
-    if (returnIso === todayIso) returnsToday.push(b);
+    if (isRelevant) {
+      const pickupIso = format(start, "yyyy-MM-dd");
+      const returnIso = format(end, "yyyy-MM-dd");
+      if (pickupIso === todayIso) pickupsToday.push(b);
+      if (returnIso === todayIso) returnsToday.push(b);
+    }
   });
 
   return { dayCars, today: { pickups: pickupsToday, returns: returnsToday } };
@@ -584,7 +599,7 @@ const HostDashboard = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-semibold">
-                  <FaList className="text-emerald-400" /> Today’s pickups
+                  <FaList className="text-emerald-400" /> Today's pickups
                 </div>
                 <Pill tone="green">{todayPickups.length}</Pill>
               </div>
@@ -599,7 +614,7 @@ const HostDashboard = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-semibold">
-                  <FaList className="text-amber-400" /> Today’s returns
+                  <FaList className="text-amber-400" /> Today's returns
                 </div>
                 <Pill tone="amber">{todayReturns.length}</Pill>
               </div>

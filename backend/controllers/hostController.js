@@ -3,8 +3,8 @@ import path from "path";
 import fs from "fs";
 import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
-import User from "../models/userModel.js"; // Added import for User model
-import { malaysiaHolidays, holidayByDate } from "../utils/holidaysMY.js";
+import User from "../models/userModel.js";
+import { getMalaysiaHolidays, buildHolidayByDate } from "../utils/holidaysMY.js";
 
 function asObjectId(v) {
   if (!v) return null;
@@ -87,7 +87,7 @@ export const createHostCar = async (req, res) => {
 
     const imagePath = req.file ? `car-images/${req.file.filename}` : (body.image || body.imageUrl || "");
 
-        const car = await Car.create({
+    const car = await Car.create({
       make: body.make,
       model: body.model,
       year: Number(body.year),
@@ -127,15 +127,15 @@ export const createHostCar = async (req, res) => {
 };
 
 // Bookings for host-owned cars
+// BUG 1 FIX: Query by "car.id" (embedded car snapshot) instead of top-level "carId"
 export const getHostBookings = async (req, res) => {
   try {
     const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
     const carIds = cars.map((c) => c._id);
     if (!carIds.length) return res.json({ success: true, data: [] });
 
-    const bookings = await Booking.find({ carId: { $in: carIds } })
-      .populate("carId")
-      .populate("userId") // assuming Booking has userId to fetch verification info
+    const bookings = await Booking.find({ "car.id": { $in: carIds } })
+      .populate("userId")
       .lean();
 
     return res.json({ success: true, data: bookings });
@@ -172,20 +172,32 @@ export const updateHostBookingStatus = async (req, res) => {
 };
 
 // Host calendar (bookings + per-day car occupancy + holidays + verification meta)
+// BUG 1 FIX: Query by "car.id" instead of "carId"
+// BUG 2 FIX: Filter only relevant booking statuses so dayCars populates correctly
+// BUG 3 FIX: Fetch holidays dynamically via Nager.Date API
 export const getHostCalendar = async (req, res) => {
   try {
+    // BUG 3 FIX: Dynamically fetch holidays for current year + next year
+    const currentYear = new Date().getFullYear();
+    const holidays = await getMalaysiaHolidays([currentYear, currentYear + 1]);
+
     const cars = await Car.find(hostCarFilter(req.user)).select("_id make model serviceBlocks flexiblePricing").lean();
     const carIds = cars.map((c) => c._id);
     if (!carIds.length) {
       return res.json({
         success: true,
-        data: { holidays: malaysiaHolidays, bookings: [], serviceBlocks: [], dayCars: {}, today: { pickups: [], returns: [] } },
+        data: { holidays, bookings: [], serviceBlocks: [], dayCars: {}, today: { pickups: [], returns: [] } },
       });
     }
 
-    const bookings = await Booking.find({ carId: { $in: carIds } })
-      .select("pickupDate returnDate status car bookingDate carId location verificationDocType verificationIdNumber")
-      .populate("carId")
+    // BUG 1 FIX: Query "car.id" (the embedded ObjectId inside the car snapshot)
+    // BUG 2 FIX: Only include bookings with active/relevant statuses
+    const activeStatuses = ["active", "pending", "upcoming", "completed"];
+    const bookings = await Booking.find({
+      "car.id": { $in: carIds },
+      status: { $in: activeStatuses },
+    })
+      .select("pickupDate returnDate status car bookingDate location verificationDocType verificationIdNumber userId")
       .populate("userId", "docType idNumber passportNumber nricNumber verificationStatus")
       .lean();
 
@@ -203,7 +215,10 @@ export const getHostCalendar = async (req, res) => {
       const start = new Date(b.pickupDate);
       const end = new Date(b.returnDate || b.pickupDate);
       const days = eachDayInclusive(start, end);
-      const carName = b.car || `${b.carId?.make || ""} ${b.carId?.model || ""}`.trim();
+      // BUG 1 FIX: b.car is an embedded object { id, make, model, ... }, not a populated ref
+      const carName = b.car
+        ? `${b.car.make || ""} ${b.car.model || ""}`.trim()
+        : "Car";
       const docType =
         b.verificationDocType ||
         b.userId?.docType ||
@@ -219,7 +234,7 @@ export const getHostCalendar = async (req, res) => {
         const key = iso(d);
         if (!dayCars[key]) dayCars[key] = [];
         dayCars[key].push({
-          carId: b.carId?._id || null,
+          carId: b.car?.id || null,
           car: carName || "Car",
           bookingId: b._id,
           status: b.status,
@@ -235,7 +250,7 @@ export const getHostCalendar = async (req, res) => {
     return res.json({
       success: true,
       data: {
-        holidays: malaysiaHolidays,
+        holidays,
         bookings,
         serviceBlocks,
         dayCars,
@@ -252,6 +267,7 @@ export const getHostCalendar = async (req, res) => {
 };
 
 // Block selected car(s) for service (prevent blocking active booking days)
+// BUG 1 FIX: Query by "car.id" instead of "carId"
 export const blockServiceDates = async (req, res) => {
   try {
     const { carIds = [], dates = [] } = req.body || {};
@@ -263,19 +279,19 @@ export const blockServiceDates = async (req, res) => {
 
     // fetch conflicting bookings
     const conflicts = await Booking.find({
-      carId: { $in: carIds.map(asObjectId).filter(Boolean) },
+      "car.id": { $in: carIds.map(asObjectId).filter(Boolean) },
       $or: cleanDates.map((d) => ({
         pickupDate: { $lte: new Date(`${d}T23:59:59.999Z`) },
         returnDate: { $gte: new Date(`${d}T00:00:00.000Z`) },
       })),
     })
-      .select("carId pickupDate returnDate status")
+      .select("car.id pickupDate returnDate status")
       .lean();
 
     if (conflicts.length) {
       const byCar = {};
       for (const c of conflicts) {
-        const cid = String(c.carId);
+        const cid = String(c.car?.id);
         if (!byCar[cid]) byCar[cid] = [];
         byCar[cid].push({ pickupDate: c.pickupDate, returnDate: c.returnDate, status: c.status });
       }

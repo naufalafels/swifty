@@ -42,3 +42,9 @@ export const upsertFlexiblePricing = async (carId, payload) => {
   const res = await api.put(`/api/host/pricing/${carId}`, payload);
   return res.data?.data;
 };
+
+// Get booking customer detail (with signed KYC image URLs)
+export const getBookingCustomerDetail = async (bookingId) => {
+  const res = await api.get(`/api/host/bookings/${bookingId}/customer`);
+  return res.data?.data;
+};

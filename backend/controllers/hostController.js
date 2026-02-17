@@ -5,6 +5,8 @@ import Car from "../models/carModel.js";
 import Booking from "../models/bookingModel.js";
 import User from "../models/userModel.js";
 import { getMalaysiaHolidays, buildHolidayByDate } from "../utils/holidaysMY.js";
+import { generateDownloadUrl } from "../services/s3Service.js";
+import { decrypt } from "../services/cryptoService.js";
 
 function asObjectId(v) {
   if (!v) return null;
@@ -197,8 +199,8 @@ export const getHostCalendar = async (req, res) => {
       "car.id": { $in: carIds },
       status: { $in: activeStatuses },
     })
-      .select("pickupDate returnDate status car bookingDate location verificationDocType verificationIdNumber userId")
-      .populate("userId", "docType idNumber passportNumber nricNumber verificationStatus")
+      .select("pickupDate returnDate status car bookingDate location verificationDocType verificationIdNumber userId customer email phone kyc")
+      .populate("userId", "name email phone docType idNumber passportNumber nricNumber verificationStatus kyc")
       .lean();
 
     const serviceBlocks = cars.flatMap((c) =>
@@ -209,7 +211,7 @@ export const getHostCalendar = async (req, res) => {
       }))
     );
 
-    // Build per-day car occupancy with verification info
+    // Build per-day car occupancy with verification info + customer info
     const dayCars = {};
     for (const b of bookings) {
       const start = new Date(b.pickupDate);
@@ -240,6 +242,12 @@ export const getHostCalendar = async (req, res) => {
           status: b.status,
           verificationDocType: docType,
           verificationIdNumber: docId,
+          // Customer info for sidebar display
+          customerName: b.customer || b.userId?.name || "Unknown",
+          customerEmail: b.email || b.userId?.email || "",
+          customerPhone: b.phone || b.userId?.phone || "",
+          pickupDate: b.pickupDate,
+          returnDate: b.returnDate,
         });
       }
     }
@@ -262,6 +270,102 @@ export const getHostCalendar = async (req, res) => {
     });
   } catch (err) {
     console.error("getHostCalendar error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET booking customer detail with signed KYC image URLs
+export const getBookingCustomerDetail = async (req, res) => {
+  try {
+    const bookingId = asObjectId(req.params.bookingId);
+    if (!bookingId) return res.status(400).json({ success: false, message: "Invalid booking id" });
+
+    // Verify this booking belongs to one of the host's cars
+    const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
+    const carIds = cars.map((c) => String(c._id));
+
+    const booking = await Booking.findById(bookingId).populate("userId").lean();
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+    const bookingCarId = String(booking.car?.id || "");
+    if (!carIds.includes(bookingCarId)) {
+      return res.status(403).json({ success: false, message: "Not authorized to view this booking" });
+    }
+
+    const user = booking.userId;
+    const userKyc = user?.kyc || {};
+    const bookingKyc = booking.kyc || {};
+
+    // Determine ID type and number (prefer user KYC, fallback to booking KYC)
+    const idType = userKyc.idType || bookingKyc.idType || "N/A";
+    const idCountry = userKyc.idCountry || bookingKyc.idCountry || "MY";
+
+    // Try to decrypt the ID number
+    let idNumber = "N/A";
+    const rawIdNumber = userKyc.idNumber || bookingKyc.idNumber || "";
+    if (rawIdNumber) {
+      try {
+        idNumber = decrypt(rawIdNumber);
+      } catch {
+        idNumber = rawIdNumber;
+      }
+    }
+
+    // Generate signed URLs for KYC images
+    // Priority: user KYC images > booking KYC images
+    const frontKey = userKyc.frontImageUrl || bookingKyc.frontImageUrl || "";
+    const backKey = userKyc.backImageUrl || bookingKyc.backImageUrl || "";
+
+    let frontImageUrl = null;
+    if (frontKey) {
+      if (frontKey.startsWith("http")) {
+        frontImageUrl = frontKey;
+      } else {
+        try {
+          frontImageUrl = await generateDownloadUrl(frontKey);
+        } catch (err) {
+          console.error("Error generating front signed URL", err);
+        }
+      }
+    }
+
+    let backImageUrl = null;
+    if (backKey) {
+      if (backKey.startsWith("http")) {
+        backImageUrl = backKey;
+      } else {
+        try {
+          backImageUrl = await generateDownloadUrl(backKey);
+        } catch (err) {
+          console.error("Error generating back signed URL", err);
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        customerName: booking.customer || user?.name || "Unknown",
+        email: booking.email || user?.email || "",
+        phone: booking.phone || user?.phone || "",
+        idType,
+        idNumber,
+        idCountry,
+        frontImageUrl,
+        backImageUrl,
+        carMake: booking.car?.make || "",
+        carModel: booking.car?.model || "",
+        carYear: booking.car?.year || "",
+        pickupDate: booking.pickupDate,
+        returnDate: booking.returnDate,
+        status: booking.status,
+        bookingId: booking._id,
+        amount: booking.amount || 0,
+        paymentStatus: booking.paymentStatus || "pending",
+      },
+    });
+  } catch (err) {
+    console.error("getBookingCustomerDetail error", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -378,4 +482,4 @@ export const upsertFlexiblePricing = async (req, res) => {
     console.error("upsertFlexiblePricing error", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
-}
+};

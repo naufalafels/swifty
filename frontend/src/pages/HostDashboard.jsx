@@ -7,15 +7,20 @@ import {
   FaCar,
   FaClipboardCheck,
   FaDollarSign,
+  FaEnvelope,
   FaFlag,
   FaHome,
+  FaIdCard,
   FaInfoCircle,
   FaList,
   FaMapMarkerAlt,
+  FaPhone,
   FaPlus,
   FaSearch,
   FaShieldAlt,
+  FaSpinner,
   FaTimes,
+  FaUser,
   FaChevronDown
 } from "react-icons/fa";
 import {
@@ -25,6 +30,7 @@ import {
   blockServiceDates,
   getFlexiblePricing,
   upsertFlexiblePricing,
+  getBookingCustomerDetail,
 } from "../services/hostService";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -82,7 +88,7 @@ const BookingCard = ({ booking }) => (
   </div>
 );
 
-/* ───────────────────────── PricingCard ────────────────────────��� */
+/* ───────────────────────── PricingCard ───────────────────────── */
 
 const PricingCard = ({ car, pricing, onSave }) => {
   const [collapsed, setCollapsed] = useState(true);
@@ -213,6 +219,11 @@ const buildDayCarsAndToday = (bookings) => {
         status: b.status,
         verificationDocType: docType,
         verificationIdNumber: docId,
+        customerName: b.customer || b.userId?.name || "Unknown",
+        customerEmail: b.email || b.userId?.email || "",
+        customerPhone: b.phone || b.userId?.phone || "",
+        pickupDate: b.pickupDate,
+        returnDate: b.returnDate,
       });
       cur = addDays(cur, 1);
     }
@@ -228,7 +239,171 @@ const buildDayCarsAndToday = (bookings) => {
   return { dayCars, today: { pickups: pickupsToday, returns: returnsToday } };
 };
 
-/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ══════════════���════════════ */
+/* ───────────────────────── CustomerDetailModal ───────────────────────── */
+
+const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlargedImage }) => {
+  if (!detail && !loading) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-auto space-y-4"
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <FaUser className="text-emerald-400" /> Customer Detail
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">
+            <FaTimes size={18} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10 text-slate-400 gap-2">
+            <FaSpinner className="animate-spin" /> Loading customer details…
+          </div>
+        ) : detail ? (
+          <>
+            {/* Customer Info */}
+            <div className="space-y-2 text-sm">
+              <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Customer Information</div>
+              <div className="flex items-center gap-2">
+                <FaUser className="text-slate-500 w-4" />
+                <span className="text-slate-400">Name:</span>
+                <span className="text-white font-medium">{detail.customerName}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaEnvelope className="text-slate-500 w-4" />
+                <span className="text-slate-400">Email:</span>
+                <span className="text-white font-medium">{detail.email || "—"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaPhone className="text-slate-500 w-4" />
+                <span className="text-slate-400">Phone:</span>
+                <span className="text-white font-medium">{detail.phone || "—"}</span>
+              </div>
+            </div>
+
+            {/* Car & Booking */}
+            <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+              <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Booking Details</div>
+              <div className="flex items-center gap-2">
+                <FaCar className="text-amber-400 w-4" />
+                <span className="text-slate-400">Car:</span>
+                <span className="text-white font-medium">{detail.carMake} {detail.carModel} {detail.carYear ? `(${detail.carYear})` : ""}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaCalendarAlt className="text-emerald-400 w-4" />
+                <span className="text-slate-400">Pickup:</span>
+                <span className="text-white font-medium">{formatDate(detail.pickupDate)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaCalendarAlt className="text-amber-400 w-4" />
+                <span className="text-slate-400">Return:</span>
+                <span className="text-white font-medium">{formatDate(detail.returnDate)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaClipboardCheck className="text-sky-400 w-4" />
+                <span className="text-slate-400">Status:</span>
+                <Pill tone="blue">{detail.status}</Pill>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaList className="text-slate-500 w-4" />
+                <span className="text-slate-400">Booking #:</span>
+                <span className="text-white font-mono text-xs">{detail.bookingId}</span>
+              </div>
+              {detail.amount > 0 && (
+                <div className="flex items-center gap-2">
+                  <FaDollarSign className="text-emerald-400 w-4" />
+                  <span className="text-slate-400">Amount:</span>
+                  <span className="text-white font-medium">RM {detail.amount}</span>
+                  <Pill tone={detail.paymentStatus === "paid" ? "green" : "amber"}>{detail.paymentStatus}</Pill>
+                </div>
+              )}
+            </div>
+
+            {/* Identification */}
+            <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+              <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Identification</div>
+              <div className="flex items-center gap-2">
+                <FaIdCard className="text-sky-400 w-4" />
+                <span className="text-slate-400">ID Type:</span>
+                <span className="text-white font-medium uppercase">{detail.idType || "—"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaShieldAlt className="text-sky-400 w-4" />
+                <span className="text-slate-400">ID Number:</span>
+                <span className="text-white font-mono">{detail.idNumber || "—"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FaFlag className="text-sky-400 w-4" />
+                <span className="text-slate-400">Country:</span>
+                <span className="text-white font-medium">{detail.idCountry || "—"}</span>
+              </div>
+            </div>
+
+            {/* ID Images */}
+            <div className="border-t border-slate-800 pt-3 space-y-3">
+              <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Identification Images</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-slate-400 mb-1">Front</div>
+                  {detail.frontImageUrl ? (
+                    <img
+                      src={detail.frontImageUrl}
+                      alt="ID Front"
+                      className="w-full rounded-lg border border-slate-700 cursor-pointer hover:opacity-80 hover:border-emerald-500 transition object-cover max-h-48"
+                      onClick={() => setEnlargedImage(detail.frontImageUrl)}
+                    />
+                  ) : (
+                    <div className="w-full h-32 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center text-xs text-slate-500">
+                      No front image
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400 mb-1">Back</div>
+                  {detail.backImageUrl ? (
+                    <img
+                      src={detail.backImageUrl}
+                      alt="ID Back"
+                      className="w-full rounded-lg border border-slate-700 cursor-pointer hover:opacity-80 hover:border-emerald-500 transition object-cover max-h-48"
+                      onClick={() => setEnlargedImage(detail.backImageUrl)}
+                    />
+                  ) : (
+                    <div className="w-full h-32 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center text-xs text-slate-500">
+                      No back image
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-sm text-slate-400 py-6 text-center">No customer data available.</div>
+        )}
+      </div>
+
+      {/* Enlarged image overlay */}
+      {enlargedImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4"
+          onClick={(e) => { e.stopPropagation(); setEnlargedImage(null); }}>
+          <div className="relative max-w-3xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setEnlargedImage(null)}
+              className="absolute -top-3 -right-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full w-8 h-8 flex items-center justify-center z-10 shadow-lg">
+              <FaTimes />
+            </button>
+            <img src={enlargedImage} alt="ID Enlarged" className="max-w-full max-h-[85vh] rounded-xl border border-slate-600 shadow-2xl" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
 
 const CALENDAR_STYLES = `
   /* ── wrapper: white bg ── */
@@ -318,10 +493,6 @@ const CALENDAR_STYLES = `
     background: transparent !important;
   }
 
-  /*
-   * KEY FIX: DO NOT hide .rdrDayNumber — let the library render dates natively.
-   * Just force the text colour to dark so it's visible on white bg.
-   */
   .host-calendar .rdrDayNumber {
     position: absolute !important;
     top: 4px !important;
@@ -410,7 +581,6 @@ const CALENDAR_STYLES = `
     z-index: 2 !important;
     position: relative !important;
   }
-  /* .rdrDayNumber is z-index: 3 (set above) — always on top */
 `;
 
 /* ═══════════════════════════ MAIN DASHBOARD ═══════════════════════════ */
@@ -427,6 +597,33 @@ const HostDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [serviceError, setServiceError] = useState("");
+
+  // Customer detail modal state
+  const [customerModal, setCustomerModal] = useState(null);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const [enlargedImage, setEnlargedImage] = useState(null);
+
+  const handleViewCustomer = async (bookingId) => {
+    if (!bookingId) return;
+    setCustomerLoading(true);
+    setCustomerModal(null);
+    setEnlargedImage(null);
+    try {
+      const detail = await getBookingCustomerDetail(bookingId);
+      setCustomerModal(detail);
+    } catch (err) {
+      console.error("Failed to fetch customer detail", err);
+      setCustomerModal(null);
+    } finally {
+      setCustomerLoading(false);
+    }
+  };
+
+  const closeCustomerModal = () => {
+    setCustomerModal(null);
+    setCustomerLoading(false);
+    setEnlargedImage(null);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -525,10 +722,21 @@ const HostDashboard = () => {
     : "Select dates";
 
   const selectedRangeCars = selectedDates.flatMap((d) => {
-    const iso = format(d, "yyyy-MM-dd");
-    const items = dayCars[iso] || [];
-    return items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy") }));
+    const isoStr = format(d, "yyyy-MM-dd");
+    const items = dayCars[isoStr] || [];
+    return items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy"), __isoDate: isoStr }));
   });
+
+  // Holidays that fall within the selected date range
+  const holidaysInRange = useMemo(() => {
+    return selectedDates
+      .map((d) => {
+        const isoStr = format(d, "yyyy-MM-dd");
+        const holiday = holidayByDate.get(isoStr);
+        return holiday ? { ...holiday, dateLabel: format(d, "dd/MM/yyyy") } : null;
+      })
+      .filter(Boolean);
+  }, [selectedDates, holidayByDate]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading host center…</div>;
@@ -537,6 +745,17 @@ const HostDashboard = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-10">
       <style>{CALENDAR_STYLES}</style>
+
+      {/* Customer Detail Modal */}
+      {(customerModal || customerLoading) && (
+        <CustomerDetailModal
+          detail={customerModal}
+          loading={customerLoading}
+          onClose={closeCustomerModal}
+          enlargedImage={enlargedImage}
+          setEnlargedImage={setEnlargedImage}
+        />
+      )}
 
       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* ──── header ──── */}
@@ -636,14 +855,12 @@ const HostDashboard = () => {
                   const isWknd = isWeekend(date);
                   const hasBookings = carsOnDay.length > 0;
 
-                  // Light background tints on white
                   let bgClass = "";
                   if (holiday && hasBookings) bgClass = "bg-amber-100";
                   else if (holiday) bgClass = "bg-amber-50";
                   else if (hasBookings) bgClass = "bg-emerald-50";
                   else if (isWknd) bgClass = "bg-slate-100";
 
-                  // Ring/border
                   let ringClass = "";
                   if (holiday) ringClass = "ring-2 ring-amber-400";
                   else if (hasBookings) ringClass = "ring-1 ring-emerald-400";
@@ -651,12 +868,9 @@ const HostDashboard = () => {
 
                   return (
                     <div className={`host-cal-cell relative w-full h-full flex flex-col items-center justify-end rounded-md overflow-hidden px-0.5 pb-[3px] pt-[20px] ${bgClass} ${ringClass}`}>
-                      {/* Explicit day number (needed because dayContentRenderer overrides default) */}
                       <div className="absolute inset-x-0 top-1 flex justify-center pointer-events-none z-30">
                         <span className="text-slate-900 font-bold text-sm leading-none">{format(date, "d")}</span>
                       </div>
-
-                      {/* Dots + labels sit below the number */}
                       <div className="flex items-center gap-[3px] z-20">
                         {holiday && (
                           <span className="w-[6px] h-[6px] rounded-full bg-amber-500 shadow-[0_0_3px_rgba(245,158,11,0.4)]" title={holiday.label}></span>
@@ -665,15 +879,11 @@ const HostDashboard = () => {
                           <span className="w-[6px] h-[6px] rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.4)]" title={`${carsOnDay.length} car(s) booked`}></span>
                         )}
                       </div>
-
-                      {/* car count */}
                       {hasBookings && (
                         <span className="text-[9px] leading-none text-emerald-700 font-bold mt-[1px] z-20">
                           {carsOnDay.length} car{carsOnDay.length !== 1 ? "s" : ""}
                         </span>
                       )}
-
-                      {/* short holiday label */}
                       {holiday && !hasBookings && (
                         <span className="text-[8px] leading-none text-amber-700 truncate max-w-[46px] mt-[1px] font-semibold z-20">
                           {holiday.label.length > 10 ? holiday.label.slice(0, 10) + "…" : holiday.label}
@@ -696,26 +906,90 @@ const HostDashboard = () => {
               <FaList className="text-emerald-400" /> Selected day detail
             </div>
             {selectedDates.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="text-sm text-slate-200 font-medium">{selectedRangeLabel}</div>
+
+                {/* ── Holidays in selected range ── */}
+                {holidaysInRange.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                      <FaFlag /> Holidays in selected range
+                    </div>
+                    {holidaysInRange.map((h, idx) => (
+                      <div key={`holiday-${h.date}-${idx}`} className="text-xs text-amber-200 bg-amber-900/30 border border-amber-800/40 rounded px-2 py-1.5 flex items-center gap-2">
+                        <FaCalendarAlt className="text-amber-500 shrink-0" />
+                        <span className="font-medium">{h.dateLabel}</span>
+                        <span className="text-amber-300">—</span>
+                        <span>{h.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ── Bookings in selected range (grouped by day with dividers) ── */}
                 {selectedRangeCars.length === 0 && (
                   <div className="text-sm text-slate-400">No cars booked in this range.</div>
                 )}
-                <div className="space-y-2 max-h-56 overflow-auto pr-1">
-                  {selectedRangeCars.map((c, idx) => (
-                    <div key={`${c.bookingId || idx}-${c.__dateLabel}-${idx}`} className="border border-slate-800 rounded-lg p-2 text-sm bg-slate-950/60">
-                      <div className="flex justify-between items-start gap-2">
-                        <span className="font-semibold">{c.car}</span>
-                        <Pill tone="blue">{c.status}</Pill>
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {c.__dateLabel} • Booking #{c.bookingId}
-                      </div>
-                      <div className="text-xs text-slate-300 mt-1">
-                        Verification: {c.verificationDocType || "Not provided"} {c.verificationIdNumber ? `(${c.verificationIdNumber})` : ""}
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-1 max-h-[400px] overflow-auto pr-1">
+                  {(() => {
+                    let lastDate = null;
+                    return selectedRangeCars.map((c, idx) => {
+                      const showDivider = c.__dateLabel !== lastDate;
+                      lastDate = c.__dateLabel;
+                      return (
+                        <React.Fragment key={`${c.bookingId || idx}-${c.__dateLabel}-${idx}`}>
+                          {/* Day divider */}
+                          {showDivider && (
+                            <div className={`flex items-center gap-2 ${idx > 0 ? "pt-3 mt-2 border-t border-slate-700" : ""}`}>
+                              <FaCalendarAlt className="text-emerald-400 text-xs shrink-0" />
+                              <span className="text-xs font-semibold text-emerald-400">{c.__dateLabel}</span>
+                              <div className="flex-1 h-px bg-slate-700" />
+                            </div>
+                          )}
+
+                          {/* Booking card */}
+                          <div
+                            className="border border-slate-800 rounded-lg p-3 text-sm bg-slate-950/60 cursor-pointer hover:border-emerald-500 hover:bg-slate-950/80 transition-all group"
+                            onClick={() => handleViewCustomer(c.bookingId)}
+                          >
+                            {/* Car Make & Model + Status */}
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="font-semibold text-white flex items-center gap-1.5">
+                                <FaCar className="text-amber-400 shrink-0" /> {c.car}
+                              </span>
+                              <Pill tone="blue">{c.status}</Pill>
+                            </div>
+
+                            {/* Booking Number */}
+                            <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                              <FaList className="text-slate-500 shrink-0" /> Booking #{c.bookingId}
+                            </div>
+
+                            {/* Identification — only show if doc type exists */}
+                            {c.verificationDocType && (
+                              <div className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
+                                <FaIdCard className="text-sky-400 shrink-0" />
+                                {c.verificationDocType}
+                                {c.verificationIdNumber ? `: ${c.verificationIdNumber}` : ""}
+                              </div>
+                            )}
+
+                            {/* Customer Name */}
+                            {c.customerName && c.customerName !== "Unknown" && (
+                              <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                                <FaUser className="text-slate-500 shrink-0" /> {c.customerName}
+                              </div>
+                            )}
+
+                            {/* Click hint */}
+                            <div className="text-[10px] text-emerald-500 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              Click to view full customer details & ID images →
+                            </div>
+                          </div>
+                        </React.Fragment>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             ) : (
@@ -810,7 +1084,7 @@ const HostDashboard = () => {
   );
 };
 
-/* ───────────────────────── StatCard ────────────────���──────── */
+/* ───────────────────────── StatCard ───────────────────────── */
 
 const StatCard = ({ title, value, icon, tone = "slate" }) => {
   const tones = {

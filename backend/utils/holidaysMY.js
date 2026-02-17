@@ -79,7 +79,21 @@ async function fetchHolidaysForYear(year) {
       return FALLBACK_HOLIDAYS[year] || [];
     }
 
-    const data = await res.json();
+    // FIX: Read body as text first to handle empty responses safely
+    const text = await res.text();
+
+    if (!text || !text.trim()) {
+      console.warn(`Nager.Date API returned empty body for year ${year}, using fallback`);
+      return FALLBACK_HOLIDAYS[year] || [];
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.warn(`Nager.Date API returned invalid JSON for year ${year}, using fallback`);
+      return FALLBACK_HOLIDAYS[year] || [];
+    }
 
     if (!Array.isArray(data) || data.length === 0) {
       console.warn(`Nager.Date API returned empty data for year ${year}, using fallback`);

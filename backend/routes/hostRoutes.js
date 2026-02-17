@@ -11,7 +11,8 @@ import {
   getHostCalendar,
   blockServiceDates,
   getFlexiblePricing,
-  upsertFlexiblePricing
+  upsertFlexiblePricing,
+  getBookingCustomerDetail
 } from "../controllers/hostController.js";
 
 const router = express.Router();
@@ -40,6 +41,7 @@ router.post("/cars", uploadCarImage.single("image"), createHostCar);
 
 // Bookings
 router.get("/bookings", getHostBookings);
+router.get("/bookings/:bookingId/customer", getBookingCustomerDetail);
 router.patch("/bookings/:id/status", updateHostBookingStatus);
 
 // Calendar + service blocks

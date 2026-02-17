@@ -29,6 +29,8 @@ import {
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
+/* ───────────────────────── tiny reusable components ───────────────────────── */
+
 const Pill = ({ children, tone = "slate" }) => {
   const tones = {
     slate: "bg-slate-800 text-slate-100",
@@ -51,13 +53,14 @@ const formatDate = (value) => {
   return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 };
 
-// BUG 4 FIX: Handle booking.car as an embedded object { make, model, ... } not a string
 const getCarLabel = (booking) => {
   if (typeof booking.car === "string") return booking.car;
   if (booking.car?.make && booking.car?.model) return `${booking.car.make} ${booking.car.model}`;
   if (booking.carId?.make && booking.carId?.model) return `${booking.carId.make} ${booking.carId.model}`;
   return "Car";
 };
+
+/* ───────────────────────── BookingCard ───────────────────────── */
 
 const BookingCard = ({ booking }) => (
   <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2">
@@ -78,6 +81,8 @@ const BookingCard = ({ booking }) => (
     </div>
   </div>
 );
+
+/* ───────────────────────── PricingCard ───────────────────────── */
 
 const PricingCard = ({ car, pricing, onSave }) => {
   const [collapsed, setCollapsed] = useState(true);
@@ -112,49 +117,24 @@ const PricingCard = ({ car, pricing, onSave }) => {
           <div className="grid md:grid-cols-3 gap-4">
             <label className="flex flex-col text-sm text-slate-200 gap-1">
               Base daily rate (RM)
-              <input
-                type="number"
-                min="0"
-                value={base}
-                onChange={(e) => setBase(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-              />
+              <input type="number" min="0" value={base} onChange={(e) => setBase(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
             </label>
-
             <label className="flex flex-col text-sm text-slate-200 gap-1">
               Base deposit (RM)
-              <input
-                type="number"
-                min="0"
-                value={baseDep}
-                onChange={(e) => setBaseDep(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-              />
+              <input type="number" min="0" value={baseDep} onChange={(e) => setBaseDep(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
             </label>
-
             <label className="flex flex-col text-sm text-slate-200 gap-1">
               Weekend multiplier
-              <input
-                type="number"
-                step="0.05"
-                min="0.5"
-                value={weekend}
-                onChange={(e) => setWeekend(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-              />
+              <input type="number" step="0.05" min="0.5" value={weekend} onChange={(e) => setWeekend(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
               <span className="text-xs text-slate-400">Applied on Saturday/Sunday</span>
             </label>
-
             <label className="flex flex-col text-sm text-slate-200 gap-1">
               Deposit weekend multiplier
-              <input
-                type="number"
-                step="0.05"
-                min="0.5"
-                value={depWeekend}
-                onChange={(e) => setDepWeekend(Number(e.target.value))}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-              />
+              <input type="number" step="0.05" min="0.5" value={depWeekend} onChange={(e) => setDepWeekend(Number(e.target.value))}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
             </label>
           </div>
 
@@ -162,10 +142,8 @@ const PricingCard = ({ car, pricing, onSave }) => {
             <div className="text-sm text-slate-200 flex items-center gap-2">
               <FaFlag className="text-amber-400" /> Peak multipliers
             </div>
-            <button
-              onClick={addPeak}
-              className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 flex items-center gap-2"
-            >
+            <button onClick={addPeak}
+              className="text-sm bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-3 py-2 flex items-center gap-2">
               <FaPlus /> Add peak window
             </button>
           </div>
@@ -174,45 +152,18 @@ const PricingCard = ({ car, pricing, onSave }) => {
             <div className="space-y-3">
               {peak.map((p, idx) => (
                 <div key={idx} className="grid md:grid-cols-5 gap-3 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
-                  <input
-                    value={p.label}
-                    onChange={(e) => updatePeak(idx, "label", e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                    placeholder="Label"
-                  />
-                  <input
-                    type="date"
-                    value={p.start}
-                    onChange={(e) => updatePeak(idx, "start", e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                  />
-                  <input
-                    type="date"
-                    value={p.end}
-                    onChange={(e) => updatePeak(idx, "end", e.target.value)}
-                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                  />
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={p.multiplier}
-                    onChange={(e) => updatePeak(idx, "multiplier", Number(e.target.value))}
-                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                    placeholder="Rate x"
-                  />
+                  <input value={p.label} onChange={(e) => updatePeak(idx, "label", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" placeholder="Label" />
+                  <input type="date" value={p.start} onChange={(e) => updatePeak(idx, "start", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" />
+                  <input type="date" value={p.end} onChange={(e) => updatePeak(idx, "end", e.target.value)}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" />
+                  <input type="number" step="0.05" value={p.multiplier} onChange={(e) => updatePeak(idx, "multiplier", Number(e.target.value))}
+                    className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" placeholder="Rate x" />
                   <div className="flex gap-2">
-                    <input
-                      type="number"
-                      step="0.05"
-                      value={p.depositMultiplier}
-                      onChange={(e) => updatePeak(idx, "depositMultiplier", Number(e.target.value))}
-                      className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white"
-                      placeholder="Deposit x"
-                    />
-                    <button
-                      onClick={() => removePeak(idx)}
-                      className="bg-rose-700 hover:bg-rose-600 text-white rounded px-3 py-2"
-                    >
+                    <input type="number" step="0.05" value={p.depositMultiplier} onChange={(e) => updatePeak(idx, "depositMultiplier", Number(e.target.value))}
+                      className="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" placeholder="Deposit x" />
+                    <button onClick={() => removePeak(idx)} className="bg-rose-700 hover:bg-rose-600 text-white rounded px-3 py-2">
                       <FaTimes />
                     </button>
                   </div>
@@ -222,16 +173,8 @@ const PricingCard = ({ car, pricing, onSave }) => {
           )}
 
           <div className="flex justify-end">
-            <button
-              onClick={() => onSave({
-                baseDailyRate: base,
-                baseDeposit: baseDep,
-                weekendMultiplier: weekend,
-                depositWeekendMultiplier: depWeekend,
-                peakMultipliers: peak,
-              })}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2 font-semibold"
-            >
+            <button onClick={() => onSave({ baseDailyRate: base, baseDeposit: baseDep, weekendMultiplier: weekend, depositWeekendMultiplier: depWeekend, peakMultipliers: peak })}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2 font-semibold">
               Save pricing
             </button>
           </div>
@@ -241,15 +184,14 @@ const PricingCard = ({ car, pricing, onSave }) => {
   );
 };
 
-// Build fallback dayCars and today summaries from bookings if API omitted them
-// BUG 4 FIX: Handle b.car as an embedded object, use b.car.id, and filter by status
+/* ───────────────────────── buildDayCarsAndToday (fallback) ───────────────────────── */
+
 const buildDayCarsAndToday = (bookings) => {
   const dayCars = {};
   const now = new Date();
   const todayIso = format(now, "yyyy-MM-dd");
   const pickupsToday = [];
   const returnsToday = [];
-
   const relevantStatuses = ["active", "pending", "upcoming", "completed"];
 
   bookings.forEach((b) => {
@@ -258,7 +200,6 @@ const buildDayCarsAndToday = (bookings) => {
     const carName = getCarLabel(b);
     const docType = b.verificationDocType || b.userId?.docType || (b.userId?.passportNumber ? "Passport" : b.userId?.nricNumber ? "NRIC" : null);
     const docId = b.verificationIdNumber || b.userId?.passportNumber || b.userId?.nricNumber || b.userId?.idNumber || null;
-
     const isRelevant = relevantStatuses.includes(b.status);
 
     let cur = start;
@@ -286,6 +227,193 @@ const buildDayCarsAndToday = (bookings) => {
 
   return { dayCars, today: { pickups: pickupsToday, returns: returnsToday } };
 };
+
+/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
+
+const CALENDAR_STYLES = `
+  /* ── wrapper: white bg ── */
+  .host-calendar .rdrCalendarWrapper,
+  .host-calendar .rdrDateDisplayWrapper,
+  .host-calendar .rdrMonths,
+  .host-calendar .rdrMonth {
+    background: #ffffff !important;
+    color: #1e293b !important;
+  }
+  .host-calendar .rdrCalendarWrapper {
+    border-radius: 12px !important;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+  }
+  .host-calendar .rdrMonthAndYearWrapper {
+    background: #ffffff !important;
+    padding-top: 8px;
+  }
+
+  /* ── month & year selects ── */
+  .host-calendar .rdrMonthName {
+    color: #334155 !important;
+    font-weight: 600 !important;
+  }
+  .host-calendar .rdrMonthAndYearPickers select {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 4px 8px !important;
+    font-weight: 500 !important;
+  }
+  .host-calendar .rdrMonthAndYearPickers select:hover {
+    background: #f1f5f9 !important;
+  }
+  .host-calendar .rdrMonthAndYearPickers select option {
+    background: #ffffff !important;
+    color: #1e293b !important;
+  }
+
+  /* ── nav arrows ── */
+  .host-calendar .rdrNextPrevButton {
+    background: #f1f5f9 !important;
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  .host-calendar .rdrNextPrevButton:hover {
+    background: #e2e8f0 !important;
+  }
+  .host-calendar .rdrPprevButton i {
+    border-color: transparent #475569 transparent transparent !important;
+  }
+  .host-calendar .rdrNextButton i {
+    border-color: transparent transparent transparent #475569 !important;
+  }
+
+  /* ── weekday labels ── */
+  .host-calendar .rdrWeekDay {
+    color: #64748b !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+  }
+
+  /* ── date display inputs ── */
+  .host-calendar .rdrDateDisplay {
+    background-color: #ffffff !important;
+    margin: 0 8px !important;
+  }
+  .host-calendar .rdrDateDisplayItem {
+    background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+  }
+  .host-calendar .rdrDateDisplayItem input {
+    color: #1e293b !important;
+  }
+  .host-calendar .rdrDateDisplayItemActive {
+    border-color: #10b981 !important;
+  }
+
+  /* ── day cells ── */
+  .host-calendar .rdrDay {
+    height: 56px !important;
+    background: transparent !important;
+  }
+
+  /*
+   * KEY FIX: DO NOT hide .rdrDayNumber — let the library render dates natively.
+   * Just force the text colour to dark so it's visible on white bg.
+   */
+  .host-calendar .rdrDayNumber {
+    position: absolute !important;
+    top: 4px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 3 !important;
+  }
+  .host-calendar .rdrDayNumber span {
+    color: #1e293b !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+  }
+  .host-calendar .rdrDayPassive .rdrDayNumber span {
+    color: #cbd5e1 !important;
+  }
+  .host-calendar .rdrDayDisabled .rdrDayNumber span {
+    color: #cbd5e1 !important;
+  }
+  .host-calendar .rdrDayToday .rdrDayNumber span {
+    color: #059669 !important;
+    font-weight: 800 !important;
+  }
+  .host-calendar .rdrDayToday .rdrDayNumber span::after {
+    background: #059669 !important;
+  }
+
+  /* ── selection range ── */
+  .host-calendar .rdrStartEdge,
+  .host-calendar .rdrEndEdge {
+    background: rgba(16, 185, 129, 0.25) !important;
+    border-radius: 8px !important;
+  }
+  .host-calendar .rdrInRange {
+    background: rgba(16, 185, 129, 0.10) !important;
+  }
+
+  /* ── preview (hover) ── */
+  .host-calendar .rdrDayStartPreview,
+  .host-calendar .rdrDayEndPreview {
+    border-color: rgba(16, 185, 129, 0.4) !important;
+    border-radius: 8px !important;
+  }
+  .host-calendar .rdrDayInPreview {
+    border-color: rgba(16, 185, 129, 0.2) !important;
+  }
+
+  /* ── hover ── */
+  .host-calendar .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover {
+    cursor: pointer;
+  }
+  .host-calendar .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .host-cal-cell {
+    background: #f1f5f9 !important;
+    border-radius: 6px;
+  }
+
+  /* ── passive ── */
+  .host-calendar .rdrDayPassive .host-cal-cell {
+    opacity: 0.2 !important;
+  }
+  .host-calendar .rdrDayPassive {
+    pointer-events: none;
+  }
+
+  /* ── disabled ── */
+  .host-calendar .rdrDayDisabled {
+    background-color: #f8fafc !important;
+  }
+  .host-calendar .rdrDayDisabled .host-cal-cell {
+    opacity: 0.2 !important;
+  }
+
+  /* ── z-index layering ── */
+  .host-calendar .rdrStartEdge,
+  .host-calendar .rdrEndEdge,
+  .host-calendar .rdrInRange,
+  .host-calendar .rdrDayStartPreview,
+  .host-calendar .rdrDayInPreview,
+  .host-calendar .rdrDayEndPreview {
+    z-index: 1 !important;
+  }
+  .host-calendar .host-cal-cell {
+    z-index: 2 !important;
+    position: relative !important;
+  }
+  /* .rdrDayNumber is z-index: 3 (set above) — always on top */
+`;
+
+/* ═══════════════════════════ MAIN DASHBOARD ═══════════════════════════ */
 
 const HostDashboard = () => {
   const navigate = useNavigate();
@@ -337,9 +465,7 @@ const HostDashboard = () => {
       }
     };
     load();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const holidays = calendar?.holidays || [];
@@ -392,13 +518,6 @@ const HostDashboard = () => {
     );
   };
 
-  const dateRangeColor = (date) => {
-    const isoDate = format(date, "yyyy-MM-dd");
-    if (holidayByDate.has(isoDate)) return "ring-2 ring-amber-400";
-    if (isWeekend(date)) return "ring-1 ring-emerald-500/60";
-    return "";
-  };
-
   const selectedDayCars = selectedDay ? dayCars[selectedDay] || [] : [];
 
   if (loading) {
@@ -407,13 +526,14 @@ const HostDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-10">
+      <style>{CALENDAR_STYLES}</style>
+
       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+        {/* ──── header ──── */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2"
-            >
+            <button onClick={() => navigate("/")}
+              className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2">
               <FaHome /> Home
             </button>
             <div>
@@ -424,37 +544,31 @@ const HostDashboard = () => {
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate("/host/add-cars")}
-              className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold"
-            >
+            <button onClick={() => navigate("/host/add-cars")}
+              className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold">
               <FaPlus /> Add cars
             </button>
-            <button
-              onClick={() => navigate("/profile")}
-              className="bg-slate-800 hover:bg-slate-700 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold"
-            >
+            <button onClick={() => navigate("/profile")}
+              className="bg-slate-800 hover:bg-slate-700 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold">
               <FaShieldAlt /> Profile & security
             </button>
           </div>
         </div>
 
+        {/* ──── stat cards ──── */}
         <div className="grid md:grid-cols-3 gap-4">
           <StatCard title="Cars" value={cars.length} icon={<FaCar />} tone="blue" />
           <StatCard title="Today pickups" value={todayPickups.length} icon={<FaClipboardCheck />} tone="emerald" />
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
         </div>
 
+        {/* ──── quick find ──── */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-slate-200">
             <FaSearch /> Quick find (20–40 cars)
           </div>
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search by make/model"
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white"
-          />
+          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by make/model"
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-auto pr-1">
             {filteredCars.map((c) => (
               <div key={c._id} className="border border-slate-800 bg-slate-900 rounded-lg p-3 space-y-1">
@@ -472,65 +586,108 @@ const HostDashboard = () => {
           </div>
         </div>
 
+        {/* ══════════════ CALENDAR + SIDEBAR ══════════════ */}
         <section className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 font-semibold">
-                <FaCalendarAlt className="text-emerald-400" /> Booking calendar (holidays highlighted, cars per day)
+                <FaCalendarAlt className="text-emerald-400" /> Booking calendar
               </div>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <Pill tone="amber">Holiday ring</Pill>
-                <Pill tone="green">Weekend ring</Pill>
+              <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500"></span> Holiday
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Cars booked
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"></span> Weekend
+                </span>
               </div>
             </div>
-            <DateRange
-              onChange={(item) => {
-                setSelectedRange([item.selection]);
-                setSelectedDay(format(item.selection.startDate, "yyyy-MM-dd"));
-              }}
-              ranges={selectedRange}
-              rangeColors={["#10b981"]}
-              minDate={new Date()}
-              showMonthAndYearPickers
-              months={2}
-              direction="horizontal"
-              showPreview={false}
-              weekStartsOn={1}
-              dayContentRenderer={(date) => {
-                const isoDate = format(date, "yyyy-MM-dd");
-                const carsOnDay = dayCars[isoDate] || [];
-                const holiday = holidayByDate.get(isoDate);
-                return (
-                  <div className={`w-full h-full flex flex-col items-center justify-center gap-0.5 ${dateRangeColor(date)}`}>
-                    <span>{date.getDate()}</span>
-                    {holiday && <span className="text-[10px] text-amber-300 truncate max-w-[64px]">{holiday.label}</span>}
-                    {carsOnDay.slice(0, 2).map((c, idx) => (
-                      <span key={idx} className="text-[10px] bg-slate-800 text-white px-1 rounded">
-                        {c.car}
-                      </span>
-                    ))}
-                    {carsOnDay.length > 2 && (
-                      <span className="text-[10px] text-slate-300">+{carsOnDay.length - 2} more</span>
-                    )}
-                  </div>
-                );
-              }}
-            />
+
+            <div className="host-calendar">
+              <DateRange
+                onChange={(item) => {
+                  setSelectedRange([item.selection]);
+                  setSelectedDay(format(item.selection.startDate, "yyyy-MM-dd"));
+                }}
+                ranges={selectedRange}
+                rangeColors={["#10b981"]}
+                minDate={new Date()}
+                showMonthAndYearPickers
+                months={2}
+                direction="horizontal"
+                showPreview={false}
+                weekStartsOn={1}
+                dayContentRenderer={(date) => {
+                  const isoDate = format(date, "yyyy-MM-dd");
+                  const carsOnDay = dayCars[isoDate] || [];
+                  const holiday = holidayByDate.get(isoDate);
+                  const isWknd = isWeekend(date);
+                  const hasBookings = carsOnDay.length > 0;
+
+                  // Light background tints on white
+                  let bgClass = "";
+                  if (holiday && hasBookings) bgClass = "bg-amber-100";
+                  else if (holiday) bgClass = "bg-amber-50";
+                  else if (hasBookings) bgClass = "bg-emerald-50";
+                  else if (isWknd) bgClass = "bg-slate-100";
+
+                  // Ring/border
+                  let ringClass = "";
+                  if (holiday) ringClass = "ring-2 ring-amber-400";
+                  else if (hasBookings) ringClass = "ring-1 ring-emerald-400";
+                  else if (isWknd) ringClass = "ring-1 ring-slate-200";
+
+                  return (
+                    <div className={`host-cal-cell w-full h-full flex flex-col items-center justify-end rounded-md overflow-hidden px-0.5 pb-[3px] pt-[20px] ${bgClass} ${ringClass}`}>
+                      {/* Dots + labels sit BELOW the library's native date number */}
+                      <div className="flex items-center gap-[3px]">
+                        {holiday && (
+                          <span className="w-[6px] h-[6px] rounded-full bg-amber-500 shadow-[0_0_3px_rgba(245,158,11,0.4)]" title={holiday.label}></span>
+                        )}
+                        {hasBookings && (
+                          <span className="w-[6px] h-[6px] rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.4)]" title={`${carsOnDay.length} car(s) booked`}></span>
+                        )}
+                      </div>
+
+                      {/* car count */}
+                      {hasBookings && (
+                        <span className="text-[9px] leading-none text-emerald-700 font-bold mt-[1px]">
+                          {carsOnDay.length} car{carsOnDay.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+
+                      {/* short holiday label */}
+                      {holiday && !hasBookings && (
+                        <span className="text-[8px] leading-none text-amber-700 truncate max-w-[46px] mt-[1px] font-semibold">
+                          {holiday.label.length > 10 ? holiday.label.slice(0, 10) + "…" : holiday.label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+            </div>
+
             <div className="text-xs text-slate-400 flex items-center gap-2">
-              <FaInfoCircle /> Holidays are informational so you can adjust flexible pricing; selection is allowed.
+              <FaInfoCircle /> Click a date to see full details in the sidebar. Holidays are informational for pricing.
             </div>
           </div>
 
+          {/* ──── selected-day sidebar ──── */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2 font-semibold">
               <FaList className="text-emerald-400" /> Selected day detail
             </div>
             {selectedDay ? (
               <div className="space-y-2">
-                <div className="text-sm text-slate-200">{selectedDay}</div>
+                <div className="text-sm text-slate-200 font-medium">{selectedDay}</div>
                 {holidayByDate.get(selectedDay) && (
-                  <div className="text-xs text-amber-300 bg-amber-900/40 border border-amber-800 rounded px-2 py-1">
-                    Holiday: {holidayByDate.get(selectedDay).label} ({holidayByDate.get(selectedDay).type})
+                  <div className="text-xs text-amber-300 bg-amber-900/40 border border-amber-800 rounded px-2 py-1.5 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+                    {holidayByDate.get(selectedDay).label} ({holidayByDate.get(selectedDay).type})
                   </div>
                 )}
                 {(dayCars[selectedDay] || []).length === 0 && (
@@ -557,12 +714,12 @@ const HostDashboard = () => {
           </div>
         </section>
 
+        {/* ══════════════ SERVICE BLOCK + TODAY PICKUPS/RETURNS ══════════════ */}
         <section className="grid lg:grid-cols-3 gap-6">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 lg:col-span-1">
             <div className="flex items-center gap-2 font-semibold">
               <FaFlag className="text-amber-400" /> Block cars for service
             </div>
-
             <div className="space-y-2">
               <div className="text-xs text-slate-400">Select cars (predictive, scrollable)</div>
               <PredictiveMultiSelect
@@ -571,7 +728,6 @@ const HostDashboard = () => {
                 onChange={setSelectedCarIds}
               />
             </div>
-
             <div className="space-y-2">
               <div className="text-xs text-slate-400">Service dates</div>
               <DateRange
@@ -583,14 +739,9 @@ const HostDashboard = () => {
                 weekStartsOn={1}
               />
             </div>
-
             {serviceError && <div className="text-xs text-rose-300">{serviceError}</div>}
-
-            <button
-              disabled={!selectedCarIds.length}
-              onClick={handleBlockService}
-              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold"
-            >
+            <button disabled={!selectedCarIds.length} onClick={handleBlockService}
+              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
               Block selected cars for these dates
             </button>
           </div>
@@ -628,6 +779,7 @@ const HostDashboard = () => {
           </div>
         </section>
 
+        {/* ══════════════ FLEXIBLE PRICING ══════════════ */}
         <section className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <FaDollarSign className="text-emerald-400" /> Flexible pricing per car
@@ -648,6 +800,8 @@ const HostDashboard = () => {
   );
 };
 
+/* ───────────────────────── StatCard ───────────────────────── */
+
 const StatCard = ({ title, value, icon, tone = "slate" }) => {
   const tones = {
     slate: "from-slate-900 to-slate-800 border-slate-800",
@@ -666,6 +820,8 @@ const StatCard = ({ title, value, icon, tone = "slate" }) => {
   );
 };
 
+/* ───────────────────────── PredictiveMultiSelect ───────────────────────── */
+
 const PredictiveMultiSelect = ({ options, value, onChange }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -673,7 +829,6 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
     () => options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase())),
     [options, query]
   );
-
   const toggle = (val) => {
     onChange((prev) =>
       prev.includes(val) ? prev.filter((v) => v !== val) : [...prev, val]
@@ -682,35 +837,21 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-left text-white flex items-center justify-between"
-      >
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-left text-white flex items-center justify-between">
         <span>{value.length ? `${value.length} car(s) selected` : "Select cars"}</span>
         <FaChevronDown className="text-slate-400" />
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-800 rounded-lg shadow-lg">
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type to filter"
-            className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white"
-          />
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type to filter"
+            className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white" />
           <div className="max-h-48 overflow-auto">
             {filtered.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-800 text-white cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={value.includes(opt.value)}
-                  onChange={() => toggle(opt.value)}
-                  className="accent-emerald-500"
-                />
+              <label key={opt.value}
+                className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-800 text-white cursor-pointer">
+                <input type="checkbox" checked={value.includes(opt.value)} onChange={() => toggle(opt.value)}
+                  className="accent-emerald-500" />
                 <span>{opt.label}</span>
               </label>
             ))}
@@ -723,6 +864,8 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
     </div>
   );
 };
+
+/* ───────────────────────── eachDay helper ───────────────────────── */
 
 const eachDay = (start, end) => {
   const days = [];

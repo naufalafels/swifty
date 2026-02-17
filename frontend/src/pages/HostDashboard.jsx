@@ -82,7 +82,7 @@ const BookingCard = ({ booking }) => (
   </div>
 );
 
-/* ───────────────────────── PricingCard ───────────────────────── */
+/* ───────────────────────── PricingCard ────────────────────────��� */
 
 const PricingCard = ({ car, pricing, onSave }) => {
   const [collapsed, setCollapsed] = useState(true);
@@ -228,7 +228,7 @@ const buildDayCarsAndToday = (bookings) => {
   return { dayCars, today: { pickups: pickupsToday, returns: returnsToday } };
 };
 
-/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
+/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ══════════════���════════════ */
 
 const CALENDAR_STYLES = `
   /* ── wrapper: white bg ── */
@@ -426,7 +426,6 @@ const HostDashboard = () => {
   const [pricingByCar, setPricingByCar] = useState({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
-  const [selectedDay, setSelectedDay] = useState(null);
   const [serviceError, setServiceError] = useState("");
 
   useEffect(() => {
@@ -518,7 +517,18 @@ const HostDashboard = () => {
     );
   };
 
-  const selectedDayCars = selectedDay ? dayCars[selectedDay] || [] : [];
+  // Selected range display helpers
+  const selectedRangeObj = selectedRange[0] || null;
+  const selectedDates = selectedRangeObj ? eachDay(selectedRangeObj.startDate, selectedRangeObj.endDate) : [];
+  const selectedRangeLabel = selectedRangeObj
+    ? `${format(selectedRangeObj.startDate, "dd/MM/yyyy")} → ${format(selectedRangeObj.endDate, "dd/MM/yyyy")}`
+    : "Select dates";
+
+  const selectedRangeCars = selectedDates.flatMap((d) => {
+    const iso = format(d, "yyyy-MM-dd");
+    const items = dayCars[iso] || [];
+    return items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy") }));
+  });
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading host center…</div>;
@@ -610,7 +620,6 @@ const HostDashboard = () => {
               <DateRange
                 onChange={(item) => {
                   setSelectedRange([item.selection]);
-                  setSelectedDay(format(item.selection.startDate, "yyyy-MM-dd"));
                 }}
                 ranges={selectedRange}
                 rangeColors={["#10b981"]}
@@ -686,26 +695,22 @@ const HostDashboard = () => {
             <div className="flex items-center gap-2 font-semibold">
               <FaList className="text-emerald-400" /> Selected day detail
             </div>
-            {selectedDay ? (
+            {selectedDates.length > 0 ? (
               <div className="space-y-2">
-                <div className="text-sm text-slate-200 font-medium">{selectedDay}</div>
-                {holidayByDate.get(selectedDay) && (
-                  <div className="text-xs text-amber-300 bg-amber-900/40 border border-amber-800 rounded px-2 py-1.5 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
-                    {holidayByDate.get(selectedDay).label} ({holidayByDate.get(selectedDay).type})
-                  </div>
-                )}
-                {(dayCars[selectedDay] || []).length === 0 && (
-                  <div className="text-sm text-slate-400">No cars booked.</div>
+                <div className="text-sm text-slate-200 font-medium">{selectedRangeLabel}</div>
+                {selectedRangeCars.length === 0 && (
+                  <div className="text-sm text-slate-400">No cars booked in this range.</div>
                 )}
                 <div className="space-y-2 max-h-56 overflow-auto pr-1">
-                  {(dayCars[selectedDay] || []).map((c, idx) => (
-                    <div key={idx} className="border border-slate-800 rounded-lg p-2 text-sm bg-slate-950/60">
+                  {selectedRangeCars.map((c, idx) => (
+                    <div key={`${c.bookingId || idx}-${c.__dateLabel}-${idx}`} className="border border-slate-800 rounded-lg p-2 text-sm bg-slate-950/60">
                       <div className="flex justify-between items-start gap-2">
                         <span className="font-semibold">{c.car}</span>
                         <Pill tone="blue">{c.status}</Pill>
                       </div>
-                      <div className="text-xs text-slate-400">Booking #{c.bookingId}</div>
+                      <div className="text-xs text-slate-400">
+                        {c.__dateLabel} • Booking #{c.bookingId}
+                      </div>
                       <div className="text-xs text-slate-300 mt-1">
                         Verification: {c.verificationDocType || "Not provided"} {c.verificationIdNumber ? `(${c.verificationIdNumber})` : ""}
                       </div>
@@ -714,7 +719,7 @@ const HostDashboard = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-sm text-slate-400">Select a date to see booked cars.</div>
+              <div className="text-sm text-slate-400">Select a date range to see booked cars.</div>
             )}
           </div>
         </section>
@@ -746,7 +751,7 @@ const HostDashboard = () => {
             </div>
             {serviceError && <div className="text-xs text-rose-300">{serviceError}</div>}
             <button disabled={!selectedCarIds.length} onClick={handleBlockService}
-              className="w-full bg-amber-600 hover-bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
+              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
               Block selected cars for these dates
             </button>
           </div>
@@ -805,7 +810,7 @@ const HostDashboard = () => {
   );
 };
 
-/* ───────────────────────── StatCard ───────────────────────── */
+/* ───────────────────────── StatCard ────────────────���──────── */
 
 const StatCard = ({ title, value, icon, tone = "slate" }) => {
   const tones = {

@@ -268,11 +268,11 @@ const HomeCars = () => {
     );
   };
 
+  // Only truly disable for maintenance cars — booked/rented cars should
+  // still allow users to navigate to the detail page for advance booking
   const isBookDisabled = (car) => {
-    const effective = computeEffectiveAvailability(car);
-    if (car?.status && car.status !== "available") return true;
-    if (!effective) return false;
-    return effective.state === "booked";
+    if (car?.status === "maintenance") return true;
+    return false;
   };
 
   const handleBook = (car) => {
@@ -359,6 +359,8 @@ const HomeCars = () => {
             const transformWhenHovered =
               hoveredCard === (car._id || car.id) ? "rotate(0.5deg)" : "none";
             const disabled = isBookDisabled(car);
+            const effective = computeEffectiveAvailability(car);
+            const isCurrentlyBooked = effective?.state === "booked";
 
             return (
               <div
@@ -468,12 +470,18 @@ const HomeCars = () => {
                     aria-disabled={disabled}
                     title={
                       disabled
-                        ? "This car is currently booked or unavailable"
+                        ? "This car is under maintenance"
+                        : isCurrentlyBooked
+                        ? "Book this car for future dates"
                         : "Book this car"
                     }
                   >
                     <span className={styles.buttonText}>
-                      {disabled ? "Unavailable" : "Book Now"}
+                      {disabled
+                        ? "Unavailable"
+                        : isCurrentlyBooked
+                        ? "Book in Advance"
+                        : "Book Now"}
                       <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </span>
                   </button>

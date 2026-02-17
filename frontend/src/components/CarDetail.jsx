@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   FaUserFriends,
@@ -126,21 +126,51 @@ const CarDetail = () => {
   const currentUser = authService.getCurrentUser();
   const emailPrefill = currentUser?.email || "";
 
+  // --- FIX: Use a stable primitive (user ID string) as dependency
+  // instead of the currentUser object which creates a new reference each render ---
+  const currentUserId = currentUser?.id || currentUser?._id || null;
+
   // --- Track whether user's KYC is already approved ---
   const [userKycApproved, setUserKycApproved] = useState(false);
+  const [kycCheckDone, setKycCheckDone] = useState(false);
 
+  // --- FIX: Stable dependency [currentUserId] prevents infinite re-renders.
+  // Also try multiple API paths to handle different route configurations. ---
   useEffect(() => {
-    if (currentUser) {
-      api.get('/api/user/me')
-        .then(res => {
+    if (!currentUserId) {
+      setKycCheckDone(true);
+      return;
+    }
+    let cancelled = false;
+
+    const checkKyc = async () => {
+      // Try the primary endpoint first, fall back to alternative if it fails
+      const endpoints = ['/api/user/me', '/api/auth/me'];
+      for (const endpoint of endpoints) {
+        try {
+          const res = await api.get(endpoint);
+          if (cancelled) return;
           const userData = res.data?.user || res.data;
           if (userData?.kyc?.status === 'approved') {
             setUserKycApproved(true);
           }
-        })
-        .catch(() => {});
-    }
-  }, [currentUser]);
+          setKycCheckDone(true);
+          return; // success — stop trying endpoints
+        } catch (err) {
+          // If 404, try next endpoint; otherwise stop
+          if (err?.response?.status !== 404) {
+            if (!cancelled) setKycCheckDone(true);
+            return;
+          }
+        }
+      }
+      // All endpoints failed
+      if (!cancelled) setKycCheckDone(true);
+    };
+
+    checkKyc();
+    return () => { cancelled = true; };
+  }, [currentUserId]);
 
   const [formData, setFormData] = useState({
     pickupDate: initialPickup,
@@ -272,8 +302,11 @@ const CarDetail = () => {
     };
   }, [id]);
 
+  // --- FIX: Use stable carId primitive for socket dependency instead of full car object ---
+  const carId = car?._id || car?.id || null;
+
   useEffect(() => {
-    if (currentUser && car) {
+    if (currentUserId && carId) {
       const newSocket = io(SOCKET_URL, {
         transports: ["websocket", "polling"],
         withCredentials: true,
@@ -284,13 +317,13 @@ const CarDetail = () => {
         setMessagingError("Failed to connect to messaging server");
       });
 
-      newSocket.emit("joinUserRoom", currentUser.id);
+      newSocket.emit("joinUserRoom", currentUserId);
       newSocket.on("privateMessage", (data) => {
         setMessages((prev) => [...prev, data]);
       });
 
       api
-        .get(`/api/messages/car/${car._id}`)
+        .get(`/api/messages/car/${carId}`)
         .then((res) => {
           setMessages(res.data || []);
         })
@@ -302,7 +335,7 @@ const CarDetail = () => {
         newSocket.disconnect();
       };
     }
-  }, [currentUser, car]);
+  }, [currentUserId, carId]);
 
   const sendMessage = () => {
     if (!socket?.connected) {
@@ -320,8 +353,8 @@ const CarDetail = () => {
     }
     const msgData = {
       toUserId: hostId,
-      fromUserId: currentUser.id,
-      carId: car._id,
+      fromUserId: currentUserId,
+      carId: carId,
       message: newMessage.trim(),
     };
     api
@@ -437,7 +470,7 @@ const CarDetail = () => {
       return;
     }
 
-    // Only require KYC fields if user is NOT already approved
+    // --- FIX: Only require KYC fields if user is NOT already approved ---
     if (!userKycApproved) {
       if (!formData.idCountry) {
         toast.error("Please provide your ID issuing country.");
@@ -498,7 +531,7 @@ const CarDetail = () => {
         companyName: car.company?.name || car.companyName || "",
       }));
 
-      // Send kycFromProfile flag or upload files
+      // --- FIX: Send kycFromProfile flag if approved, otherwise upload files ---
       if (userKycApproved) {
         form.append("kycFromProfile", "true");
       } else {
@@ -814,8 +847,16 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* Show verified badge OR KYC form */}
-                {userKycApproved ? (
+                {/* --- FIX: Show verified badge OR KYC form based on actual KYC status ---
+                     Wait for kycCheckDone to avoid flashing KYC form before check completes */}
+                {!kycCheckDone && currentUserId ? (
+                  <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                    <div className="flex items-center gap-2">
+                      <FaShieldAlt className="text-gray-400 animate-pulse" />
+                      <span className="text-sm text-gray-400">Checking verification status...</span>
+                    </div>
+                  </div>
+                ) : userKycApproved ? (
                   <div className="mt-4 p-3 rounded-xl border border-emerald-700/50 bg-emerald-900/20">
                     <div className="flex items-center gap-2">
                       <FaCheckCircle className="text-emerald-400" />
@@ -882,6 +923,8 @@ const CarDetail = () => {
                         <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
                         <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
                           <div className={carDetailStyles.inputIcon}><FaImage /></div>
+                          {/* FIX: Removed required — handleSubmit validates this instead,
+                               preventing browser-level blocking if KYC check completes late */}
                           <input
                             type="file"
                             accept="image/*"
@@ -889,7 +932,6 @@ const CarDetail = () => {
                             onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
                             onFocus={() => setActiveField("frontImage")}
                             onBlur={() => setActiveField(null)}
-                            required
                             className={carDetailStyles.textInputField}
                           />
                         </div>
@@ -898,6 +940,7 @@ const CarDetail = () => {
                         <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
                         <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
                           <div className={carDetailStyles.inputIcon}><FaImage /></div>
+                          {/* FIX: Removed required — handleSubmit validates this instead */}
                           <input
                             type="file"
                             accept="image/*"
@@ -905,7 +948,6 @@ const CarDetail = () => {
                             onChange={(e) => setBackFile(e.target.files?.[0] || null)}
                             onFocus={() => setActiveField("backImage")}
                             onBlur={() => setActiveField(null)}
-                            required
                             className={carDetailStyles.textInputField}
                           />
                         </div>
@@ -1026,7 +1068,7 @@ const CarDetail = () => {
                     <div
                       key={idx}
                       className={`mb-2 text-sm ${
-                        msg.fromUserId === currentUser.id ? "text-right" : "text-left"
+                        msg.fromUserId === currentUserId ? "text-right" : "text-left"
                       }`}
                     >
                       <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">

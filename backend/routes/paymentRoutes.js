@@ -1,33 +1,28 @@
 import express from 'express';
 import {
-  createRazorpayOrder,
-  verifyRazorpayPayment
+  createXenditInvoice,
+  markPaymentFailed,
 } from '../controllers/paymentController.js';
-import { razorpayWebhookHandler } from '../controllers/webhookController.js';
+import { xenditWebhookHandler } from '../controllers/webhookController.js';
 import { uploads } from '../middlewares/uploads.js';
 
 const paymentRouter = express.Router();
 
-// Create order + pending booking (accepts KYC images as multipart/form-data)
+// Create Xendit invoice + pending booking (accepts KYC images as multipart/form-data)
 paymentRouter.post(
-  '/razorpay/order',
+  '/xendit/create-invoice',
   uploads.fields([
     { name: 'kycFront', maxCount: 1 },
     { name: 'kycBack', maxCount: 1 }
   ]),
-  createRazorpayOrder
+  createXenditInvoice
 );
 
-// Client-side verification hook (optional if you rely solely on webhooks)
-paymentRouter.post('/razorpay/verify', verifyRazorpayPayment);
+// Xendit webhook — receives payment confirmation from Xendit servers
+// Uses standard JSON body (no express.raw needed like Razorpay)
+paymentRouter.post('/xendit/webhook', xenditWebhookHandler);
 
-// Razorpay webhook
-// IMPORTANT: use express.raw middleware here so we can verify signature against the exact raw bytes
-paymentRouter.post(
-  '/razorpay/webhook',
-  // accept only application/json raw body for signature verification
-  express.raw({ type: 'application/json' }),
-  razorpayWebhookHandler
-);
+// Mark payment as failed (when user abandons payment page)
+paymentRouter.post('/xendit/failed', markPaymentFailed);
 
 export default paymentRouter;

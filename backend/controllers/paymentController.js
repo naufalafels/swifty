@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
@@ -15,19 +14,38 @@ dotenv.config();
 const FRONTEND_URL = (process.env.FRONTEND_URL || '').trim() || 'http://localhost:5173';
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || 'MYR').toUpperCase();
 const JWT_SECRET = (process.env.JWT_SECRET || 'your_jwt_secret_here');
+const XENDIT_SECRET_KEY = (process.env.XENDIT_SECRET_KEY || '').trim();
 const BLOCKING_STATUSES = ['pending', 'active', 'upcoming'];
 
-const ensureRazorpayConfig = () => {
-  const keyId = (process.env.RAZORPAY_KEY_ID || '').trim();
-  const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
-  const ok = Boolean(keyId && keySecret);
-  return { ok, keyId, keySecret };
+/**
+ * Xendit REST API helper.
+ * All Xendit calls go through this — no SDK needed, just fetch().
+ * Uses Basic Auth with your secret key.
+ */
+const xenditRequest = async (endpoint, method = 'GET', body = null) => {
+  const url = `https://api.xendit.co${endpoint}`;
+  const headers = {
+    'Authorization': 'Basic ' + Buffer.from(XENDIT_SECRET_KEY + ':').toString('base64'),
+    'Content-Type': 'application/json',
+  };
+  const options = { method, headers };
+  if (body) options.body = JSON.stringify(body);
+
+  const response = await fetch(url, options);
+  const data = await response.json();
+
+  if (!response.ok) {
+    const err = new Error(data?.message || `Xendit API error: ${response.status}`);
+    err.status = response.status;
+    err.xenditError = data;
+    throw err;
+  }
+  return data;
 };
 
-const getRazorpay = () => {
-  const { ok, keyId, keySecret } = ensureRazorpayConfig();
-  if (!ok) throw new Error('Razorpay keys are not configured');
-  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+const ensureXenditConfig = () => {
+  const ok = Boolean(XENDIT_SECRET_KEY);
+  return { ok };
 };
 
 const getUserIdFromRequest = (req) => {
@@ -87,14 +105,26 @@ const getOrCreateGuestUser = async ({ name, email, phone }) => {
   return guest._id;
 };
 
-export const createRazorpayOrder = async (req, res) => {
+/**
+ * Create a Xendit Invoice + awaiting_payment booking.
+ * Replaces createRazorpayOrder.
+ *
+ * Flow:
+ * 1. Validate input (same as before)
+ * 2. Create booking in DB with status "awaiting_payment"
+ * 3. Call Xendit POST /v2/invoices to create a hosted payment page
+ * 4. Return the invoice URL to the frontend
+ * 5. Frontend redirects user to invoice URL (no modal/SDK needed)
+ * 6. Xendit sends webhook when user pays → webhookController handles it
+ */
+export const createXenditInvoice = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { ok } = ensureRazorpayConfig();
+    const { ok } = ensureXenditConfig();
     if (!ok) {
       return res.status(503).json({
         success: false,
-        message: 'Razorpay keys are not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend environment.'
+        message: 'Xendit keys are not configured. Set XENDIT_SECRET_KEY in the backend environment.'
       });
     }
 
@@ -170,7 +200,7 @@ export const createRazorpayOrder = async (req, res) => {
 
     // No overlap guard here — first-pay-first-serve.
     // Multiple users can create awaiting_payment bookings for the same dates.
-    // The real conflict check happens in verifyRazorpayPayment after payment succeeds.
+    // The real conflict check happens in the webhook after Xendit confirms payment.
 
     let finalUserId = tokenUserId || providedUserId || null;
     if (!finalUserId) {
@@ -194,7 +224,7 @@ export const createRazorpayOrder = async (req, res) => {
         }
       }
     } catch (e) {
-      console.warn('createRazorpayOrder: failed to fetch canonical Car for companyId:', e?.message || e);
+      console.warn('createXenditInvoice: failed to fetch canonical Car for companyId:', e?.message || e);
     }
 
     // --- KYC handling: skip upload for approved users ---
@@ -253,169 +283,90 @@ export const createRazorpayOrder = async (req, res) => {
         frontImageUrl: normalizedKyc.frontImageUrl || "",
         backImageUrl: normalizedKyc.backImageUrl || "",
       },
-      paymentGateway: 'razorpay'
+      paymentGateway: 'xendit'
     };
     if (bookingCompanyId) bookingInput.companyId = bookingCompanyId;
 
     const createdArr = await Booking.create([bookingInput], { session });
     const booking = createdArr[0];
-    const bookingIdForCleanup = booking._id && String(booking._id);
+    const bookingIdStr = String(booking._id);
 
     await session.commitTransaction();
     session.endSession();
 
-    const razorpay = getRazorpay();
-    let order;
+    // --- Create Xendit Invoice ---
+    let invoice;
     try {
-      order = await razorpay.orders.create({
-        amount: Math.round(total * 100),
+      const carName = carField?.make ? `${carField.make} ${carField.model || ''}`.trim() : 'Car Rental';
+
+      invoice = await xenditRequest('/v2/invoices', 'POST', {
+        external_id: bookingIdStr,
+        amount: total,
         currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
-        receipt: booking._id.toString(),
-        notes: {
-          bookingId: booking._id.toString(),
+        description: `Swifty Car Rental - ${carName} (${pickupDate} to ${returnDate})`,
+        customer: {
+          given_names: String(customer ?? "Guest"),
+          email: String(email ?? ""),
+          mobile_number: String(phone ?? ""),
+        },
+        customer_notification_preference: {
+          invoice_paid: ["email"],
+        },
+        success_redirect_url: `${FRONTEND_URL}/success?booking_id=${bookingIdStr}&payment_status=success`,
+        failure_redirect_url: `${FRONTEND_URL}/cancel?booking_id=${bookingIdStr}&payment_status=failed`,
+        // Invoice expires in 30 minutes (matches stale booking cleanup)
+        invoice_duration: 1800,
+        metadata: {
+          bookingId: bookingIdStr,
           userId: String(finalUserId ?? ""),
           carId: String(carIdStr || ""),
           pickupDate: String(pickupDate || ""),
-          returnDate: String(returnDate || "")
-        }
+          returnDate: String(returnDate || ""),
+        },
       });
     } catch (e) {
-      if (bookingIdForCleanup) {
-        await Booking.findByIdAndUpdate(bookingIdForCleanup, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
-      }
-      console.error('Razorpay order creation failed:', e?.stack || e);
-      return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(e?.message || e) });
+      // Xendit invoice creation failed — clean up the booking
+      await Booking.findByIdAndUpdate(bookingIdStr, { status: 'cancelled', paymentStatus: 'failed' }).catch(() => {});
+      console.error('Xendit invoice creation failed:', e?.stack || e);
+      return res.status(500).json({ success: false, message: 'Failed to create payment invoice', error: String(e?.message || e) });
     }
 
+    // Save Xendit invoice ID and URL to booking
     try {
-      await Booking.findByIdAndUpdate(booking._id, { razorpayOrderId: order.id }).exec();
+      await Booking.findByIdAndUpdate(booking._id, {
+        xenditInvoiceId: invoice.id || '',
+        xenditInvoiceUrl: invoice.invoice_url || '',
+      }).exec();
     } catch (err) {
-      console.warn('Failed to persist razorpayOrderId on booking', err);
+      console.warn('Failed to persist xenditInvoiceId on booking', err);
     }
 
     return res.json({
       success: true,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
       bookingId: booking._id,
-      key: process.env.RAZORPAY_KEY_ID,
+      invoiceId: invoice.id,
+      invoiceUrl: invoice.invoice_url,
+      amount: total,
+      currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
       customer,
       email,
       phone,
-      redirect: {
-        success: `${FRONTEND_URL}/success?booking_id=${booking._id}&payment_status=success`,
-        cancel: `${FRONTEND_URL}/cancel?booking_id=${booking._id}&payment_status=cancelled`
-      }
     });
   } catch (error) {
     if (session.inTransaction()) {
       try { await session.abortTransaction(); } catch {}
     }
     session.endSession();
-    console.error('Razorpay Order Error', error?.stack || error);
-    return res.status(500).json({ success: false, message: 'Failed to create Razorpay order', error: String(error?.message || error) });
+    console.error('Xendit Invoice Error', error?.stack || error);
+    return res.status(500).json({ success: false, message: 'Failed to create payment invoice', error: String(error?.message || error) });
   }
 };
 
-// Client-side verification — FIRST-PAY-FIRST-SERVE overlap check lives here
-export const verifyRazorpayPayment = async (req, res) => {
-  try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body || {};
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
-      return res.status(400).json({ success: false, message: 'Missing payment verification fields' });
-    }
-
-    const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim();
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
-    const digest = hmac.digest('hex');
-
-    if (digest !== razorpay_signature) {
-      return res.status(400).json({ success: false, message: 'Invalid payment signature' });
-    }
-
-    // --- Fetch the booking and validate it is still awaiting payment ---
-    const bookingDoc = await Booking.findById(bookingId);
-    if (!bookingDoc) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
-    }
-
-    // If already paid, return early (idempotent)
-    if (bookingDoc.paymentStatus === 'paid') {
-      return res.json({ success: true, message: 'Payment already recorded' });
-    }
-
-    // Only allow verification for awaiting_payment bookings
-    if (bookingDoc.status !== 'awaiting_payment') {
-      return res.status(400).json({ success: false, message: 'Booking is not awaiting payment' });
-    }
-
-    // --- FIRST-PAY-FIRST-SERVE: check if someone else paid first ---
-    const conflict = await Booking.findOne({
-      _id: { $ne: bookingDoc._id },
-      "car.id": bookingDoc.car.id,
-      status: { $in: BLOCKING_STATUSES },
-      pickupDate: { $lte: bookingDoc.returnDate },
-      returnDate: { $gte: bookingDoc.pickupDate },
-    }).lean();
-
-    if (conflict) {
-      // Someone else completed payment first — cancel and refund this booking
-      bookingDoc.status = 'cancelled';
-      bookingDoc.paymentStatus = 'refunded';
-      bookingDoc.razorpayOrderId = razorpay_order_id;
-      bookingDoc.razorpayPaymentId = razorpay_payment_id;
-      bookingDoc.razorpaySignature = razorpay_signature;
-      await bookingDoc.save();
-
-      // Auto-refund via Razorpay
-      try {
-        const razorpay = getRazorpay();
-        await razorpay.payments.refund(razorpay_payment_id, { speed: 'normal' });
-      } catch (refundErr) {
-        console.error('Auto-refund failed, manual refund needed for payment:', razorpay_payment_id, refundErr);
-      }
-
-      return res.status(409).json({
-        success: false,
-        message: 'Sorry, this car was just booked by another user for the selected dates. Your payment will be refunded.',
-        refund: true,
-      });
-    }
-
-    // --- No conflict — first to pay wins. Promote to blocking status. ---
-    const postStatus = computePostPaymentStatus(bookingDoc.pickupDate);
-
-    bookingDoc.paymentStatus = 'paid';
-    bookingDoc.status = postStatus;
-    bookingDoc.razorpayOrderId = razorpay_order_id;
-    bookingDoc.razorpayPaymentId = razorpay_payment_id;
-    bookingDoc.razorpaySignature = razorpay_signature;
-    await bookingDoc.save();
-
-    // Push to car's bookings array and update car status
-    const carId = bookingDoc.car?.id;
-    if (carId) {
-      await Car.updateOne(
-        { _id: carId, "bookings.bookingId": { $ne: bookingDoc._id } },
-        { $push: { bookings: { bookingId: bookingDoc._id, pickupDate: bookingDoc.pickupDate, returnDate: bookingDoc.returnDate, status: postStatus } } }
-      ).catch(() => {});
-      await Car.updateOne(
-        { _id: carId, "bookings.bookingId": bookingDoc._id },
-        { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": bookingDoc.pickupDate, "bookings.$.returnDate": bookingDoc.returnDate } }
-      ).catch(() => {});
-      await updateCarStatusBasedOnBookings(carId);
-    }
-
-    return res.json({ success: true });
-  } catch (error) {
-    console.error('verifyRazorpayPayment error', error?.stack || error);
-    return res.status(500).json({ success: false, message: 'Payment verification failed', error: String(error?.message || error) });
-  }
-};
-
-// Mark payment failure explicitly to unblock availability
+/**
+ * Mark payment failure explicitly to unblock availability.
+ * Called when user abandons the Xendit payment page without paying.
+ * Kept from the original — logic is gateway-agnostic.
+ */
 export const markPaymentFailed = async (req, res) => {
   try {
     const { bookingId } = req.body || {};
@@ -435,10 +386,9 @@ export const markPaymentFailed = async (req, res) => {
 
     const carId = updated?.car?.id;
     if (carId) {
-      // Remove from car's bookings array entirely
       await Car.updateOne(
         { _id: carId },
-        { $pull: { bookings: { bookingId: mongoose.Types.ObjectId(bookingId) } } }
+        { $pull: { bookings: { bookingId: new mongoose.Types.ObjectId(bookingId) } } }
       ).catch(() => {});
       await updateCarStatusBasedOnBookings(carId);
     }
@@ -449,3 +399,6 @@ export const markPaymentFailed = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to mark payment failed', error: String(error?.message || error) });
   }
 };
+
+// Export for use in webhookController
+export { BLOCKING_STATUSES, computePostPaymentStatus, updateCarStatusBasedOnBookings };

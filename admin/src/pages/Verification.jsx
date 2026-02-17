@@ -82,7 +82,7 @@ const Verification = () => {
   const savePayoutReference = async (hostId) => {
     const payoutReference = payoutEdits[hostId] || '';
     if (!payoutReference.trim()) {
-      alert('Please enter a payout reference (e.g., bank account or Stripe/Razorpay ID).');
+      alert('Please enter a payout reference (e.g., bank account or Xendit sub-account ID).');
       return;
     }
     setSavingPayout((s) => ({ ...s, [hostId]: true }));

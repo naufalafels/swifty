@@ -31,7 +31,7 @@ import api from "../utils/api";
 import * as authService from "../utils/authService";
 import carsData from "../assets/carsData.js";
 import { carDetailStyles } from "../assets/dummyStyles.js";
-import { createRazorpayOrder, verifyRazorpayPayment, markPaymentFailed } from "../services/paymentService";
+import { createXenditInvoice, markPaymentFailed } from "../services/paymentService";
 import io from "socket.io-client";
 import { LoadScript, StandaloneSearchBox } from "@react-google-maps/api";
 import { DateRange } from "react-date-range";
@@ -84,16 +84,6 @@ const countryOptions = [
   "Australia","New Zealand","United Kingdom","United States","Canada","Germany","France","Netherlands","United Arab Emirates","Saudi Arabia"
 ];
 
-const loadRazorpayScript = () =>
-  new Promise((resolve, reject) => {
-    if (window.Razorpay) return resolve(true);
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
-    document.body.appendChild(script);
-  });
-
 const buildImageSrc = (image) => {
   if (!image) return `${API_BASE}/uploads/default-car.png`;
   if (Array.isArray(image)) image = image[0];
@@ -136,7 +126,7 @@ const CarDetail = () => {
   const currentUser = authService.getCurrentUser();
   const emailPrefill = currentUser?.email || "";
 
-  // --- ISSUE 2 FIX: Track whether user's KYC is already approved ---
+  // --- Track whether user's KYC is already approved ---
   const [userKycApproved, setUserKycApproved] = useState(false);
 
   useEffect(() => {
@@ -447,7 +437,7 @@ const CarDetail = () => {
       return;
     }
 
-    // --- ISSUE 2 FIX: Only require KYC fields if user is NOT already approved ---
+    // Only require KYC fields if user is NOT already approved
     if (!userKycApproved) {
       if (!formData.idCountry) {
         toast.error("Please provide your ID issuing country.");
@@ -508,7 +498,7 @@ const CarDetail = () => {
         companyName: car.company?.name || car.companyName || "",
       }));
 
-      // --- ISSUE 2 FIX: Send kycFromProfile flag or upload files ---
+      // Send kycFromProfile flag or upload files
       if (userKycApproved) {
         form.append("kycFromProfile", "true");
       } else {
@@ -519,77 +509,26 @@ const CarDetail = () => {
         form.append("kycBack", backFile);
       }
 
-      await loadRazorpayScript();
+      // --- Create Xendit Invoice and redirect to payment page ---
+      const res = await createXenditInvoice(form);
 
-      const res = await createRazorpayOrder(form);
-
-      if (!res?.orderId || !res?.key) {
+      if (!res?.invoiceUrl || !res?.bookingId) {
         toast.error("Failed to initiate payment. Please try again.");
         return;
       }
 
-      const rzp = new window.Razorpay({
-        key: res.key,
-        amount: res.amount,
-        currency: res.currency,
-        name: "Swifty Car Rental",
-        description: car.name || "Car Rental",
-        order_id: res.orderId,
-        prefill: {
-          name: formData.name || user?.name || "Guest",
-          email: emailToUse,
-          contact: formData.phone,
-        },
-        notes: {
-          bookingId: res.bookingId,
-          pickupDate: formData.pickupDate,
-          returnDate: formData.returnDate,
-        },
-        // --- ISSUE 1 FIX: Handle 409 conflict (someone else paid first) ---
-        handler: async (response) => {
-          toast.success("Payment captured. Finalizing booking...", { autoClose: 1200 });
-          try {
-            await verifyRazorpayPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              bookingId: res.bookingId,
-            });
-            navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
-          } catch (e) {
-            if (e?.response?.status === 409) {
-              toast.error(e.response.data?.message || "Car was booked by someone else. You will be refunded.");
-              navigate(`/cancel?booking_id=${res.bookingId}&payment_status=refunded`, { replace: true });
-            } else {
-              console.warn("Client verification failed (webhook will handle):", e);
-              navigate(`/success?booking_id=${res.bookingId}&payment_status=success`, { replace: true });
-            }
-          }
-        },
-        modal: {
-          // --- ISSUE 1 FIX: Retry markPaymentFailed up to 3 times ---
-          ondismiss: async () => {
-            toast.info("Payment was cancelled.");
-            if (res?.bookingId) {
-              for (let attempt = 0; attempt < 3; attempt++) {
-                try {
-                  await markPaymentFailed({ bookingId: res.bookingId });
-                  break;
-                } catch (e) {
-                  console.warn(`markPaymentFailed attempt ${attempt + 1} failed:`, e);
-                  if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
-                }
-              }
-            }
-            navigate(`/cancel?booking_id=${res.bookingId}&payment_status=cancelled`, { replace: true });
-          },
-        },
-        theme: {
-          color: "#f97316"
-        }
-      });
+      // Store bookingId so we can clean up if user returns without paying
+      sessionStorage.setItem("pendingBookingId", res.bookingId);
 
-      rzp.open();
+      // Redirect to Xendit's hosted payment page
+      // User pays there (FPX, card, eWallet, etc.)
+      // After payment: Xendit redirects user back to /success or /cancel
+      // Xendit sends webhook to backend to confirm payment server-to-server
+      toast.info("Redirecting to payment page...", { autoClose: 1500 });
+      setTimeout(() => {
+        window.location.href = res.invoiceUrl;
+      }, 500);
+
     } catch (err) {
       const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
       if (canceled) return;
@@ -875,7 +814,7 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* --- ISSUE 2 FIX: Show verified badge OR KYC form --- */}
+                {/* Show verified badge OR KYC form */}
                 {userKycApproved ? (
                   <div className="mt-4 p-3 rounded-xl border border-emerald-700/50 bg-emerald-900/20">
                     <div className="flex items-center gap-2">
@@ -1051,7 +990,7 @@ const CarDetail = () => {
 
                 <button type="submit" disabled={submitting} className={carDetailStyles.submitButton}>
                   <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
-                  <span>{submitting ? "Processing..." : "Pay & Confirm Booking"}</span>
+                  <span>{submitting ? "Redirecting to payment..." : "Pay & Confirm Booking"}</span>
                 </button>
               </form>
             </div>

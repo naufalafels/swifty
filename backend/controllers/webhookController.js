@@ -1,226 +1,184 @@
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import Booking from '../models/bookingModel.js';
+import Car from '../models/carModel.js';
+import { BLOCKING_STATUSES, computePostPaymentStatus, updateCarStatusBasedOnBookings } from './paymentController.js';
 
 dotenv.config();
 
-const RAZORPAY_WEBHOOK_SECRET = (process.env.RAZORPAY_KEY_SECRET || '').trim();
+const XENDIT_WEBHOOK_TOKEN = (process.env.XENDIT_WEBHOOK_TOKEN || '').trim();
+const XENDIT_SECRET_KEY = (process.env.XENDIT_SECRET_KEY || '').trim();
 
 /**
- * Timing-safe string comparison to avoid leak via timing attacks.
+ * Xendit Webhook Handler
+ * Replaces razorpayWebhookHandler.
+ *
+ * How Xendit webhooks work (different from Razorpay):
+ * - Razorpay: sends HMAC signature in header, you verify with crypto
+ * - Xendit: sends a plain token in x-callback-token header, you compare strings
+ *
+ * Xendit sends a POST with JSON body containing:
+ *   - id: Xendit invoice ID
+ *   - external_id: our bookingId (we set this when creating the invoice)
+ *   - status: "PAID", "SETTLED", "EXPIRED", etc.
+ *   - payment_method, payment_channel, paid_amount, currency, etc.
+ *
+ * Key statuses:
+ *   - "PAID" → customer completed payment → mark booking as paid
+ *   - "SETTLED" → money settled to your account → also treat as paid (idempotent)
+ *   - "EXPIRED" → invoice timed out → mark booking as expired/cancelled
  */
-const timingSafeEqualStr = (a = '', b = '') => {
+export const xenditWebhookHandler = async (req, res) => {
   try {
-    const bufA = Buffer.from(String(a));
-    const bufB = Buffer.from(String(b));
-    if (bufA.length !== bufB.length) {
-      // To keep timing similar, compare against itself
-      return crypto.timingSafeEqual(bufA, bufA);
-    }
-    return crypto.timingSafeEqual(bufA, bufB);
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Verify incoming webhook signature using rawBody and secret
- * rawBody: Buffer or string
- */
-const verifySignature = (rawBody, signature, secret) => {
-  if (!secret || !signature) return false;
-  const raw = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(String(rawBody || ''));
-  const expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');
-  return timingSafeEqualStr(expected, signature);
-};
-
-/**
- * Extract common ids and bookingId (from notes) in a resilient way.
- * Returns { razorpayOrderId, razorpayPaymentId, razorpayRefundId, bookingIdFromNotes }
- */
-const extractIdsAndBookingFromPayload = (payload = {}) => {
-  const paymentEntity = payload?.payload?.payment?.entity || payload?.payment?.entity || {};
-  const orderEntity = payload?.payload?.order?.entity || payload?.order?.entity || {};
-  const refundEntity = payload?.payload?.refund?.entity || payload?.refund?.entity || {};
-
-  const razorpayOrderId =
-    paymentEntity.order_id ||
-    orderEntity.id ||
-    refundEntity.order_id ||
-    '';
-
-  const razorpayPaymentId =
-    paymentEntity.id ||
-    paymentEntity.payment_id ||
-    refundEntity.payment_id ||
-    '';
-
-  const razorpayRefundId = refundEntity.id || '';
-
-  // Try to read bookingId from notes (Razorpay supports 'notes' on orders/payments)
-  const notesFromPayment = paymentEntity.notes || {};
-  const notesFromOrder = orderEntity.notes || {};
-  const bookingIdFromNotes = notesFromPayment.bookingId || notesFromOrder.bookingId || '';
-
-  return { razorpayOrderId, razorpayPaymentId, razorpayRefundId, bookingIdFromNotes, paymentEntity, orderEntity };
-};
-
-export const razorpayWebhookHandler = async (req, res) => {
-  try {
-    // raw body was provided by express.raw middleware in route
-    const signature = req.headers['x-razorpay-signature'] || req.headers['x-razorpay_signature'] || '';
-    const rawBodyBuffer = req.body; // Buffer from express.raw({type:'application/json'})
-
-    if (!verifySignature(rawBodyBuffer, signature, RAZORPAY_WEBHOOK_SECRET)) {
-      console.warn('Razorpay webhook signature verification failed');
-      return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
+    // --- Step 1: Verify webhook authenticity ---
+    // Xendit sends x-callback-token header with every webhook
+    // Compare it to your XENDIT_WEBHOOK_TOKEN from the dashboard
+    const callbackToken = req.headers['x-callback-token'] || '';
+    if (!XENDIT_WEBHOOK_TOKEN || callbackToken !== XENDIT_WEBHOOK_TOKEN) {
+      console.warn('Xendit webhook token verification failed');
+      return res.status(401).json({ success: false, message: 'Invalid webhook token' });
     }
 
-    // parse payload safely (we already had raw bytes, but need object for logic)
-    let payload;
-    try {
-      // If middleware already parsed body into object (unlikely with express.raw), handle both cases.
-      payload = Buffer.isBuffer(rawBodyBuffer) ? JSON.parse(rawBodyBuffer.toString('utf8')) : (req.body || {});
-    } catch (e) {
-      console.warn('Failed to parse webhook body JSON', e);
-      return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+    // --- Step 2: Parse payload ---
+    // Xendit sends standard JSON (no need for express.raw like Razorpay)
+    const payload = req.body || {};
+    const {
+      id: xenditInvoiceId,
+      external_id: externalId,
+      status,
+      payment_method: paymentMethod,
+      payment_channel: paymentChannel,
+      payment_id: paymentId,
+      paid_amount: paidAmount,
+      currency,
+    } = payload;
+
+    // external_id is our bookingId (we set it in createXenditInvoice)
+    const bookingId = externalId || '';
+    if (!bookingId) {
+      console.warn('Xendit webhook: no external_id (bookingId) in payload');
+      return res.json({ received: true, message: 'No booking context' });
     }
 
-    const event = payload?.event || '';
-    const { razorpayOrderId, razorpayPaymentId, razorpayRefundId, bookingIdFromNotes, paymentEntity, orderEntity } =
-      extractIdsAndBookingFromPayload(payload);
-
-    // Build candidate booking query: try by razorpayOrderId first, then by bookingIdFromNotes (note), then by receipt in order entity.
-    // This covers races where the booking document hasn't yet been updated with razorpayOrderId
-    const candidateQueries = [];
-    if (razorpayOrderId) candidateQueries.push({ razorpayOrderId });
-    if (bookingIdFromNotes) {
-      // bookingIdFromNotes may be an ObjectId string or receipt/booking id depending on how you stored it
-      candidateQueries.push({ _id: bookingIdFromNotes });
-      candidateQueries.push({ 'notes.bookingId': bookingIdFromNotes }); // defensive, in case you kept notes on booking doc
+    // --- Step 3: Find the booking ---
+    const existingBooking = await Booking.findById(bookingId);
+    if (!existingBooking) {
+      console.warn(`Xendit webhook: booking ${bookingId} not found`);
+      return res.json({ received: true, message: 'Booking not found' });
     }
-    // also try to match by receipt if present on order (Razorpay order.receipt)
-    const receipt = orderEntity?.receipt || '';
-    if (receipt) candidateQueries.push({ _id: receipt });
 
-    // Single merged query using $or if we have candidates
-    const bookingQuery = candidateQueries.length ? { $or: candidateQueries } : null;
+    // --- Step 4: Idempotency check ---
+    // Xendit may send the same webhook multiple times (retries)
+    // We track processed events to avoid double-processing
+    const eventKey = `${xenditInvoiceId}_${status}`;
+    if (existingBooking.processedWebhookEvents?.includes(eventKey)) {
+      return res.json({ received: true, message: 'Already processed' });
+    }
 
-    // Helper to atomically set booking to paid
-    const markBookingAsPaid = async (updateFields = {}) => {
-      if (!bookingQuery) return null;
-
-      // We must ensure idempotency:
-      // - if a booking already has this razorpayPaymentId applied, do nothing
-      // - if booking already has paymentStatus 'paid', do nothing
-      const filter = {
-        $and: [
-          bookingQuery,
-          { $or: [{ razorpayPaymentId: { $exists: false } }, { razorpayPaymentId: { $ne: razorpayPaymentId } }, { paymentStatus: { $ne: 'paid' } }] }
-        ]
-      };
-
-      const update = {
-        $set: Object.assign({
-          paymentStatus: 'paid',
-          status: 'active',
-        }, updateFields),
-        // record the payment id
-        $setOnInsert: {},
-      };
-
-      // Also push a marker (the payment id) into processedWebhookEvents to have a simple processed history
-      const options = { new: true };
-
-      // Atomically find and update. If it returns null, it means nothing was updated (already processed perhaps)
-      const updated = await Booking.findOneAndUpdate(filter, update, options).exec();
-      return updated;
-    };
-
-    // Handle payment captured/authorized -> mark paid
-    if (event === 'payment.captured' || event === 'payment.authorized' || event === 'payment.succeeded') {
-      // prefer to use payment entity fields for granular info
-      const amount = Number(paymentEntity?.amount || 0);
-      const currency = paymentEntity?.currency || undefined;
-      const paymentMethod = paymentEntity?.method || '';
-      const capturedAt = paymentEntity?.created_at ? new Date(paymentEntity.created_at * 1000) : new Date();
-
-      const updated = await markBookingAsPaid({
-        razorpayPaymentId: razorpayPaymentId || '',
-        razorpayOrderId: razorpayOrderId || '',
-        razorpaySignature: signature,
-        amount: isNaN(amount) ? undefined : (amount / 100), // Razorpay amounts are in paise
-        currency: currency || undefined,
-        paymentMethod,
-        paymentCapturedAt: capturedAt
-      });
-
-      if (!updated) {
-        // Either booking not found, or already processed. Try a safer fallback: if no booking found, attempt to find by payment notes booking id and set.
-        if (bookingIdFromNotes) {
-          const fallback = await Booking.findOne({ _id: bookingIdFromNotes }).exec();
-          if (fallback && (!fallback.razorpayPaymentId || fallback.razorpayPaymentId !== razorpayPaymentId)) {
-            fallback.paymentStatus = 'paid';
-            fallback.status = 'active';
-            fallback.razorpayPaymentId = razorpayPaymentId || fallback.razorpayPaymentId;
-            fallback.razorpayOrderId = razorpayOrderId || fallback.razorpayOrderId;
-            fallback.razorpaySignature = signature;
-            await fallback.save().catch(err => console.warn('Fallback save failed', err));
-            return res.json({ received: true, message: 'Fallback applied' });
-          }
-        }
-        return res.json({ received: true, message: 'Already processed or booking not found' });
+    // --- Step 5: Handle PAID / SETTLED ---
+    if (status === 'PAID' || status === 'SETTLED') {
+      // If already paid, skip (idempotent)
+      if (existingBooking.paymentStatus === 'paid') {
+        return res.json({ received: true, message: 'Payment already recorded' });
       }
 
-      return res.json({ received: true });
-    }
+      // Only process bookings that are awaiting payment
+      if (existingBooking.status !== 'awaiting_payment') {
+        return res.json({ received: true, message: 'Booking not awaiting payment' });
+      }
 
-    // Payment failed -> mark failed/cancelled but keep record
-    if (event === 'payment.failed' || event === 'payment.error') {
-      if (!bookingQuery) return res.json({ received: true, message: 'No booking context' });
+      // --- FIRST-PAY-FIRST-SERVE: check if someone else paid first ---
+      // This is the same overlap check from the old verifyRazorpayPayment,
+      // but now it lives in the webhook (since Xendit is redirect-based,
+      // there's no client-side verify step)
+      const conflict = await Booking.findOne({
+        _id: { $ne: existingBooking._id },
+        "car.id": existingBooking.car.id,
+        status: { $in: BLOCKING_STATUSES },
+        pickupDate: { $lte: existingBooking.returnDate },
+        returnDate: { $gte: existingBooking.pickupDate },
+      }).lean();
 
-      const filter = {
-        $and: [
-          bookingQuery,
-          { $or: [{ paymentStatus: { $ne: 'failed' } }, { razorpayPaymentId: { $ne: razorpayPaymentId } }] }
-        ]
-      };
+      if (conflict) {
+        // Someone else paid first — mark as refunded and trigger refund
+        existingBooking.status = 'cancelled';
+        existingBooking.paymentStatus = 'refunded';
+        existingBooking.xenditInvoiceId = xenditInvoiceId || existingBooking.xenditInvoiceId;
+        existingBooking.xenditPaymentId = paymentId || '';
+        existingBooking.xenditPaymentMethod = paymentMethod || '';
+        existingBooking.xenditPaymentChannel = paymentChannel || '';
+        existingBooking.processedWebhookEvents.push(eventKey);
+        await existingBooking.save();
 
-      const update = {
-        $set: {
-          paymentStatus: 'failed',
-          status: 'cancelled',
-          razorpayPaymentId: razorpayPaymentId || '',
-          razorpaySignature: signature
-        },
-      };
-
-      const updated = await Booking.findOneAndUpdate(filter, update, { new: true }).exec();
-      if (!updated) return res.json({ received: true, message: 'Already marked failed or booking not found' });
-      return res.json({ received: true });
-    }
-
-    // Refund processed -> mark refunded/cancelled
-    if (event === 'refund.processed' || event === 'refund.created' || event === 'refund.succeeded') {
-      if (!bookingQuery) return res.json({ received: true, message: 'No booking context for refund' });
-
-      const filter = bookingQuery;
-      const update = {
-        $set: {
-          paymentStatus: 'refunded',
-          status: 'cancelled',
-          refundId: razorpayRefundId || ''
+        // Auto-refund via Xendit
+        try {
+          await fetch(`https://api.xendit.co/v2/invoices/${xenditInvoiceId}/refunds`, {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Basic ' + Buffer.from(XENDIT_SECRET_KEY + ':').toString('base64'),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: paidAmount || existingBooking.amount,
+              reason: 'OTHERS',
+            }),
+          });
+        } catch (refundErr) {
+          console.error('Auto-refund failed, manual refund needed for invoice:', xenditInvoiceId, refundErr);
         }
-      };
-      await Booking.findOneAndUpdate(filter, update, { new: true }).exec();
+
+        console.log(`Booking ${bookingId} cancelled (conflict) — refund initiated`);
+        return res.json({ received: true, message: 'Conflict detected, refund initiated' });
+      }
+
+      // --- No conflict — first to pay wins ---
+      const postStatus = computePostPaymentStatus(existingBooking.pickupDate);
+
+      existingBooking.paymentStatus = 'paid';
+      existingBooking.status = postStatus;
+      existingBooking.xenditInvoiceId = xenditInvoiceId || existingBooking.xenditInvoiceId;
+      existingBooking.xenditPaymentId = paymentId || '';
+      existingBooking.xenditPaymentMethod = paymentMethod || '';
+      existingBooking.xenditPaymentChannel = paymentChannel || '';
+      existingBooking.processedWebhookEvents.push(eventKey);
+      await existingBooking.save();
+
+      // Push to car's bookings array and update car status
+      const carId = existingBooking.car?.id;
+      if (carId) {
+        await Car.updateOne(
+          { _id: carId, "bookings.bookingId": { $ne: existingBooking._id } },
+          { $push: { bookings: { bookingId: existingBooking._id, pickupDate: existingBooking.pickupDate, returnDate: existingBooking.returnDate, status: postStatus } } }
+        ).catch(() => {});
+        await Car.updateOne(
+          { _id: carId, "bookings.bookingId": existingBooking._id },
+          { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": existingBooking.pickupDate, "bookings.$.returnDate": existingBooking.returnDate } }
+        ).catch(() => {});
+        await updateCarStatusBasedOnBookings(carId);
+      }
+
+      console.log(`Booking ${bookingId} paid successfully — status: ${postStatus}`);
       return res.json({ received: true });
     }
 
-    // Unknown/unhandled events: acknowledge
+    // --- Step 6: Handle EXPIRED ---
+    // Xendit sends this when the invoice_duration (30 min) expires
+    // without the customer paying
+    if (status === 'EXPIRED') {
+      if (existingBooking.status === 'awaiting_payment') {
+        existingBooking.status = 'cancelled';
+        existingBooking.paymentStatus = 'expired';
+        existingBooking.processedWebhookEvents.push(eventKey);
+        await existingBooking.save();
+        console.log(`Booking ${bookingId} expired — cancelled`);
+      }
+      return res.json({ received: true });
+    }
+
+    // --- Step 7: Unknown status — acknowledge ---
+    // Xendit expects a 200 response, otherwise it retries
     return res.json({ received: true, message: 'Event ignored' });
   } catch (error) {
-    console.error('razorpayWebhookHandler error', error?.stack || error);
-    // Do not disclose secret details to caller
+    console.error('xenditWebhookHandler error', error?.stack || error);
     return res.status(500).json({ success: false, message: 'Webhook processing failed' });
   }
 };

@@ -92,9 +92,6 @@ app.use(
   express.static(path.join(process.cwd(), 'uploads'))
 );
 
-// Raw body for Razorpay webhook
-app.use('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }));
-
 // General middlewares
 app.use(cors({ origin: true, credentials: true }));
 app.use(

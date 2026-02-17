@@ -641,9 +641,14 @@ const HostDashboard = () => {
                   else if (isWknd) ringClass = "ring-1 ring-slate-200";
 
                   return (
-                    <div className={`host-cal-cell w-full h-full flex flex-col items-center justify-end rounded-md overflow-hidden px-0.5 pb-[3px] pt-[20px] ${bgClass} ${ringClass}`}>
-                      {/* Dots + labels sit BELOW the library's native date number */}
-                      <div className="flex items-center gap-[3px]">
+                    <div className={`host-cal-cell relative w-full h-full flex flex-col items-center justify-end rounded-md overflow-hidden px-0.5 pb-[3px] pt-[20px] ${bgClass} ${ringClass}`}>
+                      {/* Explicit day number (needed because dayContentRenderer overrides default) */}
+                      <div className="absolute inset-x-0 top-1 flex justify-center pointer-events-none z-30">
+                        <span className="text-slate-900 font-bold text-sm leading-none">{format(date, "d")}</span>
+                      </div>
+
+                      {/* Dots + labels sit below the number */}
+                      <div className="flex items-center gap-[3px] z-20">
                         {holiday && (
                           <span className="w-[6px] h-[6px] rounded-full bg-amber-500 shadow-[0_0_3px_rgba(245,158,11,0.4)]" title={holiday.label}></span>
                         )}
@@ -654,14 +659,14 @@ const HostDashboard = () => {
 
                       {/* car count */}
                       {hasBookings && (
-                        <span className="text-[9px] leading-none text-emerald-700 font-bold mt-[1px]">
+                        <span className="text-[9px] leading-none text-emerald-700 font-bold mt-[1px] z-20">
                           {carsOnDay.length} car{carsOnDay.length !== 1 ? "s" : ""}
                         </span>
                       )}
 
                       {/* short holiday label */}
                       {holiday && !hasBookings && (
-                        <span className="text-[8px] leading-none text-amber-700 truncate max-w-[46px] mt-[1px] font-semibold">
+                        <span className="text-[8px] leading-none text-amber-700 truncate max-w-[46px] mt-[1px] font-semibold z-20">
                           {holiday.label.length > 10 ? holiday.label.slice(0, 10) + "…" : holiday.label}
                         </span>
                       )}
@@ -741,7 +746,7 @@ const HostDashboard = () => {
             </div>
             {serviceError && <div className="text-xs text-rose-300">{serviceError}</div>}
             <button disabled={!selectedCarIds.length} onClick={handleBlockService}
-              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
+              className="w-full bg-amber-600 hover-bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
               Block selected cars for these dates
             </button>
           </div>

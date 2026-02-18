@@ -1108,7 +1108,7 @@ const HostDashboard = () => {
         <section className="grid lg:grid-cols-3 gap-6">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3 lg:col-span-1">
             <div className="flex items-center gap-2 font-semibold">
-              <FaFlag className="text-amber-400" /> Block cars for service
+              <FaFlag className="text-amber-400" /> Block cars for maintenance
             </div>
 
             {/* ── Step 1: Select cars ── */}

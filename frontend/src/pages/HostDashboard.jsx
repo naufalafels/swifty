@@ -8,6 +8,7 @@ import {
   FaClipboardCheck,
   FaDollarSign,
   FaEnvelope,
+  FaExclamationTriangle,
   FaFlag,
   FaHome,
   FaIdCard,
@@ -581,6 +582,73 @@ const CALENDAR_STYLES = `
     z-index: 2 !important;
     position: relative !important;
   }
+
+  /* ── service block calendar (amber theme) ── */
+  .service-calendar .rdrCalendarWrapper,
+  .service-calendar .rdrDateDisplayWrapper,
+  .service-calendar .rdrMonths,
+  .service-calendar .rdrMonth {
+    background: #ffffff !important;
+    color: #1e293b !important;
+  }
+  .service-calendar .rdrCalendarWrapper {
+    border-radius: 12px !important;
+    overflow: hidden;
+    border: 1px solid #fcd34d;
+    width: 100% !important;
+  }
+  .service-calendar .rdrMonth {
+    width: 100% !important;
+  }
+  .service-calendar .rdrMonthAndYearWrapper {
+    background: #fffbeb !important;
+    padding-top: 8px;
+  }
+  .service-calendar .rdrMonthAndYearPickers select {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+    border: 1px solid #fcd34d !important;
+    border-radius: 6px !important;
+    padding: 4px 8px !important;
+    font-weight: 600 !important;
+  }
+  .service-calendar .rdrWeekDay {
+    color: #b45309 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+  }
+  .service-calendar .rdrDayNumber span {
+    color: #1e293b !important;
+    font-weight: 700 !important;
+  }
+  .service-calendar .rdrDayDisabled {
+    background-color: #fff1f2 !important;
+  }
+  .service-calendar .rdrDayDisabled .rdrDayNumber span {
+    color: #fca5a5 !important;
+    text-decoration: line-through !important;
+  }
+  .service-calendar .rdrStartEdge,
+  .service-calendar .rdrEndEdge {
+    background: rgba(245, 158, 11, 0.35) !important;
+    border-radius: 8px !important;
+  }
+  .service-calendar .rdrInRange {
+    background: rgba(245, 158, 11, 0.15) !important;
+  }
+  .service-calendar .rdrDayToday .rdrDayNumber span {
+    color: #d97706 !important;
+    font-weight: 800 !important;
+  }
+  .service-calendar .rdrDayToday .rdrDayNumber span::after {
+    background: #d97706 !important;
+  }
+  .service-calendar .rdrNextPrevButton {
+    background: #fef3c7 !important;
+    border-radius: 8px !important;
+    border: 1px solid #fcd34d !important;
+  }
 `;
 
 /* ═══════════════════════════ MAIN DASHBOARD ═══════════════════════════ */
@@ -591,6 +659,7 @@ const HostDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [calendar, setCalendar] = useState(null);
   const [selectedCarIds, setSelectedCarIds] = useState([]);
+  // FIX 1: serviceDates is the source of truth for the service block date picker
   const [serviceDates, setServiceDates] = useState([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
   const [selectedRange, setSelectedRange] = useState([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
   const [pricingByCar, setPricingByCar] = useState({});
@@ -682,10 +751,11 @@ const HostDashboard = () => {
     );
   }, [cars, filter]);
 
+  // ─── FIX 1: Use serviceDates (not selectedRange) when blocking ───
   const handleBlockService = async () => {
     setServiceError("");
     try {
-      const dates = eachDay(selectedRange[0].startDate, selectedRange[0].endDate);
+      const dates = eachDay(serviceDates[0].startDate, serviceDates[0].endDate);
       const isoDates = dates.map((d) => format(d, "yyyy-MM-dd"));
       await blockServiceDates(selectedCarIds, isoDates);
       const updated = await getHostCalendar();
@@ -696,6 +766,7 @@ const HostDashboard = () => {
       }
       setCalendar(calData);
       setSelectedCarIds([]);
+      setServiceDates([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
     } catch (err) {
       const msg = err?.response?.data?.message || "Failed to block service";
       setServiceError(msg);
@@ -737,6 +808,41 @@ const HostDashboard = () => {
       })
       .filter(Boolean);
   }, [selectedDates, holidayByDate]);
+
+  // ─── FIX 2 & 3: Derive data for selected cars in the service block ───
+
+  // Full car objects for selected IDs — used to render detail cards
+  const selectedCarsData = useMemo(
+    () => cars.filter((c) => selectedCarIds.includes(c._id)),
+    [cars, selectedCarIds]
+  );
+
+  // FIX 3: Collect every date where a selected car already has a booking
+  // so we can disable those days on the service date picker
+  const bookedDatesForSelectedCars = useMemo(() => {
+    if (!selectedCarIds.length) return [];
+    const dateSet = new Set();
+    Object.entries(dayCars).forEach(([isoDate, entries]) => {
+      entries.forEach((entry) => {
+        if (entry.carId && selectedCarIds.includes(entry.carId)) {
+          dateSet.add(isoDate);
+        }
+      });
+    });
+    // Convert ISO strings to Date objects at noon to avoid timezone edge cases
+    return Array.from(dateSet).map((iso) => new Date(`${iso}T12:00:00`));
+  }, [selectedCarIds, dayCars]);
+
+  // Check if the current service date selection overlaps any booked date
+  const serviceOverlapDates = useMemo(() => {
+    if (!bookedDatesForSelectedCars.length) return [];
+    const bookedIsos = new Set(
+      bookedDatesForSelectedCars.map((d) => format(d, "yyyy-MM-dd"))
+    );
+    return eachDay(serviceDates[0].startDate, serviceDates[0].endDate)
+      .map((d) => format(d, "yyyy-MM-dd"))
+      .filter((iso) => bookedIsos.has(iso));
+  }, [serviceDates, bookedDatesForSelectedCars]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading host center…</div>;
@@ -1004,29 +1110,119 @@ const HostDashboard = () => {
             <div className="flex items-center gap-2 font-semibold">
               <FaFlag className="text-amber-400" /> Block cars for service
             </div>
+
+            {/* ── Step 1: Select cars ── */}
             <div className="space-y-2">
-              <div className="text-xs text-slate-400">Select cars (predictive, scrollable)</div>
+              <div className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Step 1 — Select cars</div>
               <PredictiveMultiSelect
-                options={cars.map((c) => ({ value: c._id, label: `${c.make} ${c.model}` }))}
+                options={cars.map((c) => ({
+                  value: c._id,
+                  // FIX 2: Richer label includes year so host can distinguish duplicates
+                  label: `${c.make} ${c.model}${c.year ? ` (${c.year})` : ""}${c.plateNumber ? ` · ${c.plateNumber}` : ""}`,
+                }))}
                 value={selectedCarIds}
                 onChange={setSelectedCarIds}
               />
             </div>
+
+            {/* FIX 2: Car detail cards for each selected car ── */}
+            {selectedCarsData.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Selected car details</div>
+                <div className="space-y-2 max-h-48 overflow-auto pr-1">
+                  {selectedCarsData.map((c) => (
+                    <div
+                      key={c._id}
+                      className="bg-slate-800/70 border border-amber-800/50 rounded-lg px-3 py-2 flex items-start justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white flex items-center gap-1.5 truncate">
+                          <FaCar className="text-amber-400 shrink-0" />
+                          {c.make} {c.model}
+                          {c.year && <span className="text-slate-400 font-normal">({c.year})</span>}
+                        </div>
+                        {c.plateNumber && (
+                          <div className="text-xs text-amber-300 font-mono mt-0.5">{c.plateNumber}</div>
+                        )}
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                          {c.category && <span className="text-xs text-slate-400">{c.category}</span>}
+                          {c.transmission && <span className="text-xs text-slate-400">{c.transmission}</span>}
+                          {c.fuelType && <span className="text-xs text-slate-400">{c.fuelType}</span>}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          RM {c.dailyRate}/day · Dep RM {c.deposit || 0}
+                        </div>
+                      </div>
+                      {/* Remove button for this car */}
+                      <button
+                        onClick={() => setSelectedCarIds((prev) => prev.filter((id) => id !== c._id))}
+                        className="shrink-0 text-slate-500 hover:text-rose-400 transition mt-0.5"
+                        title="Remove"
+                      >
+                        <FaTimes size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Step 2: Pick service dates ── */}
             <div className="space-y-2">
-              <div className="text-xs text-slate-400">Service dates</div>
-              <DateRange
-                onChange={(item) => setServiceDates([item.selection])}
-                ranges={serviceDates}
-                rangeColors={["#f59e0b"]}
-                minDate={new Date()}
-                showPreview={false}
-                weekStartsOn={1}
-              />
+              <div className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Step 2 — Pick service dates</div>
+
+              {/* FIX 3: Legend for the service calendar */}
+              {selectedCarIds.length > 0 && (
+                <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+                    Booked — cannot block
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                    Available to block
+                  </span>
+                </div>
+              )}
+
+              {/* FIX 3: Service DateRange now disables booked dates for selected cars */}
+              <div className="service-calendar">
+                <DateRange
+                  onChange={(item) => setServiceDates([item.selection])}
+                  ranges={serviceDates}
+                  rangeColors={["#f59e0b"]}
+                  minDate={new Date()}
+                  showPreview={false}
+                  weekStartsOn={1}
+                  disabledDates={bookedDatesForSelectedCars}
+                />
+              </div>
             </div>
+
+            {/* FIX 3: Overlap warning ── */}
+            {serviceOverlapDates.length > 0 && (
+              <div className="bg-rose-950/60 border border-rose-700/50 rounded-lg px-3 py-2 flex items-start gap-2 text-xs text-rose-300">
+                <FaExclamationTriangle className="text-rose-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="font-semibold text-rose-200 mb-0.5">Booking conflict detected</div>
+                  The selected date range overlaps with existing bookings on{" "}
+                  <span className="font-mono text-rose-100">
+                    {serviceOverlapDates.slice(0, 3).join(", ")}
+                    {serviceOverlapDates.length > 3 ? ` + ${serviceOverlapDates.length - 3} more` : ""}
+                  </span>. Those dates are disabled and will be skipped when blocking.
+                </div>
+              </div>
+            )}
+
             {serviceError && <div className="text-xs text-rose-300">{serviceError}</div>}
-            <button disabled={!selectedCarIds.length} onClick={handleBlockService}
-              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold">
-              Block selected cars for these dates
+
+            <button
+              disabled={!selectedCarIds.length}
+              onClick={handleBlockService}
+              className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold flex items-center justify-center gap-2"
+            >
+              <FaFlag />
+              Block {selectedCarIds.length > 0 ? `${selectedCarIds.length} car${selectedCarIds.length > 1 ? "s" : ""}` : "selected cars"} for these dates
             </button>
           </div>
 
@@ -1128,7 +1324,7 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-800 rounded-lg shadow-lg">
-          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type to filter"
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type to filter by make, model, plate…"
             className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white" />
           <div className="max-h-48 overflow-auto">
             {filtered.map((opt) => (

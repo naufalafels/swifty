@@ -229,6 +229,37 @@ export const createBooking = async (req, res) => {
         .json({ success: false, message: "Selected dates overlap an existing booking for this car." });
     }
 
+    // ─── FIX: Check car.serviceBlocks — reject if any requested date is blocked for service ───
+    // Previously this check was entirely absent, so customers could book on service-blocked days.
+    const carForServiceCheck = await Car.findById(carId).select("serviceBlocks").session(session).lean();
+    if (carForServiceCheck?.serviceBlocks?.length) {
+      const blockedSet = new Set(
+        carForServiceCheck.serviceBlocks.map((d) => String(d).slice(0, 10))
+      );
+      // Walk every day of the requested range and check against the blocked set
+      let cur = new Date(pickup);
+      cur.setHours(0, 0, 0, 0);
+      const retDay = new Date(ret);
+      retDay.setHours(0, 0, 0, 0);
+      let blockedDate = null;
+      while (cur <= retDay) {
+        const iso = cur.toISOString().slice(0, 10);
+        if (blockedSet.has(iso)) {
+          blockedDate = iso;
+          break;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+      if (blockedDate) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(409).json({
+          success: false,
+          message: `This car is blocked for service on ${blockedDate} and cannot be booked on those dates. Please choose different dates.`,
+        });
+      }
+    }
+
     let userId = null;
     if (req.user && (req.user.id || req.user._id)) {
       userId = req.user.id || req.user._id;

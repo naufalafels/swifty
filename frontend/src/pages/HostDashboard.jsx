@@ -982,7 +982,7 @@ const HostDashboard = () => {
                             )}
 
                             {/* Click hint */}
-                            <div className="text-[10px] text-emerald-500 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="text-[10px] text-gray-400 mt-1.5 group-hover:text-emerald-500 transition-opacity">
                               Click to view full customer details & ID images →
                             </div>
                           </div>

@@ -226,15 +226,42 @@ const CarDetail = () => {
   useEffect(() => setToday(todayISO()), []);
 
   useEffect(() => {
+    // Always reset carousel index when car or id changes
+    setCurrentImage(0);
+
+    // If car is already available from route state, we still need fresh data
+    // for serviceBlocks — that is handled by the availability useEffect below.
+    // But we don't need to re-fetch the full car object if we already have it.
     if (car) {
-      setCurrentImage(0);
-      return;
+      // Even though we have car from route state, we must fetch fresh data
+      // to ensure serviceBlocks are present (route state may strip them).
+      const controller = new AbortController();
+      (async () => {
+        try {
+          const res = await api.get(`/api/cars/${id}`, { signal: controller.signal });
+          const payload = res.data?.data ?? res.data ?? null;
+          if (payload) {
+            setCar((prev) => ({
+              ...prev,
+              ...payload,
+              serviceBlocks: payload.serviceBlocks || prev?.serviceBlocks || [],
+            }));
+          }
+        } catch (err) {
+          const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
+          if (!canceled) {
+            console.warn("Failed to refresh car data for serviceBlocks:", err);
+          }
+        }
+      })();
+      return () => {
+        try { controller.abort(); } catch {}
+      };
     }
 
     const local = carsData.find((c) => String(c.id) === String(id));
     if (local) {
       setCar(local);
-      setCurrentImage(0);
       return;
     }
 
@@ -266,9 +293,8 @@ const CarDetail = () => {
   }, [id]);
 
   // Load availability and build disabled dates for the date-range picker (inclusive of return day)
-  // FIX 5: Also fetch car.serviceBlocks and track them separately for visual distinction
-   // Load availability and build disabled dates for the date-range picker (inclusive of return day)
-  // FIX: Fetch bookings and car data independently so a failure in one doesn't prevent
+  // Also fetch car.serviceBlocks and track them separately for visual distinction.
+  // Fetch bookings and car data independently so a failure in one doesn't prevent
   // the other from loading. Service-blocked dates must always appear on the calendar.
   useEffect(() => {
     if (!id) return;
@@ -296,6 +322,7 @@ const CarDetail = () => {
       }
 
       // Fetch car data for serviceBlocks (independent — failure should not block bookings)
+      let fetchedServiceBlocks = null;
       try {
         const carRes = await api.get(`/api/cars/${id}`, { signal: controller.signal });
         const carData = carRes.data?.data ?? carRes.data ?? null;
@@ -303,25 +330,28 @@ const CarDetail = () => {
         // Update the car state with fresh data so serviceBlocks are always up-to-date
         if (carData) {
           setCar((prev) => {
-            // Only update if we have fresh data; preserve any existing fields
             if (!prev) return carData;
             return { ...prev, serviceBlocks: carData.serviceBlocks || prev.serviceBlocks };
           });
-        }
-
-        if (carData?.serviceBlocks?.length) {
-          carData.serviceBlocks.forEach((d) => {
-            const parsed = toLocalMidnight(d);
-            if (parsed) {
-              disabled.push(parsed);
-              serviceDatesSet.add(format(parsed, "yyyy-MM-dd"));
-            }
-          });
+          fetchedServiceBlocks = carData.serviceBlocks || [];
         }
       } catch (err) {
         const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
         if (!canceled) console.warn("Failed to load car service blocks", err);
         if (canceled) return; // component unmounted, stop processing
+      }
+
+      // Use fetched service blocks, or fall back to whatever is on the car state
+      const serviceBlocksToUse = fetchedServiceBlocks || car?.serviceBlocks || [];
+
+      if (serviceBlocksToUse.length) {
+        serviceBlocksToUse.forEach((d) => {
+          const parsed = toLocalMidnight(d);
+          if (parsed) {
+            disabled.push(parsed);
+            serviceDatesSet.add(format(parsed, "yyyy-MM-dd"));
+          }
+        });
       }
 
       // Deduplicate AND normalize every disabled date to midnight local time.

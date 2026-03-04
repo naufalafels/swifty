@@ -267,33 +267,48 @@ const CarDetail = () => {
 
   // Load availability and build disabled dates for the date-range picker (inclusive of return day)
   // FIX 5: Also fetch car.serviceBlocks and track them separately for visual distinction
+   // Load availability and build disabled dates for the date-range picker (inclusive of return day)
+  // FIX: Fetch bookings and car data independently so a failure in one doesn't prevent
+  // the other from loading. Service-blocked dates must always appear on the calendar.
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
     (async () => {
+      const disabled = [];
+      const serviceDatesSet = new Set();
+
+      // Fetch bookings (independent — failure should not block service dates)
       try {
-        const [bookingsRes, carRes] = await Promise.all([
-          api.get("/api/bookings", {
-            params: { car: id, limit: 200 },
-            signal: controller.signal,
-          }),
-          api.get(`/api/cars/${id}`, { signal: controller.signal }),
-        ]);
-
+        const bookingsRes = await api.get("/api/bookings", {
+          params: { car: id, limit: 200 },
+          signal: controller.signal,
+        });
         const bookings = bookingsRes.data?.data || [];
-        const disabled = [];
-        const serviceDatesSet = new Set();
-
-        // Add booking dates (now using toLocalMidnight so all dates are at 00:00:00)
         bookings
           .filter((b) => BLOCKING_STATUSES.includes(b.status))
           .forEach((b) => {
             disabled.push(...bookingDaysInclusive(b.pickupDate, b.returnDate));
           });
+      } catch (err) {
+        const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
+        if (!canceled) console.warn("Failed to load bookings for availability", err);
+        if (canceled) return; // component unmounted, stop processing
+      }
 
-        // FIX 5: Add service-blocked dates from car.serviceBlocks and track them
-        // All dates created at midnight (00:00:00) to match react-date-range internals
+      // Fetch car data for serviceBlocks (independent — failure should not block bookings)
+      try {
+        const carRes = await api.get(`/api/cars/${id}`, { signal: controller.signal });
         const carData = carRes.data?.data ?? carRes.data ?? null;
+
+        // Update the car state with fresh data so serviceBlocks are always up-to-date
+        if (carData) {
+          setCar((prev) => {
+            // Only update if we have fresh data; preserve any existing fields
+            if (!prev) return carData;
+            return { ...prev, serviceBlocks: carData.serviceBlocks || prev.serviceBlocks };
+          });
+        }
+
         if (carData?.serviceBlocks?.length) {
           carData.serviceBlocks.forEach((d) => {
             const parsed = toLocalMidnight(d);
@@ -303,23 +318,24 @@ const CarDetail = () => {
             }
           });
         }
-
-        // Deduplicate AND normalize every disabled date to midnight local time.
-        // react-date-range creates its calendar Date objects at 00:00:00 local time
-        // and compares against disabledDates — if our entries are at any other hour,
-        // the match fails silently and the date appears white/enabled instead of grey.
-        const deduped = Array.from(
-          new Map(disabled.map((d) => {
-            const normalized = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-            return [normalized.toDateString(), normalized];
-          })).values()
-        );
-        setDisabledDates(deduped);
-        setServiceBlockedDates(serviceDatesSet);
       } catch (err) {
         const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
-        if (!canceled) console.warn("Failed to load availability", err);
+        if (!canceled) console.warn("Failed to load car service blocks", err);
+        if (canceled) return; // component unmounted, stop processing
       }
+
+      // Deduplicate AND normalize every disabled date to midnight local time.
+      // react-date-range creates its calendar Date objects at 00:00:00 local time
+      // and compares against disabledDates — if our entries are at any other hour,
+      // the match fails silently and the date appears white/enabled instead of grey.
+      const deduped = Array.from(
+        new Map(disabled.map((d) => {
+          const normalized = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+          return [normalized.toDateString(), normalized];
+        })).values()
+      );
+      setDisabledDates(deduped);
+      setServiceBlockedDates(serviceDatesSet);
     })();
     return () => {
       try { controller.abort(); } catch {}

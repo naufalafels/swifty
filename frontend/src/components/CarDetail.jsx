@@ -49,20 +49,25 @@ const GOOGLE_MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 const todayISO = () => format(new Date(), "yyyy-MM-dd");
 const formatISODate = (d) => format(d, "yyyy-MM-dd");
 
-// Normalize to date-only (ignore timezone) and set to local midday to avoid TZ edge cases
-const toLocalDateOnlyMidday = (value) => {
+// Normalize any date value to midnight local time (00:00:00.000).
+// react-date-range internally creates its calendar Date objects at midnight,
+// so every entry in disabledDates MUST also be at midnight for the grey-out
+// comparison to succeed.
+const toLocalMidnight = (value) => {
   if (!value) return null;
-  const datePart = String(value).split("T")[0]; // keep only calendar day
+  const datePart = String(value).split("T")[0];
   if (!datePart) return null;
-  const d = new Date(`${datePart}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  return d;
+  const [y, m, d] = datePart.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
 };
 
 // Build an inclusive list of days for a booking (start through end)
 const bookingDaysInclusive = (pickupIso, returnIso) => {
-  const start = toLocalDateOnlyMidday(pickupIso);
-  const end = toLocalDateOnlyMidday(returnIso);
+  const start = toLocalMidnight(pickupIso);
+  const end = toLocalMidnight(returnIso);
   if (!start || !end) return [];
   return eachDayOfInterval({ start, end });
 };
@@ -279,7 +284,7 @@ const CarDetail = () => {
         const disabled = [];
         const serviceDatesSet = new Set();
 
-        // Add booking dates
+        // Add booking dates (now using toLocalMidnight so all dates are at 00:00:00)
         bookings
           .filter((b) => BLOCKING_STATUSES.includes(b.status))
           .forEach((b) => {
@@ -287,10 +292,11 @@ const CarDetail = () => {
           });
 
         // FIX 5: Add service-blocked dates from car.serviceBlocks and track them
+        // All dates created at midnight (00:00:00) to match react-date-range internals
         const carData = carRes.data?.data ?? carRes.data ?? null;
         if (carData?.serviceBlocks?.length) {
           carData.serviceBlocks.forEach((d) => {
-            const parsed = toLocalDateOnlyMidday(d);
+            const parsed = toLocalMidnight(d);
             if (parsed) {
               disabled.push(parsed);
               serviceDatesSet.add(format(parsed, "yyyy-MM-dd"));
@@ -298,8 +304,15 @@ const CarDetail = () => {
           });
         }
 
+        // Deduplicate AND normalize every disabled date to midnight local time.
+        // react-date-range creates its calendar Date objects at 00:00:00 local time
+        // and compares against disabledDates — if our entries are at any other hour,
+        // the match fails silently and the date appears white/enabled instead of grey.
         const deduped = Array.from(
-          new Map(disabled.map((d) => [d.toDateString(), d])).values()
+          new Map(disabled.map((d) => {
+            const normalized = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+            return [normalized.toDateString(), normalized];
+          })).values()
         );
         setDisabledDates(deduped);
         setServiceBlockedDates(serviceDatesSet);
@@ -407,6 +420,46 @@ const CarDetail = () => {
     // Validate that the selected range does not span across any disabled/service-blocked date
     const rangeStart = sel.startDate;
     const rangeEnd = sel.endDate;
+
+    // FIX: Explicitly reject if the start date or end date itself is a service-blocked date.
+    // The react-date-range disabledDates prop greys out dates visually but does NOT
+    // prevent them from being clicked as a range anchor in all versions. This guard
+    // catches the case where a user clicks directly on a maintenance-blocked date.
+    if (rangeStart) {
+      const startIso = format(rangeStart, "yyyy-MM-dd");
+      if (serviceBlockedDates.has(startIso)) {
+        toast.error(
+          `${startIso} is blocked for maintenance. Please choose a different start date.`
+        );
+        return;
+      }
+    }
+    if (rangeEnd) {
+      const endIso = format(rangeEnd, "yyyy-MM-dd");
+      if (serviceBlockedDates.has(endIso)) {
+        toast.error(
+          `${endIso} is blocked for maintenance. Please choose a different end date.`
+        );
+        return;
+      }
+    }
+
+    // Also reject if start or end lands on a booking-disabled date
+    if (rangeStart) {
+      const disabledSet = new Set(disabledDates.map((d) => d.toDateString()));
+      if (disabledSet.has(rangeStart.toDateString()) && !serviceBlockedDates.has(format(rangeStart, "yyyy-MM-dd"))) {
+        toast.error("Your selected start date is already booked. Please choose an available date.");
+        return;
+      }
+    }
+    if (rangeEnd) {
+      const disabledSet = new Set(disabledDates.map((d) => d.toDateString()));
+      if (disabledSet.has(rangeEnd.toDateString()) && !serviceBlockedDates.has(format(rangeEnd, "yyyy-MM-dd"))) {
+        toast.error("Your selected end date is already booked. Please choose an available date.");
+        return;
+      }
+    }
+
     if (rangeStart && rangeEnd && rangeEnd >= rangeStart) {
       const daysInRange = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
       const blockedInRange = daysInRange.filter((d) => {

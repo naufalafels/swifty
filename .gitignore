@@ -4,6 +4,7 @@ node_modules/
 .env
 .env.*.local
 .env.local
+admin/.env
 backend/.env
 frontend/.env
 # Vite / build

@@ -143,7 +143,15 @@ const HomeCars = () => {
       }
     }
 
+    // FIX: Handle service_block state from backend availability computation
     if (car.availability) {
+      if (car.availability.state === "service_block") {
+        return {
+          state: "service_block",
+          source: car.availability.source || "serviceBlocks",
+        };
+      }
+
       if (car.availability.state === "booked" && car.availability.until) {
         return {
           state: "booked",
@@ -193,6 +201,17 @@ const HomeCars = () => {
           Available
         </span>
       );
+
+    // FIX: Handle service_block state — show "In Service" badge
+    if (effective.state === "service_block") {
+      return (
+        <div className="flex flex-col items-end">
+          <span className="px-2 py-1 text-xs rounded-md bg-orange-50 text-orange-700 font-semibold">
+            🔧 In Service
+          </span>
+        </div>
+      );
+    }
 
     if (effective.state === "booked") {
       if (effective.until) {
@@ -268,10 +287,10 @@ const HomeCars = () => {
     );
   };
 
-  // Only truly disable for maintenance cars — booked/rented cars should
-  // still allow users to navigate to the detail page for advance booking
+  // FIX: Also disable for service-blocked cars so they can't be booked today
   const isBookDisabled = (car) => {
     if (car?.status === "maintenance") return true;
+    if (car?.availability?.state === "service_block") return true;
     return false;
   };
 

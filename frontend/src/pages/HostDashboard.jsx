@@ -22,7 +22,8 @@ import {
   FaSpinner,
   FaTimes,
   FaUser,
-  FaChevronDown
+  FaChevronDown,
+  FaWrench
 } from "react-icons/fa";
 import {
   getHostCars,
@@ -45,6 +46,7 @@ const Pill = ({ children, tone = "slate" }) => {
     green: "bg-emerald-900 text-emerald-200",
     red: "bg-rose-900 text-rose-100",
     blue: "bg-blue-900 text-blue-100",
+    orange: "bg-orange-900 text-orange-200",
   };
   return (
     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${tones[tone] || tones.slate}`}>
@@ -795,7 +797,21 @@ const HostDashboard = () => {
   const selectedRangeCars = selectedDates.flatMap((d) => {
     const isoStr = format(d, "yyyy-MM-dd");
     const items = dayCars[isoStr] || [];
-    return items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy"), __isoDate: isoStr }));
+    const bookingEntries = items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy"), __isoDate: isoStr }));
+
+    // FIX: Also include service block entries for this date
+    const serviceBlocks = calendar?.serviceBlocks || [];
+    const serviceEntries = serviceBlocks
+      .filter((sb) => String(sb.date).slice(0, 10) === isoStr)
+      .map((sb) => ({
+        car: sb.car || "Car",
+        status: "service",
+        __dateLabel: format(d, "dd/MM/yyyy"),
+        __isoDate: isoStr,
+        __isServiceBlock: true,
+      }));
+
+    return [...bookingEntries, ...serviceEntries];
   });
 
   // Holidays that fall within the selected date range
@@ -936,6 +952,9 @@ const HostDashboard = () => {
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Cars booked
                 </span>
                 <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-400"></span> Service block
+                </span>
+                <span className="flex items-center gap-1">
                   <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"></span> Weekend
                 </span>
               </div>
@@ -961,14 +980,24 @@ const HostDashboard = () => {
                   const isWknd = isWeekend(date);
                   const hasBookings = carsOnDay.length > 0;
 
+                  // FIX: Check if any service block exists for this date
+                  const serviceBlocks = calendar?.serviceBlocks || [];
+                  const serviceBlocksOnDay = serviceBlocks.filter(
+                    (sb) => String(sb.date).slice(0, 10) === isoDate
+                  );
+                  const hasServiceBlock = serviceBlocksOnDay.length > 0;
+
                   let bgClass = "";
                   if (holiday && hasBookings) bgClass = "bg-amber-100";
                   else if (holiday) bgClass = "bg-amber-50";
+                  else if (hasServiceBlock && hasBookings) bgClass = "bg-orange-50";
+                  else if (hasServiceBlock) bgClass = "bg-orange-50";
                   else if (hasBookings) bgClass = "bg-emerald-50";
                   else if (isWknd) bgClass = "bg-slate-100";
 
                   let ringClass = "";
                   if (holiday) ringClass = "ring-2 ring-amber-400";
+                  else if (hasServiceBlock) ringClass = "ring-2 ring-orange-400";
                   else if (hasBookings) ringClass = "ring-1 ring-emerald-400";
                   else if (isWknd) ringClass = "ring-1 ring-slate-200";
 
@@ -984,13 +1013,21 @@ const HostDashboard = () => {
                         {hasBookings && (
                           <span className="w-[6px] h-[6px] rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.4)]" title={`${carsOnDay.length} car(s) booked`}></span>
                         )}
+                        {hasServiceBlock && (
+                          <span className="w-[6px] h-[6px] rounded-full bg-orange-400 shadow-[0_0_3px_rgba(251,146,60,0.4)]" title={`${serviceBlocksOnDay.length} car(s) in service`}></span>
+                        )}
                       </div>
                       {hasBookings && (
                         <span className="text-[9px] leading-none text-emerald-700 font-bold mt-[1px] z-20">
                           {carsOnDay.length} car{carsOnDay.length !== 1 ? "s" : ""}
                         </span>
                       )}
-                      {holiday && !hasBookings && (
+                      {hasServiceBlock && !hasBookings && (
+                        <span className="text-[8px] leading-none text-orange-600 font-bold mt-[1px] z-20">
+                          🔧 {serviceBlocksOnDay.length}
+                        </span>
+                      )}
+                      {holiday && !hasBookings && !hasServiceBlock && (
                         <span className="text-[8px] leading-none text-amber-700 truncate max-w-[46px] mt-[1px] font-semibold z-20">
                           {holiday.label.length > 10 ? holiday.label.slice(0, 10) + "…" : holiday.label}
                         </span>
@@ -1032,9 +1069,9 @@ const HostDashboard = () => {
                   </div>
                 )}
 
-                {/* ── Bookings in selected range (grouped by day with dividers) ── */}
+                {/* ── Bookings + Service Blocks in selected range (grouped by day with dividers) ── */}
                 {selectedRangeCars.length === 0 && (
-                  <div className="text-sm text-slate-400">No cars booked in this range.</div>
+                  <div className="text-sm text-slate-400">No cars booked or blocked in this range.</div>
                 )}
                 <div className="space-y-1 max-h-[400px] overflow-auto pr-1">
                   {(() => {
@@ -1042,8 +1079,9 @@ const HostDashboard = () => {
                     return selectedRangeCars.map((c, idx) => {
                       const showDivider = c.__dateLabel !== lastDate;
                       lastDate = c.__dateLabel;
+
                       return (
-                        <React.Fragment key={`${c.bookingId || idx}-${c.__dateLabel}-${idx}`}>
+                        <React.Fragment key={`${c.bookingId || "sb"}-${c.__dateLabel}-${idx}`}>
                           {/* Day divider */}
                           {showDivider && (
                             <div className={`flex items-center gap-2 ${idx > 0 ? "pt-3 mt-2 border-t border-slate-700" : ""}`}>
@@ -1053,45 +1091,63 @@ const HostDashboard = () => {
                             </div>
                           )}
 
-                          {/* Booking card */}
-                          <div
-                            className="border border-slate-800 rounded-lg p-3 text-sm bg-slate-950/60 cursor-pointer hover:border-emerald-500 hover:bg-slate-950/80 transition-all group"
-                            onClick={() => handleViewCustomer(c.bookingId)}
-                          >
-                            {/* Car Make & Model + Status */}
-                            <div className="flex justify-between items-start gap-2">
-                              <span className="font-semibold text-white flex items-center gap-1.5">
-                                <FaCar className="text-amber-400 shrink-0" /> {c.car}
-                              </span>
-                              <Pill tone="blue">{c.status}</Pill>
-                            </div>
-
-                            {/* Booking Number */}
-                            <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                              <FaList className="text-slate-500 shrink-0" /> Booking #{c.bookingId}
-                            </div>
-
-                            {/* Identification — only show if doc type exists */}
-                            {c.verificationDocType && (
-                              <div className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
-                                <FaIdCard className="text-sky-400 shrink-0" />
-                                {c.verificationDocType}
-                                {c.verificationIdNumber ? `: ${c.verificationIdNumber}` : ""}
+                          {/* FIX: Service block card — rendered differently from booking cards */}
+                          {c.__isServiceBlock ? (
+                            <div className="border border-orange-800/50 rounded-lg p-3 text-sm bg-orange-950/40">
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-semibold text-orange-200 flex items-center gap-1.5">
+                                  <FaWrench className="text-orange-400 shrink-0" /> {c.car}
+                                </span>
+                                <Pill tone="orange">service</Pill>
                               </div>
-                            )}
+                              <div className="text-xs text-orange-300 mt-1 flex items-center gap-1.5">
+                                <FaFlag className="text-orange-500 shrink-0" /> Blocked for maintenance / service
+                              </div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                {c.__dateLabel}
+                              </div>
+                            </div>
+                          ) : (
+                            /* Booking card (existing) */
+                            <div
+                              className="border border-slate-800 rounded-lg p-3 text-sm bg-slate-950/60 cursor-pointer hover:border-emerald-500 hover:bg-slate-950/80 transition-all group"
+                              onClick={() => handleViewCustomer(c.bookingId)}
+                            >
+                              {/* Car Make & Model + Status */}
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-semibold text-white flex items-center gap-1.5">
+                                  <FaCar className="text-amber-400 shrink-0" /> {c.car}
+                                </span>
+                                <Pill tone="blue">{c.status}</Pill>
+                              </div>
 
-                            {/* Customer Name */}
-                            {c.customerName && c.customerName !== "Unknown" && (
+                              {/* Booking Number */}
                               <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                                <FaUser className="text-slate-500 shrink-0" /> {c.customerName}
+                                <FaList className="text-slate-500 shrink-0" /> Booking #{c.bookingId}
                               </div>
-                            )}
 
-                            {/* Click hint */}
-                            <div className="text-[10px] text-gray-400 mt-1.5 group-hover:text-emerald-500 transition-opacity">
-                              Click to view full customer details & ID images →
+                              {/* Identification — only show if doc type exists */}
+                              {c.verificationDocType && (
+                                <div className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
+                                  <FaIdCard className="text-sky-400 shrink-0" />
+                                  {c.verificationDocType}
+                                  {c.verificationIdNumber ? `: ${c.verificationIdNumber}` : ""}
+                                </div>
+                              )}
+
+                              {/* Customer Name */}
+                              {c.customerName && c.customerName !== "Unknown" && (
+                                <div className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                                  <FaUser className="text-slate-500 shrink-0" /> {c.customerName}
+                                </div>
+                              )}
+
+                              {/* Click hint */}
+                              <div className="text-[10px] text-gray-400 mt-1.5 group-hover:text-emerald-500 transition-opacity">
+                                Click to view full customer details & ID images →
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </React.Fragment>
                       );
                     });

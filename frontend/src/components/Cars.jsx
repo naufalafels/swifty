@@ -255,7 +255,15 @@ const Cars = () => {
       }
     }
 
+    // FIX: Handle service_block state from backend availability computation
     if (car.availability) {
+      if (car.availability.state === "service_block") {
+        return {
+          state: "service_block",
+          source: car.availability.source || "serviceBlocks",
+        };
+      }
+
       if (car.availability.state === "booked" && car.availability.until) {
         return {
           state: "booked",
@@ -291,20 +299,37 @@ const Cars = () => {
     return bStart <= reqReturn && bEnd >= reqPickup;
   };
 
-  const isAvailableForRange = (car, reqPickupIso, reqReturnIso) => {
+    const isAvailableForRange = (car, reqPickupIso, reqReturnIso) => {
     if (!reqPickupIso || !reqReturnIso) return true;
     try {
       const reqPickup = startOfDay(new Date(reqPickupIso));
       const reqReturn = startOfDay(new Date(reqReturnIso));
       if (reqReturn < reqPickup) return false;
 
+      // Check bookings overlap
       if (Array.isArray(car.bookings) && car.bookings.length) {
         for (const b of car.bookings) {
           if (doesBookingOverlapRange(b, reqPickup, reqReturn)) return false;
         }
       }
 
+      // FIX: Check serviceBlocks — reject if any blocked date falls in the requested range
+      if (Array.isArray(car.serviceBlocks) && car.serviceBlocks.length) {
+        for (const d of car.serviceBlocks) {
+          const blockedDay = startOfDay(new Date(String(d).split("T")[0] + "T12:00:00"));
+          if (blockedDay >= reqPickup && blockedDay <= reqReturn) return false;
+        }
+      }
+
       if (car.availability) {
+        // FIX: If currently in service_block state, check if it overlaps requested range
+        if (car.availability.state === "service_block") {
+          // The car is currently blocked — today is in service.
+          // If reqPickup is today or earlier, it overlaps.
+          const today = startOfDay(new Date());
+          if (reqPickup <= today && reqReturn >= today) return false;
+        }
+
         if (car.availability.state === "booked" && car.availability.until) {
           const until = startOfDay(new Date(car.availability.until));
           if (until >= reqPickup) return false;
@@ -538,6 +563,17 @@ const Cars = () => {
 
     if (!effective) {
       return <span className="px-2 py-1 text-xs rounded-md bg-green-50 text-green-700">Available</span>;
+    }
+
+    // FIX: Handle service_block state — show "In Service" badge
+    if (effective.state === "service_block") {
+      return (
+        <div className="flex flex-col items-end">
+          <span className="px-2 py-1 text-xs rounded-md bg-orange-50 text-orange-700 font-semibold">
+            🔧 In Service
+          </span>
+        </div>
+      );
     }
 
     if (effective.state === "booked") {

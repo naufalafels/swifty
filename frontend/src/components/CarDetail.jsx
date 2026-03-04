@@ -270,23 +270,41 @@ const CarDetail = () => {
     };
   }, [id]);
 
-  // Load availability and build disabled dates for the date-range picker (inclusive of return day)
+    // Load availability and build disabled dates for the date-range picker (inclusive of return day)
+  // FIX: Also fetch car.serviceBlocks and merge into disabled dates
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await api.get("/api/bookings", {
-          params: { car: id, limit: 200 },
-          signal: controller.signal,
-        });
-        const bookings = res.data?.data || [];
+        // Fetch bookings AND car data (for serviceBlocks) in parallel
+        const [bookingsRes, carRes] = await Promise.all([
+          api.get("/api/bookings", {
+            params: { car: id, limit: 200 },
+            signal: controller.signal,
+          }),
+          api.get(`/api/cars/${id}`, { signal: controller.signal }),
+        ]);
+
+        const bookings = bookingsRes.data?.data || [];
         const disabled = [];
+
+        // Add booking dates
         bookings
           .filter((b) => BLOCKING_STATUSES.includes(b.status))
           .forEach((b) => {
             disabled.push(...bookingDaysInclusive(b.pickupDate, b.returnDate));
           });
+
+        // FIX: Add service-blocked dates from car.serviceBlocks
+        const carData = carRes.data?.data ?? carRes.data ?? null;
+        if (carData?.serviceBlocks?.length) {
+          carData.serviceBlocks.forEach((d) => {
+            const parsed = toLocalDateOnlyMidday(d);
+            if (parsed) disabled.push(parsed);
+          });
+        }
+
         // de-duplicate to keep the picker stable
         const deduped = Array.from(
           new Map(disabled.map((d) => [d.toDateString(), d])).values()

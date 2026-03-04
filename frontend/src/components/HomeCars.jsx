@@ -56,7 +56,19 @@ const HomeCars = () => {
         params: { limit },
         signal: ctrl.signal,
       });
-      setCars(res.data?.data || []);
+      const allCars = res.data?.data || [];
+      // Filter out cars that are under service or currently booked —
+      // only show available cars on the Home page
+      const availableCars = allCars.filter((car) => {
+        // Exclude maintenance cars
+        if (car.status === "maintenance") return false;
+        // Exclude cars currently under service
+        if (car.availability?.state === "service_block") return false;
+        // Exclude cars currently booked
+        if (car.availability?.state === "booked") return false;
+        return true;
+      });
+      setCars(availableCars);
     } catch (err) {
       const isCanceled =
         err?.code === "ERR_CANCELED" ||
@@ -143,13 +155,20 @@ const HomeCars = () => {
       }
     }
 
-    // FIX: Handle service_block state from backend availability computation
     if (car.availability) {
       if (car.availability.state === "service_block") {
-        return {
-          state: "service_block",
-          source: car.availability.source || "serviceBlocks",
-        };
+        // Validate that the service block is still active today —
+        // the cached availability may be stale (e.g. page left open overnight)
+        const todayIso = today.toISOString().slice(0, 10);
+        const stillBlocked = Array.isArray(car.serviceBlocks)
+          && car.serviceBlocks.some((d) => String(d).slice(0, 10) === todayIso);
+        if (stillBlocked) {
+          return {
+            state: "service_block",
+            source: car.availability.source || "serviceBlocks",
+          };
+        }
+        // Service day has passed — fall through to treat as available
       }
 
       if (car.availability.state === "booked" && car.availability.until) {
@@ -202,7 +221,6 @@ const HomeCars = () => {
         </span>
       );
 
-    // FIX: Handle service_block state — show "In Service" badge
     if (effective.state === "service_block") {
       return (
         <div className="flex flex-col items-end">
@@ -287,7 +305,7 @@ const HomeCars = () => {
     );
   };
 
-  // FIX: Also disable for service-blocked cars so they can't be booked today
+  // Also disable for service-blocked cars so they can't be booked today
   const isBookDisabled = (car) => {
     if (car?.status === "maintenance") return true;
     if (car?.availability?.state === "service_block") return true;

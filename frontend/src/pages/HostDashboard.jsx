@@ -1095,11 +1095,11 @@ const HostDashboard = () => {
           {/* FIX 3: Search by ID, make, or model */}
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by ID, make, or model"
             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-auto pr-1">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-auto pr-1">
             {filteredCars.map((c) => (
               <div key={c._id}
                 className="border border-slate-800 bg-slate-900 rounded-lg p-3 space-y-1 cursor-pointer hover:border-emerald-600 transition"
-                onClick={() => navigate(`/cars/${c._id}`)}>
+                onClick={() => setServiceCarModal(c)}>
                 <div className="text-sm font-semibold text-white">{c.make} {c.model}</div>
                 {/* FIX 3: Show Car ID in quick find */}
                 <div className="text-xs text-slate-500 font-mono">ID: {c._id.slice(-6).toUpperCase()}</div>

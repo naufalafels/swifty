@@ -403,6 +403,37 @@ const CarDetail = () => {
 
   const onRangeChange = (ranges) => {
     const sel = ranges.selection;
+
+    // Validate that the selected range does not span across any disabled/service-blocked date
+    const rangeStart = sel.startDate;
+    const rangeEnd = sel.endDate;
+    if (rangeStart && rangeEnd && rangeEnd >= rangeStart) {
+      const daysInRange = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+      const blockedInRange = daysInRange.filter((d) => {
+        const iso = format(d, "yyyy-MM-dd");
+        return serviceBlockedDates.has(iso);
+      });
+      if (blockedInRange.length > 0) {
+        const blockedStr = blockedInRange.map((d) => format(d, "yyyy-MM-dd")).join(", ");
+        toast.error(
+          `Your selected range includes maintenance-blocked date(s): ${blockedStr}. Please choose dates that do not overlap with blocked dates.`
+        );
+        return; // reject the range change
+      }
+
+      // Also check against general disabledDates (bookings)
+      const disabledSet = new Set(disabledDates.map((d) => d.toDateString()));
+      const bookingBlockedInRange = daysInRange.filter(
+        (d) => disabledSet.has(d.toDateString()) && !serviceBlockedDates.has(format(d, "yyyy-MM-dd"))
+      );
+      if (bookingBlockedInRange.length > 0) {
+        toast.error(
+          "Your selected range includes dates that are already booked. Please choose available dates."
+        );
+        return; // reject the range change
+      }
+    }
+
     setRange([sel]);
     setFormData((f) => ({
       ...f,

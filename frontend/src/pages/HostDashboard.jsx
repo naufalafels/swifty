@@ -407,6 +407,131 @@ const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlar
   );
 };
 
+/* ───────────────────────── ServiceCarDetailModal ───────────────────────── */
+
+const ServiceCarDetailModal = ({ car, onClose }) => {
+  if (!car) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-auto space-y-4"
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <FaWrench className="text-orange-400" /> Vehicle Detail — Maintenance
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">
+            <FaTimes size={18} />
+          </button>
+        </div>
+
+        {/* Car Info */}
+        <div className="space-y-2 text-sm">
+          <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Vehicle Information</div>
+          <div className="flex items-center gap-2">
+            <FaCar className="text-amber-400 w-4" />
+            <span className="text-slate-400">Car:</span>
+            <span className="text-white font-medium">{car.make} {car.model} {car.year ? `(${car.year})` : ""}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FaIdCard className="text-sky-400 w-4" />
+            <span className="text-slate-400">ID:</span>
+            <span className="text-white font-mono text-xs">{car._id}</span>
+          </div>
+          {car.plateNumber && (
+            <div className="flex items-center gap-2">
+              <FaList className="text-slate-500 w-4" />
+              <span className="text-slate-400">Plate:</span>
+              <span className="text-white font-mono">{car.plateNumber}</span>
+            </div>
+          )}
+          {car.color && (
+            <div className="flex items-center gap-2">
+              <FaCar className="text-slate-500 w-4" />
+              <span className="text-slate-400">Color:</span>
+              <span className="text-white">{car.color}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Specs */}
+        <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+          <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Specifications</div>
+          <div className="grid grid-cols-2 gap-2">
+            {car.category && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Category:</span>
+                <span className="text-white">{car.category}</span>
+              </div>
+            )}
+            {car.transmission && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Transmission:</span>
+                <span className="text-white">{car.transmission}</span>
+              </div>
+            )}
+            {car.fuelType && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Fuel:</span>
+                <span className="text-white">{car.fuelType}</span>
+              </div>
+            )}
+            {car.seats && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Seats:</span>
+                <span className="text-white">{car.seats}</span>
+              </div>
+            )}
+            {car.mileage != null && (
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">Mileage:</span>
+                <span className="text-white">{car.mileage} km</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Pricing */}
+        <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+          <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Pricing</div>
+          <div className="flex items-center gap-2">
+            <FaDollarSign className="text-emerald-400 w-4" />
+            <span className="text-slate-400">Daily Rate:</span>
+            <span className="text-white font-medium">RM {car.dailyRate || 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FaDollarSign className="text-amber-400 w-4" />
+            <span className="text-slate-400">Deposit:</span>
+            <span className="text-white font-medium">RM {car.deposit || 0}</span>
+          </div>
+        </div>
+
+        {/* Service Blocks */}
+        {car.serviceBlocks && car.serviceBlocks.length > 0 && (
+          <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+            <div className="text-xs uppercase text-orange-400 tracking-wide font-semibold">Maintenance Blocked Dates</div>
+            <div className="flex flex-wrap gap-1">
+              {car.serviceBlocks.map((d, i) => (
+                <span key={i} className="bg-orange-900/40 text-orange-200 px-2 py-0.5 rounded text-xs font-mono">
+                  {String(d).slice(0, 10)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Status pill */}
+        <div className="border-t border-slate-800 pt-3">
+          <Pill tone="orange">🔧 Blocked for Maintenance</Pill>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ════════��══════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
 
 const CALENDAR_STYLES = `
@@ -668,6 +793,8 @@ const HostDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [serviceError, setServiceError] = useState("");
+    // Service car detail modal state
+  const [serviceCarModal, setServiceCarModal] = useState(null);
 
   // Customer detail modal state
   const [customerModal, setCustomerModal] = useState(null);
@@ -918,6 +1045,14 @@ const HostDashboard = () => {
         />
       )}
 
+      {/* Service Car Detail Modal */}
+      {serviceCarModal && (
+        <ServiceCarDetailModal
+          car={serviceCarModal}
+          onClose={() => setServiceCarModal(null)}
+        />
+      )}
+
       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* ──── header ──── */}
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1142,7 +1277,7 @@ const HostDashboard = () => {
                                 const matchedCar = cars.find(
                                   (car) => `${car.make} ${car.model}` === c.car
                                 );
-                                if (matchedCar) navigate(`/cars/${matchedCar._id}`);
+                                if (matchedCar) setServiceCarModal(matchedCar);
                               }}
                             >
                               <div className="flex justify-between items-start gap-2">
@@ -1365,7 +1500,7 @@ const HostDashboard = () => {
               className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 rounded-lg py-2 font-semibold flex items-center justify-center gap-2"
             >
               <FaFlag />
-              Block {selectedCarIds.length > 0 ? `${selectedCarIds.length} car${selectedCarIds.length > 1 ? "s" : ""}` : "selected cars"} for these dates
+              Block {selectedCarIds.length > 0 ? `${selectedCarIds.length} car${selectedCarIds.length > 1 ? "s" : ""}` : "selected cars"}
             </button>
           </div>
 

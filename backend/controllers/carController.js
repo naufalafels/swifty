@@ -99,6 +99,12 @@ export const getCars = async (req, res, next) => {
       }
     });
 
+    // Save original serviceBlocks before computeAvailability may transform them
+    const serviceBlocksByCar = {};
+    cars.forEach(c => {
+      serviceBlocksByCar[String(c._id)] = c.serviceBlocks || [];
+    });
+
     let carsWithAvailability = cars;
     if (Array.isArray(cars) && cars.length && typeof Car.computeAvailabilityForCars === "function") {
       try {
@@ -113,6 +119,15 @@ export const getCars = async (req, res, next) => {
     // if car.location is missing, copy company.location into car.location so client filtering works.
     const normalized = await Promise.all(carsWithAvailability.map(async (c) => {
       const car = { ...c };
+
+      // Defensively restore serviceBlocks if lost during computeAvailability
+      if (!car.serviceBlocks || !car.serviceBlocks.length) {
+        const origBlocks = serviceBlocksByCar[String(car._id)];
+        if (origBlocks && origBlocks.length) {
+          car.serviceBlocks = origBlocks;
+        }
+      }
+
       if (car.companyId) {
         const company = await Company.findById(car.companyId).select('name slug logo address location').lean();
         if (company) {
@@ -165,11 +180,18 @@ export const getCarById = async (req, res, next) => {
     const car = await Car.findById(id).lean();
     if (!car) return res.status(404).json({ message: "Car not found" });
 
+    // Save original serviceBlocks before computeAvailability may transform them
+    const originalServiceBlocks = car.serviceBlocks || [];
+
     let carWithAvailability = car;
     if (typeof Car.computeAvailabilityForCars === "function") {
       try {
         const arr = await Car.computeAvailabilityForCars([car]);
         carWithAvailability = arr && arr[0] ? arr[0] : car;
+        // Preserve serviceBlocks from the original car document — computeAvailabilityForCars may strip it
+        if (!carWithAvailability.serviceBlocks || !carWithAvailability.serviceBlocks.length) {
+          carWithAvailability.serviceBlocks = originalServiceBlocks;
+        }
       } catch (err) {
         console.warn("computeAvailabilityForCars failed for single car:", err);
       }

@@ -187,7 +187,7 @@ export const getHostCalendar = async (req, res) => {
       });
     }
 
-    const activeStatuses = ["active", "pending", "upcoming", "completed"];
+    const activeStatuses = ["awaiting_payment", "active", "pending", "upcoming", "completed"];
     const bookings = await Booking.find({
       "car.id": { $in: carIds },
       status: { $in: activeStatuses },

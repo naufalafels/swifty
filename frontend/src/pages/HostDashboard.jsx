@@ -202,7 +202,7 @@ const buildDayCarsAndToday = (bookings) => {
   const todayIso = format(now, "yyyy-MM-dd");
   const pickupsToday = [];
   const returnsToday = [];
-  const relevantStatuses = ["active", "pending", "upcoming", "completed"];
+  const relevantStatuses = ["awaiting_payment", "active", "pending", "upcoming", "completed"];
 
   bookings.forEach((b) => {
     const start = new Date(b.pickupDate);

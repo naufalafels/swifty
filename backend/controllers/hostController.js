@@ -129,7 +129,6 @@ export const createHostCar = async (req, res) => {
 };
 
 // Bookings for host-owned cars
-// BUG 1 FIX: Query by "car.id" (embedded car snapshot) instead of top-level "carId"
 export const getHostBookings = async (req, res) => {
   try {
     const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
@@ -174,12 +173,8 @@ export const updateHostBookingStatus = async (req, res) => {
 };
 
 // Host calendar (bookings + per-day car occupancy + holidays + verification meta)
-// BUG 1 FIX: Query by "car.id" instead of "carId"
-// BUG 2 FIX: Filter only relevant booking statuses so dayCars populates correctly
-// BUG 3 FIX: Fetch holidays dynamically via Nager.Date API
 export const getHostCalendar = async (req, res) => {
   try {
-    // BUG 3 FIX: Dynamically fetch holidays for current year + next year
     const currentYear = new Date().getFullYear();
     const holidays = await getMalaysiaHolidays([currentYear, currentYear + 1]);
 
@@ -192,8 +187,6 @@ export const getHostCalendar = async (req, res) => {
       });
     }
 
-    // BUG 1 FIX: Query "car.id" (the embedded ObjectId inside the car snapshot)
-    // BUG 2 FIX: Only include bookings with active/relevant statuses
     const activeStatuses = ["active", "pending", "upcoming", "completed"];
     const bookings = await Booking.find({
       "car.id": { $in: carIds },
@@ -207,6 +200,7 @@ export const getHostCalendar = async (req, res) => {
       (c.serviceBlocks || []).map((d) => ({
         date: d,
         car: `${c.make} ${c.model}`,
+        carId: String(c._id),
         type: "service",
       }))
     );
@@ -217,7 +211,6 @@ export const getHostCalendar = async (req, res) => {
       const start = new Date(b.pickupDate);
       const end = new Date(b.returnDate || b.pickupDate);
       const days = eachDayInclusive(start, end);
-      // BUG 1 FIX: b.car is an embedded object { id, make, model, ... }, not a populated ref
       const carName = b.car
         ? `${b.car.make || ""} ${b.car.model || ""}`.trim()
         : "Car";
@@ -242,7 +235,6 @@ export const getHostCalendar = async (req, res) => {
           status: b.status,
           verificationDocType: docType,
           verificationIdNumber: docId,
-          // Customer info for sidebar display
           customerName: b.customer || b.userId?.name || "Unknown",
           customerEmail: b.email || b.userId?.email || "",
           customerPhone: b.phone || b.userId?.phone || "",
@@ -280,7 +272,6 @@ export const getBookingCustomerDetail = async (req, res) => {
     const bookingId = asObjectId(req.params.bookingId);
     if (!bookingId) return res.status(400).json({ success: false, message: "Invalid booking id" });
 
-    // Verify this booking belongs to one of the host's cars
     const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
     const carIds = cars.map((c) => String(c._id));
 
@@ -296,11 +287,9 @@ export const getBookingCustomerDetail = async (req, res) => {
     const userKyc = user?.kyc || {};
     const bookingKyc = booking.kyc || {};
 
-    // Determine ID type and number (prefer user KYC, fallback to booking KYC)
     const idType = userKyc.idType || bookingKyc.idType || "N/A";
     const idCountry = userKyc.idCountry || bookingKyc.idCountry || "MY";
 
-    // Try to decrypt the ID number
     let idNumber = "N/A";
     const rawIdNumber = userKyc.idNumber || bookingKyc.idNumber || "";
     if (rawIdNumber) {
@@ -311,8 +300,6 @@ export const getBookingCustomerDetail = async (req, res) => {
       }
     }
 
-    // Generate signed URLs for KYC images
-    // Priority: user KYC images > booking KYC images
     const frontKey = userKyc.frontImageUrl || bookingKyc.frontImageUrl || "";
     const backKey = userKyc.backImageUrl || bookingKyc.backImageUrl || "";
 
@@ -371,7 +358,6 @@ export const getBookingCustomerDetail = async (req, res) => {
 };
 
 // Block selected car(s) for service (prevent blocking active booking days)
-// BUG 1 FIX: Query by "car.id" instead of "carId"
 export const blockServiceDates = async (req, res) => {
   try {
     const { carIds = [], dates = [] } = req.body || {};
@@ -381,7 +367,6 @@ export const blockServiceDates = async (req, res) => {
     const cleanDates = (dates || []).map((d) => String(d).slice(0, 10)).filter(Boolean);
     if (!cleanDates.length) return res.status(400).json({ success: false, message: "dates required" });
 
-    // fetch conflicting bookings
     const conflicts = await Booking.find({
       "car.id": { $in: carIds.map(asObjectId).filter(Boolean) },
       $or: cleanDates.map((d) => ({
@@ -413,6 +398,28 @@ export const blockServiceDates = async (req, res) => {
     return res.json({ success: true, data: { carIds, dates: cleanDates } });
   } catch (err) {
     console.error("blockServiceDates error", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// FIX 6: Unblock selected car(s) from service — remove specific dates from serviceBlocks
+// Use case: emergency cancellation or cancelled maintenance
+export const unblockServiceDates = async (req, res) => {
+  try {
+    const { carIds = [], dates = [] } = req.body || {};
+    if (!Array.isArray(carIds) || !carIds.length) {
+      return res.status(400).json({ success: false, message: "carIds required" });
+    }
+    const cleanDates = (dates || []).map((d) => String(d).slice(0, 10)).filter(Boolean);
+    if (!cleanDates.length) return res.status(400).json({ success: false, message: "dates required" });
+
+    await Car.updateMany(
+      { _id: { $in: carIds.map(asObjectId).filter(Boolean) } },
+      { $pull: { serviceBlocks: { $in: cleanDates } } }
+    );
+    return res.json({ success: true, data: { carIds, dates: cleanDates } });
+  } catch (err) {
+    console.error("unblockServiceDates error", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };

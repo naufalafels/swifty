@@ -30,6 +30,7 @@ import {
   getHostBookings,
   getHostCalendar,
   blockServiceDates,
+  unblockServiceDates,
   getFlexiblePricing,
   upsertFlexiblePricing,
   getBookingCustomerDetail,
@@ -406,7 +407,7 @@ const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlar
   );
 };
 
-/* ═══════════════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
+/* ════════��══════════════════ CALENDAR CSS — WHITE BACKGROUND ═══════════════════════════ */
 
 const CALENDAR_STYLES = `
   /* ── wrapper: white bg ── */
@@ -661,7 +662,6 @@ const HostDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [calendar, setCalendar] = useState(null);
   const [selectedCarIds, setSelectedCarIds] = useState([]);
-  // FIX 1: serviceDates is the source of truth for the service block date picker
   const [serviceDates, setServiceDates] = useState([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
   const [selectedRange, setSelectedRange] = useState([{ startDate: new Date(), endDate: addDays(new Date(), 1), key: "selection" }]);
   const [pricingByCar, setPricingByCar] = useState({});
@@ -746,14 +746,16 @@ const HostDashboard = () => {
     return m;
   }, [holidays]);
 
+  /* ── FIX 3: Quick find now searches by ID, make, or model ── */
   const filteredCars = useMemo(() => {
     if (!filter.trim()) return cars;
+    const q = filter.trim().toLowerCase();
     return cars.filter((c) =>
-      `${c.make} ${c.model}`.toLowerCase().includes(filter.trim().toLowerCase())
+      `${c.make} ${c.model}`.toLowerCase().includes(q) ||
+      String(c._id).toLowerCase().includes(q)
     );
   }, [cars, filter]);
 
-  // ─── FIX 1: Use serviceDates (not selectedRange) when blocking ───
   const handleBlockService = async () => {
     setServiceError("");
     try {
@@ -772,6 +774,31 @@ const HostDashboard = () => {
     } catch (err) {
       const msg = err?.response?.data?.message || "Failed to block service";
       setServiceError(msg);
+    }
+  };
+
+  /* ── FIX 6: Unblock service dates handler ── */
+  const handleUnblockService = async (carName, dates) => {
+    setServiceError("");
+    try {
+      const matchedCar = cars.find((c) => `${c.make} ${c.model}` === carName);
+      if (!matchedCar) {
+        setServiceError("Car not found for unblocking.");
+        return;
+      }
+      const isoDates = dates.map((d) => String(d).slice(0, 10));
+      await unblockServiceDates([matchedCar._id], isoDates);
+      // Refresh calendar
+      const updated = await getHostCalendar();
+      let calData = updated || {};
+      if (!calData.dayCars || !calData.today) {
+        const derived = buildDayCarsAndToday(bookings || []);
+        calData = { ...calData, ...derived };
+      }
+      setCalendar(calData);
+    } catch (err) {
+      console.error("Unblock service error", err);
+      setServiceError(err?.response?.data?.message || "Failed to unblock service dates.");
     }
   };
 
@@ -799,7 +826,6 @@ const HostDashboard = () => {
     const items = dayCars[isoStr] || [];
     const bookingEntries = items.map((c) => ({ ...c, __dateLabel: format(d, "dd/MM/yyyy"), __isoDate: isoStr }));
 
-    // FIX: Also include service block entries for this date
     const serviceBlocks = calendar?.serviceBlocks || [];
     const serviceEntries = serviceBlocks
       .filter((sb) => String(sb.date).slice(0, 10) === isoStr)
@@ -825,19 +851,19 @@ const HostDashboard = () => {
       .filter(Boolean);
   }, [selectedDates, holidayByDate]);
 
-  // ─── FIX 2 & 3: Derive data for selected cars in the service block ───
-
-  // Full car objects for selected IDs — used to render detail cards
+  // Full car objects for selected IDs
   const selectedCarsData = useMemo(
     () => cars.filter((c) => selectedCarIds.includes(c._id)),
     [cars, selectedCarIds]
   );
 
-  // FIX 3: Collect every date where a selected car already has a booking
-  // so we can disable those days on the service date picker
+  /* ── FIX 1: Collect every date where a selected car already has a booking OR an existing service block
+       so we can disable those days on the service date picker (prevent double-blocking) ── */
   const bookedDatesForSelectedCars = useMemo(() => {
     if (!selectedCarIds.length) return [];
     const dateSet = new Set();
+
+    // 1. Dates that have active bookings for selected cars
     Object.entries(dayCars).forEach(([isoDate, entries]) => {
       entries.forEach((entry) => {
         if (entry.carId && selectedCarIds.includes(entry.carId)) {
@@ -845,9 +871,22 @@ const HostDashboard = () => {
         }
       });
     });
+
+    // 2. Dates that are already service-blocked for selected cars
+    const serviceBlocks = calendar?.serviceBlocks || [];
+    serviceBlocks.forEach((sb) => {
+      const sbDate = String(sb.date).slice(0, 10);
+      const matchingCar = selectedCarsData.find(
+        (c) => `${c.make} ${c.model}` === sb.car
+      );
+      if (matchingCar) {
+        dateSet.add(sbDate);
+      }
+    });
+
     // Convert ISO strings to Date objects at noon to avoid timezone edge cases
     return Array.from(dateSet).map((iso) => new Date(`${iso}T12:00:00`));
-  }, [selectedCarIds, dayCars]);
+  }, [selectedCarIds, dayCars, calendar, selectedCarsData]);
 
   // Check if the current service date selection overlaps any booked date
   const serviceOverlapDates = useMemo(() => {
@@ -918,12 +957,17 @@ const HostDashboard = () => {
           <div className="flex items-center gap-2 text-slate-200">
             <FaSearch /> Quick find (20–40 cars)
           </div>
-          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by make/model"
+          {/* FIX 3: Search by ID, make, or model */}
+          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search by ID, make, or model"
             className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white" />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-auto pr-1">
             {filteredCars.map((c) => (
-              <div key={c._id} className="border border-slate-800 bg-slate-900 rounded-lg p-3 space-y-1">
+              <div key={c._id}
+                className="border border-slate-800 bg-slate-900 rounded-lg p-3 space-y-1 cursor-pointer hover:border-emerald-600 transition"
+                onClick={() => navigate(`/cars/${c._id}`)}>
                 <div className="text-sm font-semibold text-white">{c.make} {c.model}</div>
+                {/* FIX 3: Show Car ID in quick find */}
+                <div className="text-xs text-slate-500 font-mono">ID: {c._id.slice(-6).toUpperCase()}</div>
                 <div className="text-xs text-slate-400">{c.category} • {c.year}</div>
                 <div className="text-xs text-slate-400">RM {c.dailyRate} / day</div>
                 <div className="text-xs text-slate-400">Dep RM {c.deposit || 0}</div>
@@ -980,7 +1024,6 @@ const HostDashboard = () => {
                   const isWknd = isWeekend(date);
                   const hasBookings = carsOnDay.length > 0;
 
-                  // FIX: Check if any service block exists for this date
                   const serviceBlocks = calendar?.serviceBlocks || [];
                   const serviceBlocksOnDay = serviceBlocks.filter(
                     (sb) => String(sb.date).slice(0, 10) === isoDate
@@ -1043,7 +1086,7 @@ const HostDashboard = () => {
             </div>
           </div>
 
-          {/* ──── selected-day sidebar ──── */}
+          {/* ──── selected-day sidebar ─��── */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2 font-semibold">
               <FaList className="text-emerald-400" /> Selected day detail
@@ -1069,7 +1112,7 @@ const HostDashboard = () => {
                   </div>
                 )}
 
-                {/* ── Bookings + Service Blocks in selected range (grouped by day with dividers) ── */}
+                {/* ── Bookings + Service Blocks in selected range ── */}
                 {selectedRangeCars.length === 0 && (
                   <div className="text-sm text-slate-400">No cars booked or blocked in this range.</div>
                 )}
@@ -1091,21 +1134,66 @@ const HostDashboard = () => {
                             </div>
                           )}
 
-                          {/* FIX: Service block card — rendered differently from booking cards */}
+                          {/* FIX 4 + 6: Service block card — clickable with full details + unblock button */}
                           {c.__isServiceBlock ? (
-                            <div className="border border-orange-800/50 rounded-lg p-3 text-sm bg-orange-950/40">
+                            <div
+                              className="border border-orange-800/50 rounded-lg p-3 text-sm bg-orange-950/40 cursor-pointer hover:border-orange-600 transition"
+                              onClick={() => {
+                                const matchedCar = cars.find(
+                                  (car) => `${car.make} ${car.model}` === c.car
+                                );
+                                if (matchedCar) navigate(`/cars/${matchedCar._id}`);
+                              }}
+                            >
                               <div className="flex justify-between items-start gap-2">
                                 <span className="font-semibold text-orange-200 flex items-center gap-1.5">
                                   <FaWrench className="text-orange-400 shrink-0" /> {c.car}
                                 </span>
                                 <Pill tone="orange">service</Pill>
                               </div>
+                              {/* FIX 4: Full car details for service-blocked vehicle */}
+                              {(() => {
+                                const matchedCar = cars.find(
+                                  (car) => `${car.make} ${car.model}` === c.car
+                                );
+                                if (!matchedCar) return null;
+                                return (
+                                  <div className="mt-2 space-y-1 text-xs text-orange-200/70">
+                                    <div>ID: <span className="font-mono text-orange-300">{matchedCar._id.slice(-6).toUpperCase()}</span></div>
+                                    <div className="flex flex-wrap gap-2">
+                                      <span>{matchedCar.year}</span>
+                                      <span>·</span>
+                                      <span>{matchedCar.transmission}</span>
+                                      <span>·</span>
+                                      <span>{matchedCar.fuelType}</span>
+                                      <span>·</span>
+                                      <span>{matchedCar.seats} seats</span>
+                                    </div>
+                                    <div>RM {matchedCar.dailyRate}/day · Dep RM {matchedCar.deposit || 0}</div>
+                                    {matchedCar.mileage != null && <div>Mileage: {matchedCar.mileage} km</div>}
+                                  </div>
+                                );
+                              })()}
                               <div className="text-xs text-orange-300 mt-1 flex items-center gap-1.5">
                                 <FaFlag className="text-orange-500 shrink-0" /> Blocked for maintenance / service
                               </div>
                               <div className="text-xs text-slate-500 mt-1">
                                 {c.__dateLabel}
                               </div>
+                              {/* FIX 6: Unblock service button */}
+                              <button
+                                className="mt-2 text-xs bg-orange-700 hover:bg-orange-600 text-white rounded px-2 py-1 flex items-center gap-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(
+                                    `⚠️ Unblock "${c.car}" on ${c.__dateLabel}?\n\nWe wouldn't advise this for cars exceeding their service mileage.`
+                                  )) {
+                                    handleUnblockService(c.car, [c.__isoDate]);
+                                  }
+                                }}
+                              >
+                                <FaTimes className="text-xs" /> Unblock service
+                              </button>
                             </div>
                           ) : (
                             /* Booking card (existing) */
@@ -1126,7 +1214,7 @@ const HostDashboard = () => {
                                 <FaList className="text-slate-500 shrink-0" /> Booking #{c.bookingId}
                               </div>
 
-                              {/* Identification — only show if doc type exists */}
+                              {/* Identification */}
                               {c.verificationDocType && (
                                 <div className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
                                   <FaIdCard className="text-sky-400 shrink-0" />
@@ -1170,18 +1258,18 @@ const HostDashboard = () => {
             {/* ── Step 1: Select cars ── */}
             <div className="space-y-2">
               <div className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Step 1 — Select cars</div>
+              {/* FIX 2: Car ID included in label and searchable by ID */}
               <PredictiveMultiSelect
                 options={cars.map((c) => ({
                   value: c._id,
-                  // FIX 2: Richer label includes year so host can distinguish duplicates
-                  label: `${c.make} ${c.model}${c.year ? ` (${c.year})` : ""}${c.plateNumber ? ` · ${c.plateNumber}` : ""}`,
+                  label: `${c._id.slice(-6).toUpperCase()} — ${c.make} ${c.model}${c.year ? ` (${c.year})` : ""}${c.plateNumber ? ` · ${c.plateNumber}` : ""}`,
                 }))}
                 value={selectedCarIds}
                 onChange={setSelectedCarIds}
               />
             </div>
 
-            {/* FIX 2: Car detail cards for each selected car ── */}
+            {/* Car detail cards for each selected car */}
             {selectedCarsData.length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Selected car details</div>
@@ -1197,6 +1285,8 @@ const HostDashboard = () => {
                           {c.make} {c.model}
                           {c.year && <span className="text-slate-400 font-normal">({c.year})</span>}
                         </div>
+                        {/* FIX 2: Show Car ID in selected car details */}
+                        <div className="text-xs text-amber-300 font-mono mt-0.5">ID: {c._id.slice(-6).toUpperCase()}</div>
                         {c.plateNumber && (
                           <div className="text-xs text-amber-300 font-mono mt-0.5">{c.plateNumber}</div>
                         )}
@@ -1227,12 +1317,11 @@ const HostDashboard = () => {
             <div className="space-y-2">
               <div className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Step 2 — Pick service dates</div>
 
-              {/* FIX 3: Legend for the service calendar */}
               {selectedCarIds.length > 0 && (
                 <div className="flex flex-wrap gap-3 text-xs text-slate-400">
                   <span className="flex items-center gap-1">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-rose-400"></span>
-                    Booked — cannot block
+                    Booked / already blocked — cannot block
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"></span>
@@ -1241,7 +1330,6 @@ const HostDashboard = () => {
                 </div>
               )}
 
-              {/* FIX 3: Service DateRange now disables booked dates for selected cars */}
               <div className="service-calendar">
                 <DateRange
                   onChange={(item) => setServiceDates([item.selection])}
@@ -1255,7 +1343,6 @@ const HostDashboard = () => {
               </div>
             </div>
 
-            {/* FIX 3: Overlap warning ── */}
             {serviceOverlapDates.length > 0 && (
               <div className="bg-rose-950/60 border border-rose-700/50 rounded-lg px-3 py-2 flex items-start gap-2 text-xs text-rose-300">
                 <FaExclamationTriangle className="text-rose-400 shrink-0 mt-0.5" />
@@ -1357,12 +1444,16 @@ const StatCard = ({ title, value, icon, tone = "slate" }) => {
 };
 
 /* ───────────────────────── PredictiveMultiSelect ───────────────────────── */
+/* FIX 2: Filter also matches by full car _id value */
 
 const PredictiveMultiSelect = ({ options, value, onChange }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const filtered = useMemo(
-    () => options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase())),
+    () => options.filter((o) => {
+      const q = query.toLowerCase();
+      return o.label.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q);
+    }),
     [options, query]
   );
   const toggle = (val) => {
@@ -1380,7 +1471,7 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
       </button>
       {open && (
         <div className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-800 rounded-lg shadow-lg">
-          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type to filter by make, model, plate…"
+          <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type to filter by ID, make, model, plate…"
             className="w-full bg-slate-800 border-b border-slate-800 px-3 py-2 text-sm text-white" />
           <div className="max-h-48 overflow-auto">
             {filtered.map((opt) => (
@@ -1401,7 +1492,7 @@ const PredictiveMultiSelect = ({ options, value, onChange }) => {
   );
 };
 
-/* ───────────────────────── eachDay helper ───────────────────────── */
+/* ─��─────────────────────── eachDay helper ───────────────────────── */
 
 const eachDay = (start, end) => {
   const days = [];

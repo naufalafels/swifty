@@ -126,16 +126,11 @@ const CarDetail = () => {
   const currentUser = authService.getCurrentUser();
   const emailPrefill = currentUser?.email || "";
 
-  // --- FIX: Use a stable primitive (user ID string) as dependency
-  // instead of the currentUser object which creates a new reference each render ---
   const currentUserId = currentUser?.id || currentUser?._id || null;
 
-  // --- Track whether user's KYC is already approved ---
   const [userKycApproved, setUserKycApproved] = useState(false);
   const [kycCheckDone, setKycCheckDone] = useState(false);
 
-  // --- FIX: Stable dependency [currentUserId] prevents infinite re-renders.
-  // Also try multiple API paths to handle different route configurations. ---
   useEffect(() => {
     if (!currentUserId) {
       setKycCheckDone(true);
@@ -144,7 +139,6 @@ const CarDetail = () => {
     let cancelled = false;
 
     const checkKyc = async () => {
-      // Try the primary endpoint first, fall back to alternative if it fails
       const endpoints = ['/api/user/me', '/api/auth/me'];
       for (const endpoint of endpoints) {
         try {
@@ -155,16 +149,14 @@ const CarDetail = () => {
             setUserKycApproved(true);
           }
           setKycCheckDone(true);
-          return; // success — stop trying endpoints
+          return;
         } catch (err) {
-          // If 404, try next endpoint; otherwise stop
           if (err?.response?.status !== 404) {
             if (!cancelled) setKycCheckDone(true);
             return;
           }
         }
       }
-      // All endpoints failed
       if (!cancelled) setKycCheckDone(true);
     };
 
@@ -191,7 +183,6 @@ const CarDetail = () => {
   const [locationQuery, setLocationQuery] = useState("");
   const searchBoxRef = useRef(null);
 
-  // Date-range picker state
   const [range, setRange] = useState([
     {
       startDate: initialPickup ? new Date(initialPickup) : new Date(),
@@ -200,11 +191,12 @@ const CarDetail = () => {
     },
   ]);
   const [disabledDates, setDisabledDates] = useState([]);
+  // FIX 5: Track which disabled dates are service blocks vs bookings
+  const [serviceBlockedDates, setServiceBlockedDates] = useState(new Set());
 
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
 
-  // Updated: Use car.deposit if available, else fallback to 500
   const deposit = car?.deposit || 500;
   const emailReadOnly = !!emailPrefill;
 
@@ -214,14 +206,12 @@ const CarDetail = () => {
   const submitControllerRef = useRef(null);
   const [today, setToday] = useState(todayISO());
 
-  // Messaging state
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messagingError, setMessagingError] = useState("");
 
-  // Terms & Conditions state
   const [termsOpen, setTermsOpen] = useState(false);
   const [termsLoading, setTermsLoading] = useState(false);
   const [termsError, setTermsError] = useState("");
@@ -270,14 +260,13 @@ const CarDetail = () => {
     };
   }, [id]);
 
-    // Load availability and build disabled dates for the date-range picker (inclusive of return day)
-  // FIX: Also fetch car.serviceBlocks and merge into disabled dates
+  // Load availability and build disabled dates for the date-range picker (inclusive of return day)
+  // FIX 5: Also fetch car.serviceBlocks and track them separately for visual distinction
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
     (async () => {
       try {
-        // Fetch bookings AND car data (for serviceBlocks) in parallel
         const [bookingsRes, carRes] = await Promise.all([
           api.get("/api/bookings", {
             params: { car: id, limit: 200 },
@@ -288,6 +277,7 @@ const CarDetail = () => {
 
         const bookings = bookingsRes.data?.data || [];
         const disabled = [];
+        const serviceDatesSet = new Set();
 
         // Add booking dates
         bookings
@@ -296,20 +286,23 @@ const CarDetail = () => {
             disabled.push(...bookingDaysInclusive(b.pickupDate, b.returnDate));
           });
 
-        // FIX: Add service-blocked dates from car.serviceBlocks
+        // FIX 5: Add service-blocked dates from car.serviceBlocks and track them
         const carData = carRes.data?.data ?? carRes.data ?? null;
         if (carData?.serviceBlocks?.length) {
           carData.serviceBlocks.forEach((d) => {
             const parsed = toLocalDateOnlyMidday(d);
-            if (parsed) disabled.push(parsed);
+            if (parsed) {
+              disabled.push(parsed);
+              serviceDatesSet.add(format(parsed, "yyyy-MM-dd"));
+            }
           });
         }
 
-        // de-duplicate to keep the picker stable
         const deduped = Array.from(
           new Map(disabled.map((d) => [d.toDateString(), d])).values()
         );
         setDisabledDates(deduped);
+        setServiceBlockedDates(serviceDatesSet);
       } catch (err) {
         const canceled = err?.code === "ERR_CANCELED" || err?.name === "CanceledError" || err?.message === "canceled";
         if (!canceled) console.warn("Failed to load availability", err);
@@ -320,7 +313,6 @@ const CarDetail = () => {
     };
   }, [id]);
 
-  // --- FIX: Use stable carId primitive for socket dependency instead of full car object ---
   const carId = car?._id || car?.id || null;
 
   useEffect(() => {
@@ -409,7 +401,6 @@ const CarDetail = () => {
   };
   const closeTerms = () => setTermsOpen(false);
 
-  // Sync form dates when range changes (use format to avoid TZ drift)
   const onRangeChange = (ranges) => {
     const sel = ranges.selection;
     setRange([sel]);
@@ -488,7 +479,6 @@ const CarDetail = () => {
       return;
     }
 
-    // --- FIX: Only require KYC fields if user is NOT already approved ---
     if (!userKycApproved) {
       if (!formData.idCountry) {
         toast.error("Please provide your ID issuing country.");
@@ -549,7 +539,6 @@ const CarDetail = () => {
         companyName: car.company?.name || car.companyName || "",
       }));
 
-      // --- FIX: Send kycFromProfile flag if approved, otherwise upload files ---
       if (userKycApproved) {
         form.append("kycFromProfile", "true");
       } else {
@@ -560,7 +549,6 @@ const CarDetail = () => {
         form.append("kycBack", backFile);
       }
 
-      // --- Create Xendit Invoice and redirect to payment page ---
       const res = await createXenditInvoice(form);
 
       if (!res?.invoiceUrl || !res?.bookingId) {
@@ -568,13 +556,8 @@ const CarDetail = () => {
         return;
       }
 
-      // Store bookingId so we can clean up if user returns without paying
       sessionStorage.setItem("pendingBookingId", res.bookingId);
 
-      // Redirect to Xendit's hosted payment page
-      // User pays there (FPX, card, eWallet, etc.)
-      // After payment: Xendit redirects user back to /success or /cancel
-      // Xendit sends webhook to backend to confirm payment server-to-server
       toast.info("Redirecting to payment page...", { autoClose: 1500 });
       setTimeout(() => {
         window.location.href = res.invoiceUrl;
@@ -596,7 +579,6 @@ const CarDetail = () => {
   };
 
   const transmissionLabel = car.transmission ? String(car.transmission).toLowerCase() : "standard";
-  // Updated: Prioritize car.companyName, then fallbacks
   const companyName = car.companyId?.hostProfile?.companyName || car.companyId?.name || car.companyName || "Unknown Company";
   const companyAddress = (() => {
     const addr = car.company?.address || {};
@@ -708,6 +690,7 @@ const CarDetail = () => {
                   <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
                     <FaCalendarAlt /> <span>Select dates</span>
                   </div>
+                  {/* FIX 5: dayContentRenderer visually marks maintenance-blocked dates with 🔧 */}
                   <DateRange
                     ranges={range}
                     onChange={onRangeChange}
@@ -717,6 +700,30 @@ const CarDetail = () => {
                     months={1}
                     showDateDisplay={false}
                     disabledDates={disabledDates}
+                    dayContentRenderer={(date) => {
+                      const isoStr = format(date, "yyyy-MM-dd");
+                      const isServiceBlocked = serviceBlockedDates.has(isoStr);
+                      return (
+                        <div style={{ position: "relative" }}>
+                          <span>{date.getDate()}</span>
+                          {isServiceBlocked && (
+                            <span
+                              title="Blocked for maintenance"
+                              style={{
+                                position: "absolute",
+                                bottom: -2,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                fontSize: "7px",
+                                color: "#f59e0b",
+                              }}
+                            >
+                              🔧
+                            </span>
+                          )}
+                        </div>
+                      );
+                    }}
                   />
                 </div>
 
@@ -865,8 +872,6 @@ const CarDetail = () => {
                   </div>
                 </div>
 
-                {/* --- FIX: Show verified badge OR KYC form based on actual KYC status ---
-                     Wait for kycCheckDone to avoid flashing KYC form before check completes */}
                 {!kycCheckDone && currentUserId ? (
                   <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
                     <div className="flex items-center gap-2">
@@ -941,8 +946,6 @@ const CarDetail = () => {
                         <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
                         <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
                           <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                          {/* FIX: Removed required — handleSubmit validates this instead,
-                               preventing browser-level blocking if KYC check completes late */}
                           <input
                             type="file"
                             accept="image/*"
@@ -958,7 +961,6 @@ const CarDetail = () => {
                         <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
                         <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
                           <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                          {/* FIX: Removed required — handleSubmit validates this instead */}
                           <input
                             type="file"
                             accept="image/*"

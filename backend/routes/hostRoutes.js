@@ -10,6 +10,7 @@ import {
   updateHostBookingStatus,
   getHostCalendar,
   blockServiceDates,
+  unblockServiceDates,
   getFlexiblePricing,
   upsertFlexiblePricing,
   getBookingCustomerDetail
@@ -47,6 +48,7 @@ router.patch("/bookings/:id/status", updateHostBookingStatus);
 // Calendar + service blocks
 router.get("/calendar", getHostCalendar);
 router.post("/calendar/block", blockServiceDates);
+router.post("/calendar/unblock", unblockServiceDates);
 
 // Flexible pricing
 router.get("/pricing/:carId", getFlexiblePricing);

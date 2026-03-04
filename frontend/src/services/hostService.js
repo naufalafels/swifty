@@ -32,6 +32,12 @@ export const blockServiceDates = async (carIds, dates) => {
   return res.data?.data;
 };
 
+// FIX 6: Unblock car(s) from service
+export const unblockServiceDates = async (carIds, dates) => {
+  const res = await api.post("/api/host/calendar/unblock", { carIds, dates });
+  return res.data?.data;
+};
+
 // Flexible pricing
 export const getFlexiblePricing = async (carId) => {
   const res = await api.get(`/api/host/pricing/${carId}`);

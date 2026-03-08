@@ -18,17 +18,41 @@ const PaymentResultPage = () => {
   const [booking, setBooking] = useState(null);
 
   useEffect(() => {
-    if (!bookingId) return;
+  if (!bookingId) return;
+  let attempts = 0;
+  const maxAttempts = 15; // 15 × 2s = 30 seconds max
+  let timer;
+  let cancelled = false;
+
+  const poll = async () => {
+    if (cancelled) return;
     setLoading(true);
-    setError("");
-    api
-      .get(`/api/bookings/${bookingId}`)
-      .then((res) => setBooking(res.data?.data || null))
-      .catch((err) => {
-        setError(err?.response?.data?.message || "Failed to load booking details.");
-      })
-      .finally(() => setLoading(false));
-  }, [bookingId]);
+    try {
+      const res = await api.get(`/api/bookings/${bookingId}`);
+      const data = res.data?.data || null;
+      setBooking(data);
+
+      // If payment is confirmed OR we've exhausted retries, stop polling
+      if (data?.paymentStatus === 'paid' || data?.status !== 'awaiting_payment' || attempts >= maxAttempts) {
+        setLoading(false);
+        return;
+      }
+
+      attempts++;
+      timer = setTimeout(poll, 2000);
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to load booking details.");
+      setLoading(false);
+    }
+  };
+
+  poll();
+
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+  };
+}, [bookingId]);
 
   const isSuccess = paymentStatus === "success";
   const isCancelled = paymentStatus === "cancelled";

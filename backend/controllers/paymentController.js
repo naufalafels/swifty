@@ -363,6 +363,166 @@ export const createXenditInvoice = async (req, res) => {
 };
 
 /**
+ * Verify payment status by proactively checking Xendit.
+ *
+ * Solves the race condition where the user is redirected back to the frontend
+ * BEFORE the Xendit webhook has arrived and updated the booking in the DB.
+ *
+ * Flow:
+ * 1. Look up the booking in the DB
+ * 2. If already updated (paymentStatus !== 'pending'), return it immediately
+ * 3. If still 'awaiting_payment', call Xendit GET /v2/invoices/:invoiceId
+ * 4. If Xendit says PAID/SETTLED, run the same update logic as the webhook
+ * 5. Return the (now-updated) booking
+ */
+export const verifyPaymentStatus = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ success: false, message: 'Invalid bookingId' });
+    }
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    // If the webhook already processed this booking, return immediately
+    if (booking.paymentStatus === 'paid' || booking.status !== 'awaiting_payment') {
+      return res.json({
+        success: true,
+        booking,
+        source: 'database',
+      });
+    }
+
+    // Booking is still awaiting_payment — proactively check Xendit
+    const xenditInvoiceId = booking.xenditInvoiceId;
+    if (!xenditInvoiceId) {
+      // No invoice ID stored yet — can't check Xendit, return current state
+      return res.json({
+        success: true,
+        booking,
+        source: 'database',
+        message: 'No Xendit invoice ID on booking yet — webhook may still be pending',
+      });
+    }
+
+    let xenditInvoice;
+    try {
+      xenditInvoice = await xenditRequest(`/v2/invoices/${xenditInvoiceId}`, 'GET');
+    } catch (e) {
+      console.warn('verifyPaymentStatus: failed to fetch Xendit invoice', e?.message || e);
+      // Can't reach Xendit — return current DB state
+      return res.json({
+        success: true,
+        booking,
+        source: 'database',
+        message: 'Could not verify with Xendit — returning database state',
+      });
+    }
+
+    const xenditStatus = (xenditInvoice.status || '').toUpperCase();
+
+    // If Xendit says PAID or SETTLED, update the booking now
+    if (xenditStatus === 'PAID' || xenditStatus === 'SETTLED') {
+      // Double-check: if another request or the webhook already updated it, skip
+      const freshBooking = await Booking.findById(bookingId);
+      if (freshBooking.paymentStatus === 'paid' || freshBooking.status !== 'awaiting_payment') {
+        return res.json({
+          success: true,
+          booking: freshBooking,
+          source: 'database',
+        });
+      }
+
+      // --- FIRST-PAY-FIRST-SERVE: same conflict check as webhook ---
+      const conflict = await Booking.findOne({
+        _id: { $ne: freshBooking._id },
+        "car.id": freshBooking.car.id,
+        status: { $in: BLOCKING_STATUSES },
+        pickupDate: { $lte: freshBooking.returnDate },
+        returnDate: { $gte: freshBooking.pickupDate },
+      }).lean();
+
+      if (conflict) {
+        freshBooking.status = 'cancelled';
+        freshBooking.paymentStatus = 'refunded';
+        freshBooking.xenditPaymentId = xenditInvoice.payment_id || '';
+        freshBooking.xenditPaymentMethod = xenditInvoice.payment_method || '';
+        freshBooking.xenditPaymentChannel = xenditInvoice.payment_channel || '';
+        await freshBooking.save();
+
+        return res.json({
+          success: true,
+          booking: freshBooking,
+          source: 'xendit_verify',
+          message: 'Conflict detected — booking cancelled and refund initiated',
+        });
+      }
+
+      // --- No conflict — update booking as paid ---
+      const postStatus = computePostPaymentStatus(freshBooking.pickupDate);
+
+      freshBooking.paymentStatus = 'paid';
+      freshBooking.status = postStatus;
+      freshBooking.xenditPaymentId = xenditInvoice.payment_id || '';
+      freshBooking.xenditPaymentMethod = xenditInvoice.payment_method || '';
+      freshBooking.xenditPaymentChannel = xenditInvoice.payment_channel || '';
+      await freshBooking.save();
+
+      // Update car bookings array and car status
+      const carId = freshBooking.car?.id;
+      if (carId) {
+        await Car.updateOne(
+          { _id: carId, "bookings.bookingId": { $ne: freshBooking._id } },
+          { $push: { bookings: { bookingId: freshBooking._id, pickupDate: freshBooking.pickupDate, returnDate: freshBooking.returnDate, status: postStatus } } }
+        ).catch(() => {});
+        await Car.updateOne(
+          { _id: carId, "bookings.bookingId": freshBooking._id },
+          { $set: { "bookings.$.status": postStatus, "bookings.$.pickupDate": freshBooking.pickupDate, "bookings.$.returnDate": freshBooking.returnDate } }
+        ).catch(() => {});
+        await updateCarStatusBasedOnBookings(carId);
+      }
+
+      console.log(`verifyPaymentStatus: Booking ${bookingId} confirmed paid via Xendit check — status: ${postStatus}`);
+
+      return res.json({
+        success: true,
+        booking: freshBooking,
+        source: 'xendit_verify',
+      });
+    }
+
+    // Xendit says EXPIRED
+    if (xenditStatus === 'EXPIRED') {
+      if (booking.status === 'awaiting_payment') {
+        booking.status = 'cancelled';
+        booking.paymentStatus = 'expired';
+        await booking.save();
+      }
+      return res.json({
+        success: true,
+        booking,
+        source: 'xendit_verify',
+      });
+    }
+
+    // Xendit says PENDING or something else — return current state
+    return res.json({
+      success: true,
+      booking,
+      source: 'xendit_verify',
+      xenditStatus,
+      message: 'Payment not yet confirmed by Xendit',
+    });
+  } catch (error) {
+    console.error('verifyPaymentStatus error', error?.stack || error);
+    return res.status(500).json({ success: false, message: 'Failed to verify payment status', error: String(error?.message || error) });
+  }
+};
+
+/**
  * Mark payment failure explicitly to unblock availability.
  * Called when user abandons the Xendit payment page without paying.
  * Kept from the original — logic is gateway-agnostic.

@@ -5,9 +5,13 @@ export function startStaleBookingCleanup() {
     try {
       const cutoff = new Date(Date.now() - 30 * 60 * 1000); // 30 min old
       const result = await Booking.updateMany(
-        { status: 'awaiting_payment', bookingDate: { $lte: cutoff } },
+        { 
+          status: 'awaiting_payment', 
+          paymentStatus: { $in: ['pending'] },  // ← Don't cancel if already 'paid'
+          bookingDate: { $lte: cutoff } 
+        },
         { status: 'cancelled', paymentStatus: 'expired' }
-      );
+      ) ;
       if (result.modifiedCount > 0) {
         console.log(`Cleaned up ${result.modifiedCount} stale awaiting_payment bookings`);
       }

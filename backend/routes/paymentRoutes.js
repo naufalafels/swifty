@@ -2,6 +2,7 @@ import express from 'express';
 import {
   createXenditInvoice,
   markPaymentFailed,
+  verifyPaymentStatus,
 } from '../controllers/paymentController.js';
 import { xenditWebhookHandler } from '../controllers/webhookController.js';
 import { uploads } from '../middlewares/uploads.js';
@@ -21,6 +22,10 @@ paymentRouter.post(
 // Xendit webhook — receives payment confirmation from Xendit servers
 // Uses standard JSON body (no express.raw needed like Razorpay)
 paymentRouter.post('/xendit/webhook', xenditWebhookHandler);
+
+// Verify payment status — proactively checks Xendit when webhook hasn't arrived yet
+// Called by the frontend PaymentResultPage to resolve the race condition
+paymentRouter.get('/xendit/verify/:bookingId', verifyPaymentStatus);
 
 // Mark payment as failed (when user abandons payment page)
 paymentRouter.post('/xendit/failed', markPaymentFailed);

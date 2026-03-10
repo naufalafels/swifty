@@ -20,7 +20,8 @@ const PaymentResultPage = () => {
   useEffect(() => {
   if (!bookingId) return;
   let attempts = 0;
-  const maxAttempts = 15; // 15 × 2s = 30 seconds max
+  const maxAttempts = 8;
+  const delays = [0, 2000, 3000, 3000, 5000, 5000, 5000, 5000];
   let timer;
   let cancelled = false;
 
@@ -28,18 +29,17 @@ const PaymentResultPage = () => {
     if (cancelled) return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/bookings/${bookingId}`);
-      const data = res.data?.data || null;
+      const res = await api.get(`/api/payment/xendit/verify/${bookingId}`);
+      const data = res.data?.booking || null;
       setBooking(data);
 
-      // If payment is confirmed OR we've exhausted retries, stop polling
       if (data?.paymentStatus === 'paid' || data?.status !== 'awaiting_payment' || attempts >= maxAttempts) {
         setLoading(false);
         return;
       }
 
       attempts++;
-      timer = setTimeout(poll, 2000);
+      timer = setTimeout(poll, delays[attempts] || 5000);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load booking details.");
       setLoading(false);

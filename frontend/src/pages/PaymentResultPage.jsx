@@ -29,7 +29,8 @@ const PaymentResultPage = () => {
     if (cancelled) return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/payment/xendit/verify/${bookingId}`);
+      // ✅ FIXED: /api/payments (plural) matches server.js mount point
+      const res = await api.get(`/api/payments/xendit/verify/${bookingId}`);
       const data = res.data?.booking || null;
       setBooking(data);
 

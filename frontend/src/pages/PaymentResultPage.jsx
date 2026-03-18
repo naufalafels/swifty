@@ -17,46 +17,53 @@ const PaymentResultPage = () => {
   const [error, setError] = useState("");
   const [booking, setBooking] = useState(null);
 
+  // ✅ FIX Bug #2: On failure/cancel, immediately tell backend to clean up
   useEffect(() => {
-  if (!bookingId) return;
-  let attempts = 0;
-  const maxAttempts = 8;
-  const delays = [0, 2000, 3000, 3000, 5000, 5000, 5000, 5000];
-  let timer;
-  let cancelled = false;
-
-  const poll = async () => {
-    if (cancelled) return;
-    setLoading(true);
-    try {
-      // ✅ FIXED: /api/payments (plural) matches server.js mount point
-      const res = await api.get(`/api/payments/xendit/verify/${bookingId}`);
-      const data = res.data?.booking || null;
-      setBooking(data);
-
-      if (data?.paymentStatus === 'paid' || data?.status !== 'awaiting_payment' || attempts >= maxAttempts) {
-        setLoading(false);
-        return;
-      }
-
-      attempts++;
-      timer = setTimeout(poll, delays[attempts] || 5000);
-    } catch (err) {
-      setError(err?.response?.data?.message || "Failed to load booking details.");
-      setLoading(false);
+    if ((paymentStatus === 'failed' || paymentStatus === 'cancelled') && bookingId) {
+      api.post('/api/payments/xendit/failed', { bookingId }).catch(() => {});
     }
-  };
+  }, [paymentStatus, bookingId]);
 
-  poll();
+  useEffect(() => {
+    if (!bookingId) return;
+    let attempts = 0;
+    const maxAttempts = 8;
+    const delays = [0, 2000, 3000, 3000, 5000, 5000, 5000, 5000];
+    let timer;
+    let cancelled = false;
 
-  return () => {
-    cancelled = true;
-    clearTimeout(timer);
-  };
-}, [bookingId]);
+    const poll = async () => {
+      if (cancelled) return;
+      setLoading(true);
+      try {
+        const res = await api.get(`/api/payments/xendit/verify/${bookingId}`);
+        const data = res.data?.booking || null;
+        setBooking(data);
+
+        if (data?.paymentStatus === 'paid' || data?.status !== 'awaiting_payment' || attempts >= maxAttempts) {
+          setLoading(false);
+          return;
+        }
+
+        attempts++;
+        timer = setTimeout(poll, delays[attempts] || 5000);
+      } catch (err) {
+        setError(err?.response?.data?.message || "Failed to load booking details.");
+        setLoading(false);
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [bookingId]);
 
   const isSuccess = paymentStatus === "success";
-  const isCancelled = paymentStatus === "cancelled";
+  // ✅ FIX Bug #1: Check both "cancelled" AND "failed"
+  const isCancelled = paymentStatus === "cancelled" || paymentStatus === "failed";
 
   const deposit = booking?.paymentBreakdown?.deposit ?? 0;
   const paid = booking?.amount ?? 0;

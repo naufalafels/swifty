@@ -12,6 +12,7 @@ import {
   FaBuilding,
   FaCheck,
   FaMapPin,
+  FaInfoCircle,
 } from "react-icons/fa";
 import axios from "axios";
 import { carPageStyles } from "../assets/dummyStyles.js";
@@ -27,6 +28,74 @@ const daysBetween = (from, to) => Math.ceil((startOfDay(to) - startOfDay(from)) 
 
 const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury"];
 const DEFAULT_SEATS = [2, 4, 5, 7];
+
+// ─── Flexible pricing helpers ───
+const getFlexPricing = (car) => car?.flexiblePricing || {
+  baseDailyRate: Number(car?.dailyRate) || 0,
+  baseDeposit: Number(car?.deposit) || 500,
+  weekendMultiplier: 1,
+  depositWeekendMultiplier: 1,
+  peakMultipliers: [],
+};
+
+const hasFlexibleMultipliers = (fp) => {
+  return (Number(fp.weekendMultiplier) || 1) > 1 ||
+    (Array.isArray(fp.peakMultipliers) && fp.peakMultipliers.length > 0);
+};
+
+const computeDayRate = (fp, dateStr) => {
+  const baseRate = Number(fp.baseDailyRate) || 0;
+  const weekendMul = Number(fp.weekendMultiplier) || 1;
+  const peakMultipliers = Array.isArray(fp.peakMultipliers) ? fp.peakMultipliers : [];
+  let mul = 1;
+  const d = new Date(dateStr);
+  const dayOfWeek = d.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) mul = weekendMul;
+  for (const peak of peakMultipliers) {
+    if (peak.start && peak.end && dateStr >= peak.start && dateStr <= peak.end) {
+      mul = Math.max(mul, Number(peak.multiplier) || 1);
+    }
+  }
+  return Math.round(baseRate * mul * 100) / 100;
+};
+
+const computeTotalRent = (fp, fallbackDailyRate, pickupDate, returnDate, days) => {
+  if (!pickupDate || !returnDate) {
+    return Number(fp.baseDailyRate) || Number(fallbackDailyRate) || 0;
+  }
+  let total = 0;
+  const start = new Date(pickupDate);
+  for (let i = 0; i < days; i++) {
+    const cur = new Date(start);
+    cur.setDate(cur.getDate() + i);
+    total += computeDayRate(fp, cur.toISOString().slice(0, 10));
+  }
+  return Math.round(total * 100) / 100;
+};
+
+const computeDepositMultiplier = (fp, pickupDate, returnDate, days) => {
+  const depWeekendMul = Number(fp.depositWeekendMultiplier) || 1;
+  const peakMultipliers = Array.isArray(fp.peakMultipliers) ? fp.peakMultipliers : [];
+  let maxMul = 1;
+  if (pickupDate && returnDate) {
+    const start = new Date(pickupDate);
+    for (let i = 0; i < days; i++) {
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() + i);
+      const isoStr = cur.toISOString().slice(0, 10);
+      const dayOfWeek = cur.getDay();
+      let mul = 1;
+      if (dayOfWeek === 0 || dayOfWeek === 6) mul = depWeekendMul;
+      for (const peak of peakMultipliers) {
+        if (peak.start && peak.end && isoStr >= peak.start && isoStr <= peak.end) {
+          mul = Math.max(mul, Number(peak.depositMultiplier) || 1);
+        }
+      }
+      maxMul = Math.max(maxMul, mul);
+    }
+  }
+  return maxMul;
+};
 
 const Cars = () => {
   const navigate = useNavigate();
@@ -381,7 +450,7 @@ const Cars = () => {
       car.companyId?.address?.stateName,
       car.state,
       car.companyId?.state,
-      car.companyId?.hostProfile?.address?.state,  // Fallback for host cars
+      car.companyId?.hostProfile?.address?.state,
       car.companyId?.hostProfile?.address?.region,
       car.companyId?.hostProfile?.address?.stateName,
     ]
@@ -400,7 +469,7 @@ const Cars = () => {
       car.city,
       car.pickupLocation,
       car.locationName,
-      car.companyId?.hostProfile?.address?.city,  // Fallback for host cars
+      car.companyId?.hostProfile?.address?.city,
       car.companyId?.hostProfile?.address?.cityName,
     ]
       .filter(Boolean)
@@ -474,6 +543,13 @@ const Cars = () => {
   );
 
   const hasDateFilter = Boolean(pickupDate && returnDate);
+
+  // ─── Compute days for flexible pricing when date filters are set ───
+  const filterDays = useMemo(() => {
+    if (!pickupDate || !returnDate) return 0;
+    const d = Math.ceil((new Date(returnDate) - new Date(pickupDate)) / MS_PER_DAY);
+    return Math.max(1, d);
+  }, [pickupDate, returnDate]);
 
   const filteredCars = useMemo(() => {
     const reqPickup = pickupDate ? startOfDay(new Date(pickupDate)) : null;
@@ -673,6 +749,35 @@ const Cars = () => {
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
+  // ─── Helper: compute display price for a car card ───
+  const getDisplayPrice = (car) => {
+    const fp = getFlexPricing(car);
+    const basePrice = Number(fp.baseDailyRate) || Number(car.dailyRate) || 0;
+    const isFlex = hasFlexibleMultipliers(fp);
+
+    // If the user has selected dates, compute the average daily rate for that range
+    if (hasDateFilter && filterDays > 0) {
+      const total = computeTotalRent(fp, car.dailyRate, pickupDate, returnDate, filterDays);
+      const avg = Math.round(total / filterDays * 100) / 100;
+      return { price: avg, isFlex, hasDateRange: true, totalRent: total, days: filterDays };
+    }
+
+    return { price: basePrice, isFlex, hasDateRange: false, totalRent: 0, days: 0 };
+  };
+
+  // ─── Helper: compute display deposit for a car card ───
+  const getDisplayDeposit = (car) => {
+    const fp = getFlexPricing(car);
+    const baseDeposit = Number(fp.baseDeposit) || Number(car.deposit) || 500;
+
+    if (hasDateFilter && filterDays > 0) {
+      const depMul = computeDepositMultiplier(fp, pickupDate, returnDate, filterDays);
+      return Math.round(baseDeposit * depMul * 100) / 100;
+    }
+
+    return baseDeposit;
+  };
+
   return (
     <div className={carPageStyles.pageContainer}>
       <div className={carPageStyles.contentContainer}>
@@ -862,14 +967,18 @@ const Cars = () => {
                       <p>{selectedMarker.company?.hostProfile?.address?.city || ""}</p>
                       <h4>Cars Available:</h4>
                       <ul>
-                        {selectedMarker.cars.map((car) => (
-                          <li key={car._id}>
-                            {car.make} {car.model} - MYR {car.dailyRate}/day
-                            <button onClick={() => handleBook(car, car._id)} className="ml-2 bg-blue-600 text-white px-2 py-1 rounded">
-                              Book
-                            </button>
-                          </li>
-                        ))}
+                        {selectedMarker.cars.map((car) => {
+                          const fp = getFlexPricing(car);
+                          const displayRate = Number(fp.baseDailyRate) || Number(car.dailyRate) || 0;
+                          return (
+                            <li key={car._id}>
+                              {car.make} {car.model} - {hasFlexibleMultipliers(fp) ? "from " : ""}MYR {displayRate}/day
+                              <button onClick={() => handleBook(car, car._id)} className="ml-2 bg-blue-600 text-white px-2 py-1 rounded">
+                                Book
+                              </button>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </InfoWindow>
@@ -929,6 +1038,10 @@ const Cars = () => {
               const companyCity = car.companyId?.address?.city || car.companyId?.address?.cityName || car.companyId?.hostProfile?.address?.city || car.companyId?.hostProfile?.address?.cityName || "";
               const companyState = car.companyId?.address?.state || car.companyId?.hostProfile?.address?.state || "";
 
+              // ─── Flexible pricing for this car card ───
+              const { price: displayPrice, isFlex, hasDateRange, totalRent, days } = getDisplayPrice(car);
+              const displayDeposit = getDisplayDeposit(car);
+
               return (
                 <div key={id} className={carPageStyles.carCard}>
                   <div className={carPageStyles.glowEffect}></div>
@@ -945,8 +1058,9 @@ const Cars = () => {
                     <div className="absolute right-4 top-4 z-20">{renderAvailabilityBadge(car)}</div>
 
                     <div className={carPageStyles.priceBadge}>
-                      MYR&nbsp;{car.dailyRate ?? car.price ?? car.pricePerDay ?? "—"}
-                      /day
+                      {isFlex && !hasDateRange ? "from " : ""}
+                      MYR&nbsp;{displayPrice}
+                      {hasDateRange ? "/day avg" : "/day"}
                     </div>
                   </div>
 
@@ -968,6 +1082,26 @@ const Cars = () => {
                         {car.distance ? <div className="text-xs text-gray-400">{car.distance}</div> : null}
                       </div>
                     </div>
+
+                    {/* Flexible pricing summary when dates are selected */}
+                    {hasDateRange && (
+                      <div className="mt-2 p-2 bg-gray-800/60 border border-gray-700 rounded-lg text-xs text-gray-300 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Total rent ({days} {days === 1 ? "day" : "days"})</span>
+                          <span className="text-white font-medium">MYR {totalRent}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Deposit (at counter)</span>
+                          <span className="text-gray-400">MYR {displayDeposit}</span>
+                        </div>
+                        {isFlex && (
+                          <div className="flex items-center gap-1 text-orange-300/70 pt-1">
+                            <FaInfoCircle className="text-[10px]" />
+                            <span>Flexible pricing — rates may vary for weekends/peak.</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className={carPageStyles.specsGrid}>
                       <div className={carPageStyles.specItem}>

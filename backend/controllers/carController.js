@@ -4,6 +4,115 @@ import path from "path";
 import fs from "fs";
 import mongoose from "mongoose";
 
+// ─── NEW: Helper to compute effective daily rate & deposit for a given date ───
+function computeEffectivePrice(flexiblePricing, dateStr) {
+  const fp = flexiblePricing || {};
+  const baseRate = Number(fp.baseDailyRate) || 0;
+  const baseDeposit = Number(fp.baseDeposit) || 0;
+  const weekendMul = Number(fp.weekendMultiplier) || 1;
+  const depWeekendMul = Number(fp.depositWeekendMultiplier) || 1;
+  const peakMultipliers = Array.isArray(fp.peakMultipliers) ? fp.peakMultipliers : [];
+
+  let rateMultiplier = 1;
+  let depositMultiplier = 1;
+
+  // Check weekend (Saturday=6, Sunday=0)
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  if (day === 0 || day === 6) {
+    rateMultiplier = weekendMul;
+    depositMultiplier = depWeekendMul;
+  }
+
+  // Check peak periods (peak overrides weekend if higher)
+  for (const peak of peakMultipliers) {
+    if (peak.start && peak.end && dateStr >= peak.start && dateStr <= peak.end) {
+      rateMultiplier = Math.max(rateMultiplier, Number(peak.multiplier) || 1);
+      depositMultiplier = Math.max(depositMultiplier, Number(peak.depositMultiplier) || 1);
+    }
+  }
+
+  return {
+    dailyRate: Math.round(baseRate * rateMultiplier * 100) / 100,
+    deposit: Math.round(baseDeposit * depositMultiplier * 100) / 100,
+    rateMultiplier,
+    depositMultiplier,
+  };
+}
+
+// ─── NEW: Compute total rent + deposit for a date range using flexible pricing ───
+function computeFlexibleTotal(flexiblePricing, pickupDateStr, returnDateStr) {
+  const fp = flexiblePricing || {};
+  const baseRate = Number(fp.baseDailyRate) || 0;
+  const baseDeposit = Number(fp.baseDeposit) || 0;
+
+  if (!pickupDateStr || !returnDateStr) {
+    return { totalRent: baseRate, effectiveDeposit: baseDeposit, days: 1, perDay: [] };
+  }
+
+  const start = new Date(pickupDateStr);
+  const end = new Date(returnDateStr);
+  const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+
+  let totalRent = 0;
+  let maxDepositMultiplier = 1;
+  const perDay = [];
+
+  for (let i = 0; i < days; i++) {
+    const cur = new Date(start);
+    cur.setDate(cur.getDate() + i);
+    const isoStr = cur.toISOString().slice(0, 10);
+    const eff = computeEffectivePrice(fp, isoStr);
+    totalRent += eff.dailyRate;
+    maxDepositMultiplier = Math.max(maxDepositMultiplier, eff.depositMultiplier);
+    perDay.push({ date: isoStr, dailyRate: eff.dailyRate, rateMultiplier: eff.rateMultiplier });
+  }
+
+  const effectiveDeposit = Math.round(baseDeposit * maxDepositMultiplier * 100) / 100;
+
+  return { totalRent: Math.round(totalRent * 100) / 100, effectiveDeposit, days, perDay };
+}
+
+/**
+ * GET /api/cars/:id/pricing?pickupDate=YYYY-MM-DD&returnDate=YYYY-MM-DD
+ * Public endpoint — returns flexible pricing breakdown for selected dates.
+ */
+export const getCarPricing = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid car id" });
+    }
+
+    const car = await Car.findById(id).select("flexiblePricing dailyRate deposit").lean();
+    if (!car) return res.status(404).json({ message: "Car not found" });
+
+    const fp = car.flexiblePricing || {
+      baseDailyRate: car.dailyRate || 0,
+      baseDeposit: car.deposit || 0,
+      weekendMultiplier: 1,
+      depositWeekendMultiplier: 1,
+      peakMultipliers: [],
+    };
+
+    const { pickupDate, returnDate } = req.query;
+    const result = computeFlexibleTotal(fp, pickupDate, returnDate);
+
+    return res.json({
+      success: true,
+      data: {
+        flexiblePricing: fp,
+        ...result,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Also export the helper so it can be used in bookingController if needed ───
+export { computeEffectivePrice, computeFlexibleTotal };
+
 /**
  * Create a car
  * Accepts multipart/form-data with optional file (handled by multer in routes)
@@ -322,6 +431,7 @@ export default {
   createCar,
   getCars,
   getCarById,
+  getCarPricing,
   updateCar,
   deleteCar,
 };

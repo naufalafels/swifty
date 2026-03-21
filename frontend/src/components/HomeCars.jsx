@@ -14,6 +14,20 @@ const startOfDay = (d) => {
 const daysBetween = (from, to) =>
   Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
+// ─── Flexible pricing helpers ───
+const getFlexPricing = (car) => car?.flexiblePricing || {
+  baseDailyRate: Number(car?.dailyRate) || 0,
+  baseDeposit: Number(car?.deposit) || 500,
+  weekendMultiplier: 1,
+  depositWeekendMultiplier: 1,
+  peakMultipliers: [],
+};
+
+const hasFlexibleMultipliers = (fp) => {
+  return (Number(fp.weekendMultiplier) || 1) > 1 ||
+    (Array.isArray(fp.peakMultipliers) && fp.peakMultipliers.length > 0);
+};
+
 const HomeCars = () => {
   const navigate = useNavigate();
   const [cars, setCars] = useState([]);
@@ -23,7 +37,7 @@ const HomeCars = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const abortRef = useRef(null);
 
-  const base = "http://localhost:7889";
+  const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
   const api = axios.create({
     baseURL: base,
     headers: { Accept: "application/json" },
@@ -399,6 +413,11 @@ const HomeCars = () => {
             const effective = computeEffectiveAvailability(car);
             const isCurrentlyBooked = effective?.state === "booked";
 
+            // ─── Flexible pricing: compute display price ───
+            const fp = getFlexPricing(car);
+            const displayPrice = Number(fp.baseDailyRate) || Number(car.dailyRate) || 0;
+            const isFlex = hasFlexibleMultipliers(fp);
+
             return (
               <div
                 key={car._id || car.id || idx}
@@ -421,7 +440,7 @@ const HomeCars = () => {
 
                 <div className={styles.priceBadge}>
                   <span className={styles.priceText}>
-                    MYR&nbsp;{car.dailyRate ?? car.price ?? 0}/day
+                    {isFlex ? "from " : ""}MYR&nbsp;{displayPrice}/day
                   </span>
                 </div>
 

@@ -202,7 +202,13 @@ const CarDetail = () => {
   const [frontFile, setFrontFile] = useState(null);
   const [backFile, setBackFile] = useState(null);
 
-  const deposit = car?.deposit || 500;
+  const getFlexPricing = () => car?.flexiblePricing || {
+    baseDailyRate: Number(car?.dailyRate) || 0,
+    baseDeposit: Number(car?.deposit) || 500,
+    weekendMultiplier: 1,
+    depositWeekendMultiplier: 1,
+    peakMultipliers: [],
+  };
   const emailReadOnly = !!emailPrefill;
 
   const [activeField, setActiveField] = useState(null);
@@ -579,12 +585,74 @@ const CarDetail = () => {
     ...(car.image ? (Array.isArray(car.image) ? car.image : [car.image]) : []),
   ].filter(Boolean);
 
-  const price = Number(car.price ?? car.dailyRate ?? 0) || 0;
-  const days = calculateDays(formData.pickupDate, formData.returnDate);
+  // NEW — flexible pricing aware:
+const fp = getFlexPricing();
+const days = calculateDays(formData.pickupDate, formData.returnDate);
 
-  const selectedPlan = insuranceOptions.find((p) => p.value === formData.insurancePlan) || insuranceOptions[2];
-  const insuranceCost = days * (selectedPlan.feePerDay || 0);
-  const calculateTotal = () => days * price + insuranceCost;
+// Compute per-day rates using flexible pricing
+const computeDayRate = (dateStr) => {
+  const baseRate = Number(fp.baseDailyRate) || Number(car?.dailyRate) || 0;
+  const weekendMul = Number(fp.weekendMultiplier) || 1;
+  const peakMultipliers = Array.isArray(fp.peakMultipliers) ? fp.peakMultipliers : [];
+
+  let mul = 1;
+  const d = new Date(dateStr);
+  const dayOfWeek = d.getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) mul = weekendMul;
+
+  for (const peak of peakMultipliers) {
+    if (peak.start && peak.end && dateStr >= peak.start && dateStr <= peak.end) {
+      mul = Math.max(mul, Number(peak.multiplier) || 1);
+    }
+  }
+  return Math.round(baseRate * mul * 100) / 100;
+};
+
+const computeDepositMultiplier = () => {
+  const depWeekendMul = Number(fp.depositWeekendMultiplier) || 1;
+  const peakMultipliers = Array.isArray(fp.peakMultipliers) ? fp.peakMultipliers : [];
+  let maxMul = 1;
+
+  if (formData.pickupDate && formData.returnDate) {
+    const start = new Date(formData.pickupDate);
+    for (let i = 0; i < days; i++) {
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() + i);
+      const isoStr = cur.toISOString().slice(0, 10);
+      const dayOfWeek = cur.getDay();
+      let mul = 1;
+      if (dayOfWeek === 0 || dayOfWeek === 6) mul = depWeekendMul;
+      for (const peak of peakMultipliers) {
+        if (peak.start && peak.end && isoStr >= peak.start && isoStr <= peak.end) {
+          mul = Math.max(mul, Number(peak.depositMultiplier) || 1);
+        }
+      }
+      maxMul = Math.max(maxMul, mul);
+    }
+  }
+  return maxMul;
+};
+
+const computeTotalRent = () => {
+  if (!formData.pickupDate || !formData.returnDate) {
+    return Number(fp.baseDailyRate) || Number(car?.dailyRate) || 0;
+  }
+  let total = 0;
+  const start = new Date(formData.pickupDate);
+  for (let i = 0; i < days; i++) {
+    const cur = new Date(start);
+    cur.setDate(cur.getDate() + i);
+    total += computeDayRate(cur.toISOString().slice(0, 10));
+  }
+  return Math.round(total * 100) / 100;
+};
+
+const price = Number(fp.baseDailyRate) || Number(car?.dailyRate) || 0; // base price for display
+const deposit = Math.round((Number(fp.baseDeposit) || Number(car?.deposit) || 500) * computeDepositMultiplier() * 100) / 100;
+
+const selectedPlan = insuranceOptions.find((p) => p.value === formData.insurancePlan) || insuranceOptions[2];
+const insuranceCost = days * (selectedPlan.feePerDay || 0);
+const calculateTotal = () => computeTotalRent() + insuranceCost;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -663,7 +731,7 @@ const CarDetail = () => {
         make: car.make,
         model: car.model,
         year: car.year,
-        dailyRate: car.dailyRate,
+        dailyRate: computeTotalRent() / days,
         image: car.image,
         companyId: car.companyId || car.company?.id || null,
         companyName: car.company?.name || car.companyName || "",
@@ -1170,7 +1238,10 @@ const CarDetail = () => {
                 </div>
 
                 <div className={carDetailStyles.priceBreakdown + " mt-4"}>
-                  <div className={carDetailStyles.priceRow}><span>Rate/day</span><span>MYR&nbsp;{price}</span></div>
+                  <div className={carDetailStyles.priceRow}>
+                    <span>Rate/day {(Number(fp.weekendMultiplier) > 1 || (fp.peakMultipliers && fp.peakMultipliers.length > 0)) ? "(avg)" : ""}</span>
+                    <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price}</span>
+                  </div>
                   {formData.pickupDate && formData.returnDate && (
                     <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
                   )}

@@ -121,6 +121,8 @@ function userResponse(user) {
     address: user.address || '',
     mailingAddress: user.mailingAddress || '',
     city: user.city || '',
+    state: user.state || '',
+    zipCode: user.zipCode || '',
     country: user.country || '',
     about: user.about || '',
     privacy: user.privacy || { showCity: true, showAbout: true },
@@ -347,6 +349,8 @@ export async function updateProfile(req, res) {
       mailingAddress,
       sameMailing,
       city,
+      state, 
+      zipCode,
       country,
       about,
       privacy,
@@ -376,6 +380,8 @@ export async function updateProfile(req, res) {
       user.mailingAddress = sameMailing ? String(address || '') : String(mailingAddress || '');
     }
     if (city !== undefined) user.city = String(city).trim();
+    if (state !== undefined) user.state = String(state).trim();        
+    if (zipCode !== undefined) user.zipCode = String(zipCode).trim(); 
     if (country !== undefined) user.country = String(country).trim();
     if (about !== undefined) user.about = String(about);
 

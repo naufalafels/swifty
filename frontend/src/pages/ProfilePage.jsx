@@ -107,6 +107,8 @@ const ProfilePage = () => {
     mailingAddress: '',
     sameMailing: true,
     city: '',
+    state: '', 
+    zipCode: '',
     country: '',
     addressSearch: '',
   });
@@ -181,6 +183,8 @@ const ProfilePage = () => {
               mailingAddress: profile?.mailingAddress || profile?.address || '',
               sameMailing: profile?.mailingAddress ? profile?.mailingAddress === profile?.address : true,
               city: profile?.city || '',
+              state: profile?.state || '',
+              zipCode: profile?.zipCode || '',
               country: profile?.country || '',
               addressSearch: '',
             });
@@ -284,6 +288,8 @@ const ProfilePage = () => {
         address: personalForm.residentialAddress,
         mailingAddress: personalForm.sameMailing ? personalForm.residentialAddress : personalForm.mailingAddress,
         city: personalForm.city,
+        state: personalForm.state,
+        zipCode: personalForm.zipCode,
         country: personalForm.country,
       };
       const res = await api.put('/api/auth/update-profile', payload);
@@ -546,22 +552,31 @@ const ProfilePage = () => {
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner overflow-hidden">
                   {user?.profilePicture ? (
                     <img
-                      src={user.profilePicture.startsWith('http')
+                      src={
+                        user.profilePicture.startsWith('http')
                         ? user.profilePicture
-                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
+                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`
+                      }
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      e.target.parentElement.textContent = user?.name?.[0]?.toUpperCase() || 'U';
+                      }}
                     />
-                  ) : (
-                    user?.name?.[0]?.toUpperCase() || 'U'
-                  )}
+                    ) : (
+                      user?.name?.[0]?.toUpperCase() || 'U'
+                    )}
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="text-xl font-semibold text-white">{user?.name || 'Unnamed user'}</div>
                 <div className="text-sm text-slate-300 flex items-center gap-2">
                   <FaMapMarkerAlt className="text-emerald-400" />
-                  {user?.city && user?.country ? `${user.city}, ${user.country}` : 'Location hidden'}
+                  {user?.privacy?.showCity !== false && user?.city && user?.country
+                    ? `${user.city}, ${user.country}`
+                  : 'Location hidden'}
                 </div>
                 <div className="text-sm text-slate-200">
                   <span className="font-semibold">About me: </span>
@@ -975,11 +990,23 @@ const ProfilePage = () => {
               <label className="text-sm font-semibold text-slate-800 flex flex-col gap-2">
                 Edit profile picture
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
-                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
-                    <FaImage /> Choose image
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
-                  </label>
-                  <PreviewThumb file={editExtras.profilePic} />
+                  {/* Show existing saved profile picture */}
+                  {!editExtras.profilePic && user?.profilePicture && (
+                    <div className="w-24 h-16 border border-slate-300 rounded-md overflow-hidden bg-slate-100">
+                      <img
+                        src={user.profilePicture.startsWith('http')
+                        ? user.profilePicture
+                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`}
+                        alt="Current profile"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    )}
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
+                      <FaImage /> Choose image
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
+                    </label>
+                    <PreviewThumb file={editExtras.profilePic} />
                 </div>
               </label>
 

@@ -93,13 +93,13 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["user", "customer", "company_admin", "superadmin", "guest", "host"],  // Added "host"
+      enum: ["user", "customer", "company_admin", "superadmin", "guest", "host"],
       default: "user",
     },
 
     roles: {
       type: [String],
-      enum: ["renter", "host", "admin", "company_admin"],  // Added "company_admin"
+      enum: ["renter", "host", "admin", "company_admin"],
       default: ["renter"],
     },
 
@@ -111,34 +111,41 @@ const userSchema = new mongoose.Schema(
 
     kyc: { type: kycSubSchema, default: () => ({}) },
 
+    // ✅ ADDED: Personal info fields that updateProfile saves
+    legalName: { type: String, default: '' },
+    preferredName: { type: String, default: '' },
+    birthdate: { type: String, default: '' },
+    phone: { type: String, default: '' },
+    address: { type: String, default: '' },
+    mailingAddress: { type: String, default: '' },
+    city: { type: String, default: '' },
+    state: { type: String, default: '' },
+    zipCode: { type: String, default: '' },
+    country: { type: String, default: '' },
+    about: { type: String, default: '' },
+    privacy: {
+      showCity: { type: Boolean, default: true },
+      showAbout: { type: Boolean, default: true },
+    },
+
     profilePicture: { type: String, default: '' },
-
     school: { type: String, default: '' },
-
     work: { type: String, default: '' },
-
     pets: { type: String, default: '' },
-
     decade: { type: String, default: '' },
-
     languages: { type: String, default: '' },
-    
     live: { type: String, default: '' },
 
     hostProfile: { type: hostProfileSchema, default: () => ({}) },
-
-    initialCar: { type: initialCarSchema, default: null },  // NEW: Temp car details
-
-    applyingForHost: { type: Boolean, default: false },  // NEW: Flag for host application
-
-    // NEW: Host status tracking
+    initialCar: { type: initialCarSchema, default: null },
+    applyingForHost: { type: Boolean, default: false },
     hostStatus: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
     rejectionReason: { type: String, default: '' },
     notifications: [{
       message: { type: String, required: true },
       read: { type: Boolean, default: false },
       createdAt: { type: Date, default: Date.now }
-    }],  // UPDATED: Array of objects with read status
+    }],
   },
   {
     timestamps: true,

@@ -111,6 +111,20 @@ const userSchema = new mongoose.Schema(
 
     kyc: { type: kycSubSchema, default: () => ({}) },
 
+    profilePicture: { type: String, default: '' },
+
+    school: { type: String, default: '' },
+
+    work: { type: String, default: '' },
+
+    pets: { type: String, default: '' },
+
+    decade: { type: String, default: '' },
+
+    languages: { type: String, default: '' },
+    
+    live: { type: String, default: '' },
+
     hostProfile: { type: hostProfileSchema, default: () => ({}) },
 
     initialCar: { type: initialCarSchema, default: null },  // NEW: Temp car details

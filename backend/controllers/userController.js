@@ -127,6 +127,13 @@ function userResponse(user) {
     kyc: user.kyc || { status: 'not_submitted' },
     notifications: (user.notifications || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),  // UPDATED: Latest first
     createdAt: user.createdAt,
+    profilePicture: user.profilePicture || '',
+    school: user.school || '',
+    work: user.work || '',
+    pets: user.pets || '',
+    decade: user.decade || '',
+    languages: user.languages || '',
+    live: user.live || '',
   };
 }
 
@@ -286,12 +293,12 @@ export async function logout(req, res) {
       }
     }
     clearRefreshCookie(res);
-    clearAdminTokenCookie(res);  // NEW: Clear admin cookie on logout
-    return res.status(500).json({ success: false, message: 'Server error' });  // FIXED: Was 500, should be 200
+    clearAdminTokenCookie(res);
+    return res.status(200).json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
     console.error('Logout error', err);
     clearRefreshCookie(res);
-    clearAdminTokenCookie(res);  // NEW: Clear admin cookie on error
+    clearAdminTokenCookie(res);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
@@ -343,6 +350,13 @@ export async function updateProfile(req, res) {
       country,
       about,
       privacy,
+      profilePicture,
+      school,
+      work,
+      pets,
+      decade,
+      languages,
+      live,
     } = req.body || {};
 
     const user = await User.findById(req.user.id);
@@ -364,7 +378,15 @@ export async function updateProfile(req, res) {
     if (city !== undefined) user.city = String(city).trim();
     if (country !== undefined) user.country = String(country).trim();
     if (about !== undefined) user.about = String(about);
-    
+
+    if (profilePicture !== undefined) user.profilePicture = String(profilePicture).trim();
+    if (school !== undefined) user.school = String(school).trim();
+    if (work !== undefined) user.work = String(work).trim();
+    if (pets !== undefined) user.pets = String(pets).trim();
+    if (decade !== undefined) user.decade = String(decade).trim();
+    if (languages !== undefined) user.languages = String(languages).trim();
+    if (live !== undefined) user.live = String(live).trim();
+
     if (privacy && typeof privacy === 'object') {
       user.privacy = {
         showCity: privacy.showCity !== undefined ? !!privacy.showCity : user.privacy?.showCity ?? true,

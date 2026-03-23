@@ -185,6 +185,17 @@ const ProfilePage = () => {
               addressSearch: '',
             });
             setAboutForm({ about: profile?.about || '' });
+
+            // Initialize editExtras from saved profile data
+            setEditExtras({
+              profilePic: null,
+              school: profile?.school || '',
+              work: profile?.work || '',
+              pets: profile?.pets || '',
+              decade: profile?.decade || '',
+              languages: profile?.languages || '',
+              live: profile?.live || '',
+            });
             try {
               authService.setCurrentUser(profile);
             } catch {}
@@ -260,7 +271,7 @@ const ProfilePage = () => {
     setIsPasswordModalOpen(true);
   };
 
-  const savePersonal = async (e) => {
+    const savePersonal = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -276,8 +287,25 @@ const ProfilePage = () => {
         country: personalForm.country,
       };
       const res = await api.put('/api/auth/update-profile', payload);
-      setUser(res.data.user);
-      authService.setCurrentUser(res.data.user);
+      const updatedUser = res.data.user;
+      setUser(updatedUser);
+      authService.setCurrentUser(updatedUser);
+
+      // FIX: Sync personalForm state with the saved server data
+      setPersonalForm({
+        legalName: updatedUser?.legalName || updatedUser?.name || '',
+        birthdate: updatedUser?.birthdate || '',
+        preferredName: updatedUser?.preferredName || updatedUser?.name || '',
+        phone: updatedUser?.phone || '',
+        email: updatedUser?.email || '',
+        residentialAddress: updatedUser?.address || '',
+        mailingAddress: updatedUser?.mailingAddress || updatedUser?.address || '',
+        sameMailing: updatedUser?.mailingAddress ? updatedUser?.mailingAddress === updatedUser?.address : true,
+        city: updatedUser?.city || '',
+        country: updatedUser?.country || '',
+        addressSearch: '',
+      });
+
       toast.success('Personal information updated');
       setIsPersonalModalOpen(false);
     } catch (err) {
@@ -303,10 +331,55 @@ const ProfilePage = () => {
     }
   };
 
-  const saveEditExtras = async (e) => {
+    const saveEditExtras = async (e) => {
     e.preventDefault();
-    toast.info('Profile extras saved (stub). Wire to your API when ready.');
-    setIsEditModalOpen(false);
+    setLoading(true);
+    try {
+      let profilePictureUrl = user?.profilePicture || '';
+
+      // Upload profile picture if one was selected
+      if (editExtras.profilePic instanceof File) {
+        const uploadForm = new FormData();
+        uploadForm.append('file', editExtras.profilePic);
+        const uploadRes = await api.post('/api/auth/kyc/upload', uploadForm, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        profilePictureUrl = uploadRes.data.key || uploadRes.data.url || '';
+      }
+
+      // Send all extras to the update-profile endpoint
+      const res = await api.put('/api/auth/update-profile', {
+        profilePicture: profilePictureUrl,
+        school: editExtras.school,
+        work: editExtras.work,
+        pets: editExtras.pets,
+        decade: editExtras.decade,
+        languages: editExtras.languages,
+        live: editExtras.live,
+      });
+
+      const updatedUser = res.data.user;
+      setUser(updatedUser);
+      authService.setCurrentUser(updatedUser);
+
+      // Sync editExtras with saved data
+      setEditExtras({
+        profilePic: null,
+        school: updatedUser?.school || '',
+        work: updatedUser?.work || '',
+        pets: updatedUser?.pets || '',
+        decade: updatedUser?.decade || '',
+        languages: updatedUser?.languages || '',
+        live: updatedUser?.live || '',
+      });
+
+      toast.success('Profile updated successfully!');
+      setIsEditModalOpen(false);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // UPDATED: Upload to backend then S3
@@ -469,9 +542,19 @@ const ProfilePage = () => {
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 flex flex-col gap-4">
             <div className="flex gap-4">
-              <div className="relative">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner">
-                  {user?.name?.[0]?.toUpperCase() || 'U'}
+                            <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner overflow-hidden">
+                  {user?.profilePicture ? (
+                    <img
+                      src={user.profilePicture.startsWith('http')
+                        ? user.profilePicture
+                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    user?.name?.[0]?.toUpperCase() || 'U'
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
@@ -514,7 +597,7 @@ const ProfilePage = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setIsEditModalOpen(true)}
-            className="inline-flex items-center gap-2 px-3 py- rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-700 text-slate-200 hover:bg-slate-800"
           >
             <FaEdit /> Edit Profile
           </button>

@@ -117,7 +117,24 @@ app.use('/api/host', hostRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/reviews', reviewRouter);
 
-// NEW: Host approval/rejection routes
+// Google Places autocomplete proxy
+app.get('/api/places/autocomplete', async (req, res) => {
+  const { input } = req.query;
+  if (!input) return res.json({ predictions: [] });
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return res.status(500).json({ predictions: [], error: 'Google Maps API key not configured' });
+  try {
+    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&components=country:my&key=${apiKey}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return res.json({ predictions: data.predictions || [] });
+  } catch (err) {
+    console.error('Places autocomplete error', err);
+    return res.status(500).json({ predictions: [], error: 'Places lookup failed' });
+  }
+});
+
+// Host approval/rejection routes
 app.post('/api/admin/host/:id/approve', authMiddleware, approveHost);
 app.post('/api/admin/host/:id/reject', authMiddleware, rejectHost);
 

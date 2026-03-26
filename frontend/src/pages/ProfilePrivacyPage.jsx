@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 const ProfilePrivacyPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ showCity: true, showAbout: true });
+  const [form, setForm] = useState({ showCity: true, hideProfilePicture: false });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -19,7 +19,7 @@ const ProfilePrivacyPage = () => {
         const profile = res?.data?.user ?? res?.data ?? {};
         setForm({
           showCity: profile?.privacy?.showCity ?? true,
-          showAbout: profile?.privacy?.showAbout ?? true,
+          hideProfilePicture: profile?.privacy?.hideProfilePicture ?? false,
         });
       } catch {
         toast.error('Failed to load privacy settings');
@@ -74,13 +74,13 @@ const ProfilePrivacyPage = () => {
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-200">Show About me</div>
+          <div className="text-sm text-slate-200">Hide my profile picture</div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               className="sr-only peer"
-              checked={form.showAbout}
-              onChange={(e) => setForm({ ...form, showAbout: e.target.checked })}
+              checked={form.hideProfilePicture}
+              onChange={(e) => setForm({ ...form, hideProfilePicture: e.target.checked })}
             />
             <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition"></div>
             <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transform transition peer-checked:translate-x-5" />

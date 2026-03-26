@@ -125,7 +125,8 @@ const userSchema = new mongoose.Schema(
     about: { type: String, default: '' },
     privacy: {
       showCity: { type: Boolean, default: true },
-      showAbout: { type: Boolean, default: true },
+      showAbout: { type: Boolean, default: true },  // Keep for backward compat
+      hideProfilePicture: { type: Boolean, default: false },
     },
 
     profilePicture: { type: String, default: '' },

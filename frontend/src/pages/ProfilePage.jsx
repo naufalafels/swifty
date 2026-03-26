@@ -297,7 +297,6 @@ const ProfilePage = () => {
       setUser(updatedUser);
       authService.setCurrentUser(updatedUser);
 
-      // FIX: Sync personalForm state with the saved server data
       setPersonalForm({
         legalName: updatedUser?.legalName || updatedUser?.name || '',
         birthdate: updatedUser?.birthdate || '',
@@ -308,9 +307,14 @@ const ProfilePage = () => {
         mailingAddress: updatedUser?.mailingAddress || updatedUser?.address || '',
         sameMailing: updatedUser?.mailingAddress ? updatedUser?.mailingAddress === updatedUser?.address : true,
         city: updatedUser?.city || '',
+        state: updatedUser?.state || '',        
+        zipCode: updatedUser?.zipCode || '',     
         country: updatedUser?.country || '',
         addressSearch: '',
       });
+
+      // Re-lock sensitive fields after save
+      setLocked({ phone: true, email: true });
 
       toast.success('Personal information updated');
       setIsPersonalModalOpen(false);
@@ -548,9 +552,9 @@ const ProfilePage = () => {
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 flex flex-col gap-4">
             <div className="flex gap-4">
-                            <div className="relative">
+              <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner overflow-hidden">
-                  {user?.profilePicture ? (
+                  {user?.profilePicture && !user?.privacy?.hideProfilePicture ? (
                     <img
                       src={
                         user.profilePicture.startsWith('http')
@@ -816,7 +820,7 @@ const ProfilePage = () => {
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <FaUserCog /> Personal Information
               </h2>
-              <button onClick={() => setIsPersonalModalOpen(false)} className="text-slate-500 hover:text-slate-800">✕</button>
+              <button onClick={() => { setIsPersonalModalOpen(false); setLocked({ phone: true, email: true }); }} className="text-slate-500 hover:text-slate-800">✕</button>
             </div>
 
             <form onSubmit={savePersonal} className="space-y-3">
@@ -830,32 +834,35 @@ const ProfilePage = () => {
                 <label className="text-sm font-semibold text-slate-800">Preferred first name
                   <input value={personalForm.preferredName} onChange={(e) => setPersonalForm({ ...personalForm, preferredName: e.target.value })} className="w-full mt-1 p-2 border rounded" />
                 </label>
+
                 <label className="text-sm font-semibold text-slate-800">Phone
                   <input
-                    value={personalForm.phone}
+                    value={locked.phone ? maskPhone(personalForm.phone) : personalForm.phone}
                     onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
+                    className={`w-full mt-1 p-2 border rounded ${locked.phone ? 'bg-slate-100 cursor-pointer' : ''}`}
                     placeholder="+60123456789"
                     onClick={() => handleLockedFieldClick('phone')}
                     readOnly={locked.phone}
                     aria-label="Phone (locked until verified)"
                   />
-                  <div className="text-[11px] text-slate-500 mt-1">Will display as {maskPhone(personalForm.phone)}</div>
+                  {locked.phone && <div className="text-[11px] text-amber-600 mt-1">🔒 Click to verify password and reveal</div>}
                 </label>
+
                 <label className="text-sm font-semibold text-slate-800">Email
                   <input
-                    type="email"
-                    value={personalForm.email}
+                    type={locked.email ? 'text' : 'email'}
+                    value={locked.email ? maskEmail(personalForm.email) : personalForm.email}
                     onChange={(e) => setPersonalForm({ ...personalForm, email: e.target.value })}
-                    className="w-full mt-1 p-2 border rounded"
+                    className={`w-full mt-1 p-2 border rounded ${locked.email ? 'bg-slate-100 cursor-pointer' : ''}`}
                     placeholder="johndoe@vroomu.com"
-                    required
+                    required={!locked.email}
                     onClick={() => handleLockedFieldClick('email')}
                     readOnly={locked.email}
                     aria-label="Email (locked until verified)"
                   />
-                  <div className="text-[11px] text-slate-500 mt-1">Will display as {maskEmail(personalForm.email)}</div>
+                  {locked.email && <div className="text-[11px] text-amber-600 mt-1">🔒 Click to verify password and reveal</div>}
                 </label>
+
                 <label className="text-sm font-semibold text-slate-800">Search address
                   <input
                     value={personalForm.addressSearch}
@@ -990,23 +997,15 @@ const ProfilePage = () => {
               <label className="text-sm font-semibold text-slate-800 flex flex-col gap-2">
                 Edit profile picture
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
-                  {/* Show existing saved profile picture */}
-                  {!editExtras.profilePic && user?.profilePicture && (
-                    <div className="w-24 h-16 border border-slate-300 rounded-md overflow-hidden bg-slate-100">
-                      <img
-                        src={user.profilePicture.startsWith('http')
-                        ? user.profilePicture
-                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`}
-                        alt="Current profile"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    )}
-                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
-                      <FaImage /> Choose image
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
-                    </label>
+                  <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
+                    <FaImage /> Choose image
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
+                  </label>
+                  {editExtras.profilePic ? (
                     <PreviewThumb file={editExtras.profilePic} />
+                  ) : (
+                    <PreviewThumb url={user?.profilePicture || null} />
+                  )}
                 </div>
               </label>
 

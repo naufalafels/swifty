@@ -104,7 +104,19 @@ async function buildSignedKycUrl(s3Key) {
   return await generateDownloadUrl(s3Key);
 }
 
-function userResponse(user) {
+// async userResponse with signed profile picture URL:
+async function userResponse(user) {
+  let profilePictureUrl = user.profilePicture || '';
+  // If profilePicture is an S3 key (not a URL and not empty), generate a signed URL
+  if (profilePictureUrl && !profilePictureUrl.startsWith('http')) {
+    try {
+      profilePictureUrl = await generateDownloadUrl(profilePictureUrl);
+    } catch (err) {
+      console.error('Failed to generate signed URL for profile picture:', err);
+      profilePictureUrl = '';
+    }
+  }
+
   return {
     id: user._id,
     name: user.name,
@@ -113,7 +125,7 @@ function userResponse(user) {
     roles: Array.isArray(user.roles) && user.roles.length ? user.roles : ['renter'],
     companyId: user.companyId || null,
     isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
-    applyingForHost: user.applyingForHost || false,  // NEW: Include flag
+    applyingForHost: user.applyingForHost || false,
     legalName: user.legalName || '',
     preferredName: user.preferredName || '',
     birthdate: user.birthdate || '',
@@ -125,11 +137,11 @@ function userResponse(user) {
     zipCode: user.zipCode || '',
     country: user.country || '',
     about: user.about || '',
-    privacy: user.privacy || { showCity: true, showAbout: true },
+    privacy: user.privacy || { showCity: true, showAbout: true, hideProfilePicture: false },
     kyc: user.kyc || { status: 'not_submitted' },
-    notifications: (user.notifications || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),  // UPDATED: Latest first
+    notifications: (user.notifications || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
     createdAt: user.createdAt,
-    profilePicture: user.profilePicture || '',
+    profilePicture: profilePictureUrl,
     school: user.school || '',
     work: user.work || '',
     pets: user.pets || '',
@@ -183,7 +195,8 @@ export async function register(req, res) {
       success: true,
       message: 'Account has been created successfully!',
       accessToken,
-      user: userResponse(user),
+      user: await userResponse(user),
+
     });
   } catch (err) {
     console.error('Registering Error', err);
@@ -229,7 +242,7 @@ export async function login(req, res) {
       success: true,
       message: 'Login Successfully!',
       accessToken,
-      user: userResponse(user),
+      user: await userResponse(user),
     });
   } catch (err) {
     console.error('Login Error!', err);
@@ -278,7 +291,7 @@ export async function refresh(req, res) {
       setAdminTokenCookie(res, accessToken);
     }
 
-    return res.json({ success: true, accessToken, user: user ? userResponse(user) : null });
+    return res.json({ success: true, accessToken, user: user ? await userResponse(user) : null, });
   } catch (err) {
     console.error('Refresh error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -310,7 +323,7 @@ export async function me(req, res) {
     if (!req.user || !req.user.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
     const user = await User.findById(req.user.id).lean();
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    return res.json({ success: true, user: userResponse(user) });
+    return res.json({ success: true, user: await userResponse(user) });
   } catch (err) {
     console.error('Me error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -397,11 +410,12 @@ export async function updateProfile(req, res) {
       user.privacy = {
         showCity: privacy.showCity !== undefined ? !!privacy.showCity : user.privacy?.showCity ?? true,
         showAbout: privacy.showAbout !== undefined ? !!privacy.showAbout : user.privacy?.showAbout ?? true,
+        hideProfilePicture: privacy.hideProfilePicture !== undefined ? !!privacy.hideProfilePicture : user.privacy?.hideProfilePicture ?? false,
       };
     }
 
     await user.save();
-    return res.json({ success: true, user: userResponse(user) });
+    return res.json({ success: true, user: await userResponse(user) });
   } catch (err) {
     console.error('updateProfile error', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -608,7 +622,7 @@ export async function becomeHost(req, res) {
     return res.json({
       success: true,
       message: 'Host application submitted. You will become a host after admin approval.',
-      user: userResponse(user),
+      user: await userResponse(user),
     });
   } catch (err) {
     console.error('becomeHost error', err);

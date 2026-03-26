@@ -145,7 +145,7 @@ app.post(
   submitKycMultipart
 );
 
-// NEW: Upload route for files to S3
+// Upload route for files to S3
 const s3Client = new S3Client({ region: 'ap-southeast-1' });
 const BUCKET_NAME = 'swifty-kyc-uploads';
 const upload = multer({ storage: multer.memoryStorage() });
@@ -165,6 +165,29 @@ app.post('/api/auth/kyc/upload', authMiddleware, upload.single('file'), async (r
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Upload failed' });
+  }
+});
+
+// Dedicated profile picture upload route (separate S3 prefix)
+app.post('/api/auth/profile-picture/upload', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file' });
+    // Validate it's an image
+    if (!req.file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ message: 'Only image files are allowed' });
+    }
+    const key = `profile-pictures/${req.user.id}/${Date.now()}-${req.file.originalname}`;
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    });
+    await s3Client.send(command);
+    res.json({ key });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Profile picture upload failed' });
   }
 });
 

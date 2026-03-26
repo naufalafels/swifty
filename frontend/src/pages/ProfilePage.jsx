@@ -345,28 +345,30 @@ const ProfilePage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      let profilePictureUrl = user?.profilePicture || '';
-
-      // Upload profile picture if one was selected
-      if (editExtras.profilePic instanceof File) {
-        const uploadForm = new FormData();
-        uploadForm.append('file', editExtras.profilePic);
-        const uploadRes = await api.post('/api/auth/kyc/upload', uploadForm, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        profilePictureUrl = uploadRes.data.key || uploadRes.data.url || '';
-      }
-
-      // Send all extras to the update-profile endpoint
-      const res = await api.put('/api/auth/update-profile', {
-        profilePicture: profilePictureUrl,
+      // Build the payload WITHOUT profilePicture by default
+      const payload = {
         school: editExtras.school,
         work: editExtras.work,
         pets: editExtras.pets,
         decade: editExtras.decade,
         languages: editExtras.languages,
         live: editExtras.live,
-      });
+      };
+
+      // Only upload & include profilePicture if user selected a new file
+      if (editExtras.profilePic instanceof File) {
+        const uploadForm = new FormData();
+        uploadForm.append('file', editExtras.profilePic);
+        const uploadRes = await api.post('/api/auth/profile-picture/upload', uploadForm, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        // Send the raw S3 KEY (not a URL) to the backend
+        payload.profilePicture = uploadRes.data.key || '';
+      }
+      // If no new file selected, do NOT send profilePicture at all —
+      // the backend keeps the existing value untouched (line 401: "if profilePicture !== undefined")
+
+      const res = await api.put('/api/auth/update-profile', payload);
 
       const updatedUser = res.data.user;
       setUser(updatedUser);

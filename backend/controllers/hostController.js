@@ -462,35 +462,75 @@ export const upsertFlexiblePricing = async (req, res) => {
       return res.status(400).json({ success: false, message: "baseDailyRate required" });
     }
 
-    const safePeak = (Array.isArray(peakMultipliers) ? peakMultipliers : [])
-      .map((p) => ({
-        label: p.label || "Peak",
-        start: String(p.start || "").slice(0, 10),
-        end: String(p.end || "").slice(0, 10),
-        multiplier: Number(p.multiplier || 1),
-        depositMultiplier: Number(p.depositMultiplier || 1),
-      }))
-      .filter((p) => p.start && p.end && p.multiplier > 0 && p.depositMultiplier > 0);
-
-    const car = await Car.findByIdAndUpdate(
-      carId,
-      {
-        $set: {
-          dailyRate: Number(baseDailyRate),
-          deposit: Number(baseDeposit),
-          flexiblePricing: {
-            baseDailyRate: Number(baseDailyRate),
-            baseDeposit: Number(baseDeposit),
-            weekendMultiplier: Number(weekendMultiplier || 1),
-            depositWeekendMultiplier: Number(depositWeekendMultiplier || 1),
-            peakMultipliers: safePeak,
-          },
-        },
-      },
-      { new: true }
-    );
-
+    const car = await Car.findById(carId);
     if (!car) return res.status(404).json({ success: false, message: "Car not found" });
+
+    // FIX: Capture previous pricing values BEFORE saving for audit log
+    const previousPricing = {
+      baseDailyRate: car.flexiblePricing?.baseDailyRate ?? car.dailyRate ?? 0,
+      baseDeposit: car.flexiblePricing?.baseDeposit ?? car.deposit ?? 0,
+      weekendMultiplier: car.flexiblePricing?.weekendMultiplier ?? 1,
+      depositWeekendMultiplier: car.flexiblePricing?.depositWeekendMultiplier ?? 1,
+      peakMultipliers: car.flexiblePricing?.peakMultipliers || [],
+    };
+
+    car.flexiblePricing = {
+      baseDailyRate: Number(baseDailyRate),
+      baseDeposit: Number(baseDeposit),
+      weekendMultiplier: weekendMultiplier !== undefined ? Number(weekendMultiplier) : (car.flexiblePricing?.weekendMultiplier ?? 1),
+      depositWeekendMultiplier: depositWeekendMultiplier !== undefined ? Number(depositWeekendMultiplier) : (car.flexiblePricing?.depositWeekendMultiplier ?? 1),
+      peakMultipliers: Array.isArray(peakMultipliers) ? peakMultipliers : [],
+    };
+    car.dailyRate = Number(baseDailyRate);
+    car.deposit = Number(baseDeposit);
+
+    await car.save();
+
+    // FIX: Create audit log for host price change
+    try {
+      const AuditLog = (await import('../models/auditLogModel.js')).default;
+
+      const newPricing = {
+        baseDailyRate: Number(baseDailyRate),
+        baseDeposit: Number(baseDeposit),
+        weekendMultiplier: car.flexiblePricing.weekendMultiplier,
+        depositWeekendMultiplier: car.flexiblePricing.depositWeekendMultiplier,
+        peakMultipliers: car.flexiblePricing.peakMultipliers,
+      };
+
+      const changes = [];
+      if (previousPricing.baseDailyRate !== newPricing.baseDailyRate) {
+        changes.push(`Daily rate: MYR ${previousPricing.baseDailyRate} → MYR ${newPricing.baseDailyRate}`);
+      }
+      if (previousPricing.baseDeposit !== newPricing.baseDeposit) {
+        changes.push(`Deposit: MYR ${previousPricing.baseDeposit} → MYR ${newPricing.baseDeposit}`);
+      }
+      if (previousPricing.weekendMultiplier !== newPricing.weekendMultiplier) {
+        changes.push(`Weekend multiplier: ${previousPricing.weekendMultiplier}x → ${newPricing.weekendMultiplier}x`);
+      }
+
+      await AuditLog.create({
+        userId: req.user.id,
+        userName: req.user.name || '',
+        userEmail: req.user.email || '',
+        companyId: car.companyId || req.user.companyId || null,
+        category: 'price_change',
+        action: `Host pricing changed: ${car.make} ${car.model} (${car.year})`,
+        details: changes.length > 0 ? changes.join('; ') : 'Flexible pricing updated (no value change)',
+        severity: 'warning',
+        metadata: {
+          targetType: 'car',
+          targetId: carId,
+          carId: carId,
+          previousValue: previousPricing,
+          newValue: newPricing,
+        },
+        ip: req.ip,
+      });
+    } catch (logErr) {
+      console.error('Audit log failed for upsertFlexiblePricing:', logErr.message);
+    }
+
     return res.json({ success: true, data: car.flexiblePricing });
   } catch (err) {
     console.error("upsertFlexiblePricing error", err);

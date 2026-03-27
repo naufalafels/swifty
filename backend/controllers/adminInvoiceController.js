@@ -1,31 +1,25 @@
+import mongoose from 'mongoose';
 import Booking from '../models/bookingModel.js';
-import User from '../models/userModel.js';
 
 const XENDIT_SECRET_KEY = (process.env.XENDIT_SECRET_KEY || '').trim();
 
 /**
- * Strategy for Invoices with Xendit:
- *
- * Xendit creates invoices when you call POST /v2/invoices — you already do this in paymentController.
- * Every booking with a xenditInvoiceId IS an invoice. So we don't need a separate Invoice collection.
- *
- * This controller:
- * 1. Lists all bookings that have a xenditInvoiceId (= all invoices)
- * 2. Fetches live status from Xendit API for any individual invoice
- * 3. Provides a "view invoice" link that redirects to Xendit's hosted invoice page
- *
- * The xenditInvoiceUrl is already stored on each booking from createXenditInvoice.
+ * Xendit Invoice Strategy:
+ * Every booking with a xenditInvoiceId IS an invoice. We don't need a separate collection.
+ * This controller queries bookings that have xenditInvoiceId set and optionally
+ * fetches live data from the Xendit API.
  */
 
-// GET /api/admin/invoices — List all invoices (= bookings with xenditInvoiceId)
+// GET /api/admin/invoices
 export const listInvoices = async (req, res) => {
   try {
-    const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company' });
+    const rawCompanyId = req.user.companyId;
+    if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company' });
+    const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
 
     const { page = 1, limit = 50, status, search, startDate, endDate } = req.query;
 
-    const filter = { companyId, xenditInvoiceId: { $ne: '' } };
+    const filter = { companyId, xenditInvoiceId: { $exists: true, $ne: '' } };
 
     if (status && status !== 'all') {
       filter.paymentStatus = status;
@@ -55,20 +49,23 @@ export const listInvoices = async (req, res) => {
       Booking.countDocuments(filter),
     ]);
 
-    // Summarize
-    const allInvoiceBookings = await Booking.find({ companyId, xenditInvoiceId: { $ne: '' } })
-      .select('paymentStatus amount')
-      .lean();
-    const summary = {
-      total: allInvoiceBookings.length,
-      paid: allInvoiceBookings.filter((b) => b.paymentStatus === 'paid').length,
-      pending: allInvoiceBookings.filter((b) => b.paymentStatus === 'pending').length,
-      expired: allInvoiceBookings.filter((b) => b.paymentStatus === 'expired').length,
-      refunded: allInvoiceBookings.filter((b) => ['refunded', 'partially_refunded'].includes(b.paymentStatus)).length,
-      totalRevenue: allInvoiceBookings
-        .filter((b) => b.paymentStatus === 'paid')
-        .reduce((s, b) => s + (b.amount || 0), 0),
-    };
+    // Summary via aggregation (uses ObjectId correctly)
+    const summaryAgg = await Booking.aggregate([
+      { $match: { companyId, xenditInvoiceId: { $exists: true, $ne: '' } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          paid: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] } },
+          pending: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'pending'] }, 1, 0] } },
+          expired: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'expired'] }, 1, 0] } },
+          refunded: { $sum: { $cond: [{ $in: ['$paymentStatus', ['refunded', 'partially_refunded']] }, 1, 0] } },
+          totalRevenue: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, { $ifNull: ['$amount', 0] }, 0] } },
+        },
+      },
+    ]);
+
+    const summary = summaryAgg[0] || { total: 0, paid: 0, pending: 0, expired: 0, refunded: 0, totalRevenue: 0 };
 
     const invoices = bookings.map((b) => ({
       bookingId: b._id,
@@ -108,20 +105,19 @@ export const listInvoices = async (req, res) => {
   }
 };
 
-// GET /api/admin/invoices/:invoiceId — Fetch live Xendit invoice details
+// GET /api/admin/invoices/:invoiceId
 export const getInvoiceDetail = async (req, res) => {
   try {
     const { invoiceId } = req.params;
     if (!invoiceId) return res.status(400).json({ success: false, message: 'invoiceId required' });
 
-    // Local data
     const booking = await Booking.findOne({
       xenditInvoiceId: invoiceId,
       companyId: req.user.companyId,
     }).lean();
     if (!booking) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
-    // Fetch live from Xendit
+    // Optionally fetch live Xendit data
     let xenditData = null;
     if (XENDIT_SECRET_KEY) {
       try {
@@ -155,7 +151,7 @@ export const getInvoiceDetail = async (req, res) => {
         paymentBreakdown: booking.paymentBreakdown,
         car: booking.car,
       },
-      xendit: xenditData, // Full Xendit response (if available)
+      xendit: xenditData,
     });
   } catch (err) {
     console.error('getInvoiceDetail error', err);

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';  // FIX: Added mongoose import for ObjectId casting
 import Booking from '../models/bookingModel.js';
 import User from '../models/userModel.js';
 import Car from '../models/carModel.js';
@@ -6,10 +7,14 @@ import Refund from '../models/refundModel.js';
 
 export const getAnalytics = async (req, res) => {
   try {
-    const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+    const rawCompanyId = req.user.companyId;
+    if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
 
-    const { period = '12' } = req.query; // months to look back
+    // FIX: Cast to ObjectId. Mongoose .find() auto-casts strings, but .aggregate() does NOT.
+    // This was the root cause of "Failed to load analytics data" — every $match returned 0 results.
+    const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
+
+    const { period = '12' } = req.query;
     const monthsBack = parseInt(period) || 12;
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
@@ -39,9 +44,9 @@ export const getAnalytics = async (req, res) => {
         },
         { $sort: { _id: 1 } },
       ]),
-      User.countDocuments({ companyId }),
-      Booking.countDocuments({ companyId }),
-      Car.countDocuments({ companyId }),
+      User.countDocuments({ companyId: rawCompanyId }),  // .countDocuments auto-casts
+      Booking.countDocuments({ companyId: rawCompanyId }),
+      Car.countDocuments({ companyId: rawCompanyId }),
 
       // Booking status breakdown
       Booking.aggregate([
@@ -116,7 +121,7 @@ export const getAnalytics = async (req, res) => {
 
       // "Active visits" proxy — count admin logins in last 30 days
       AuditLog.countDocuments({
-        companyId,
+        companyId: rawCompanyId,  // .countDocuments auto-casts
         category: 'auth',
         createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
       }),
@@ -162,7 +167,6 @@ export const getAnalytics = async (req, res) => {
 
     return res.json({
       success: true,
-      // Summary cards
       totalRevenue,
       netRevenue,
       totalRefunded: refundData.totalRefunded,
@@ -176,8 +180,6 @@ export const getAnalytics = async (req, res) => {
       conversionRate,
       projectedNextMonth,
       adminLogins30d: loginCount,
-
-      // Chart data
       revenue: { labels: revenueLabels, values: revenueValues },
       bookingTrend: { labels: revenueLabels, values: bookingCountValues },
       dailyBookings: {
@@ -189,8 +191,6 @@ export const getAnalytics = async (req, res) => {
         labels: newUsersAgg.map((u) => u._id),
         values: newUsersAgg.map((u) => u.count),
       },
-
-      // Breakdowns
       statusBreakdown: statusBreakdown.reduce((acc, s) => { acc[s._id] = s.count; return acc; }, {}),
       paymentMethods: paymentMethodAgg.map((p) => ({ method: p._id, count: p.count, revenue: p.revenue })),
       topCars,

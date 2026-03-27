@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
-import { BarChart3, ShieldCheck, FileText, ClipboardList, Receipt, FileSignature, Menu, X, LogOut, User, Settings, ChevronLeft, ChevronRight } from "lucide-react"; // UPDATED: Added ChevronLeft, ChevronRight for collapse toggle
+import axios from "axios"; // FIX: Import axios (was missing — `api` was never defined)
+import { BarChart3, ShieldCheck, FileText, Receipt, FileSignature, FileBarChart, LogOut, User, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   getAdminToken,
   getAdminUser,
@@ -10,47 +11,55 @@ import {
   ensureAuth,
 } from "../utils/auth.js";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:7889"; // FIX: define API_BASE
+
+// FIX: Removed Reports, replaced "Company Profile" with "Admin Profile", added Invoices
 const navLinks = [
-  { path: "/analytics", icon: BarChart3, label: "Analytics" }, // NEW: Analytics as first
-  { path: "/verification", icon: ShieldCheck, label: "Verification" }, // NEW
-  { path: "/audit-logs", icon: FileText, label: "Audit Logs" }, // NEW
-  { path: "/reports", icon: ClipboardList, label: "Reports" }, // NEW
-  { path: "/refunds", icon: Receipt, label: "Refunds" }, // NEW
-  { path: "/legal-docs", icon: FileSignature, label: "Legal Docs" }, // NEW
-  { path: "/company", icon: Settings, label: "Company Profile" }, // UPDATED: Keep company, move to end
+  { path: "/analytics", icon: BarChart3, label: "Analytics" },
+  { path: "/verification", icon: ShieldCheck, label: "Verification" },
+  { path: "/audit-logs", icon: FileText, label: "Audit Logs" },
+  { path: "/refunds", icon: Receipt, label: "Refunds" },
+  { path: "/invoices", icon: FileBarChart, label: "Invoices" },       // NEW
+  { path: "/legal-docs", icon: FileSignature, label: "Legal Docs" },
+  { path: "/admin-profile", icon: User, label: "Admin Profile" },     // CHANGED: was "/company" → Company Profile
 ];
 
 const Sidebar = () => {
   const navigate = useNavigate();
-  const [isCollapsed, setIsCollapsed] = useState(true); // UPDATED: Default to collapsed
-  const [company, setCompany] = useState(null);
-
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [adminUser, setAdminUser] = useState(() => getAdminUser());
 
-  // fetch company info after ensuring auth
+  // Fetch admin user profile on mount
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const ok = await ensureAuth();
         if (!ok) return;
-        // api will attach Authorization header automatically from in-memory token
-        const res = await api.get("/api/admin/company");
-        if (mounted && res?.data?.company) setCompany(res.data.company);
-        // refresh local user state
-        setAdminUser(getAdminUser());
+        const token = getAdminToken(); // FIX: use token from cookies
+        if (token) {
+          const res = await axios.get(`${API_BASE}/api/admin/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (mounted && res?.data?.profile) {
+            setAdminUser(res.data.profile);
+          }
+        }
+        // Also refresh from in-memory
+        const memUser = getAdminUser();
+        if (mounted && memUser && !adminUser) setAdminUser(memUser);
       } catch (err) {
-        console.warn("Failed to fetch company for sidebar", err?.response?.data || err.message);
+        console.warn("Failed to fetch admin profile for sidebar", err?.response?.data || err.message);
+        // Fallback to in-memory user
+        if (mounted) setAdminUser(getAdminUser());
       }
     })();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const handleLogout = async () => {
     try {
-      await adminLogout(); // server logout + clears in-memory
+      await adminLogout();
     } catch (e) {
       console.warn("logout error", e);
     } finally {
@@ -60,8 +69,9 @@ const Sidebar = () => {
   };
 
   const renderAvatar = () => {
-    if (company && company.logo) {
-      return <img src={company.logo} alt="company logo" className="w-8 h-8 rounded-full object-cover" />;
+    // FIX: Show admin's own profile picture instead of company logo
+    if (adminUser?.profilePicture) {
+      return <img src={adminUser.profilePicture} alt="avatar" className="w-8 h-8 rounded-full object-cover" />;
     }
     const name = adminUser?.name || adminUser?.email || "";
     const initials = name ? name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() : "";
@@ -74,13 +84,11 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Sidebar */}
       <div
         className={`bg-gray-900 text-white p-4 transition-all duration-300 sticky top-0 h-screen overflow-y-auto flex flex-col ${
           isCollapsed ? "w-20" : "w-64"
         }`}
       >
-        {/* Header with logo and collapse toggle */}
         <div className={`flex items-center justify-between mb-8 ${isCollapsed ? "justify-center" : ""}`}>
           <img src={logo} alt="Logo" className={`h-10 w-auto ${isCollapsed ? "" : "mr-3"}`} />
           {!isCollapsed && <span className="text-xl font-bold">Swifty Admin</span>}
@@ -92,7 +100,6 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* Navigation Links */}
         <nav className="space-y-2 flex-1">
           {navLinks.map(({ path, icon: Icon, label }) => (
             <Link
@@ -107,7 +114,6 @@ const Sidebar = () => {
           ))}
         </nav>
 
-        {/* User Section */}
         <div className={`mt-auto ${isCollapsed ? "" : "mb-4"}`}>
           <div className={`flex items-center mb-4 ${isCollapsed ? "justify-center" : ""}`}>
             {renderAvatar()}

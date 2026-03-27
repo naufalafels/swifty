@@ -163,6 +163,7 @@ export const createAdminCar = async (req, res) => {
 };
 
 // update car for company (accepts image on req.file)
+// FIX: Now creates audit logs for price changes and car updates
 export const updateAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
@@ -174,8 +175,18 @@ export const updateAdminCar = async (req, res) => {
     if (!car.companyId || car.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
 
     const body = req.body || {};
-    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','deposit','gasUsage','status','location'];  // Added deposit and gasUsage
-    allowed.forEach(k => { if (body[k] !== undefined) car[k] = body[k]; });
+    const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','deposit','gasUsage','status','location'];
+
+    // FIX: Capture previous values BEFORE applying changes (for audit log)
+    const previousValues = {};
+    const newValues = {};
+    allowed.forEach(k => {
+      if (body[k] !== undefined) {
+        previousValues[k] = car[k];
+        car[k] = body[k];
+        newValues[k] = body[k];
+      }
+    });
 
     if (req.file) {
       car.image = buildCarImageUrl(req.file);
@@ -184,6 +195,56 @@ export const updateAdminCar = async (req, res) => {
     }
 
     await car.save();
+
+    // FIX: Create audit log — detect price changes vs general updates
+    try {
+      const { default: AuditLog } = await import('../models/auditLogModel.js');
+
+      const isPriceChange = previousValues.dailyRate !== undefined || previousValues.deposit !== undefined;
+      const category = isPriceChange ? 'price_change' : 'car_management';
+      const severity = isPriceChange ? 'warning' : 'info';
+
+      let action = '';
+      let details = '';
+
+      if (isPriceChange) {
+        const parts = [];
+        if (previousValues.dailyRate !== undefined && String(previousValues.dailyRate) !== String(newValues.dailyRate)) {
+          parts.push(`Daily rate: MYR ${previousValues.dailyRate} → MYR ${newValues.dailyRate}`);
+        }
+        if (previousValues.deposit !== undefined && String(previousValues.deposit) !== String(newValues.deposit)) {
+          parts.push(`Deposit: MYR ${previousValues.deposit} → MYR ${newValues.deposit}`);
+        }
+        action = `Price changed on ${car.make} ${car.model} (${car.year})`;
+        details = parts.length > 0 ? parts.join('; ') : 'Price fields updated (no value change)';
+      } else {
+        const changedFields = Object.keys(newValues).filter(k => String(previousValues[k]) !== String(newValues[k]));
+        action = `Car updated: ${car.make} ${car.model} (${car.year})`;
+        details = changedFields.length > 0 ? `Changed: ${changedFields.join(', ')}` : 'Car fields updated';
+      }
+
+      await AuditLog.create({
+        userId: req.user.id,
+        userName: req.user.name || '',
+        userEmail: req.user.email || '',
+        companyId: req.user.companyId,
+        category,
+        action,
+        details,
+        severity,
+        metadata: {
+          targetType: 'car',
+          targetId: carId,
+          carId: carId,
+          previousValue: previousValues,
+          newValue: newValues,
+        },
+        ip: req.ip,
+      });
+    } catch (logErr) {
+      console.error('Audit log failed for updateAdminCar:', logErr.message);
+    }
+
     return res.json({ success: true, car });
   } catch (err) {
     console.error('updateAdminCar', err);

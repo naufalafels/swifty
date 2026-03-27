@@ -1,13 +1,14 @@
 import React from "react";
 import { Route, Routes, Navigate, useLocation } from "react-router-dom";
-import Sidebar from "./components/Sidebar.jsx"; // UPDATED: Use Sidebar component
-import Analytics from "./pages/Analytics.jsx"; // NEW: Analytics page
-import Verification from "./pages/Verification.jsx"; // NEW: User/Host verification page
-import AuditLogs from "./pages/AuditLogs.jsx"; // NEW: Audit logs page
-import Reports from "./pages/Reports.jsx"; // NEW: Reports page
-import LegalDocs from "./pages/LegalDocs.jsx"; // NEW: Legal documents page
-import Refunds from "./pages/Refunds.jsx"; // NEW: Refunds page
-import CompanyProfile from "./pages/CompanyProfile.jsx"; // UPDATED: Now a full page
+import Sidebar from "./components/Sidebar.jsx";
+import Analytics from "./pages/Analytics.jsx";
+import Verification from "./pages/Verification.jsx";
+import AuditLogs from "./pages/AuditLogs.jsx";
+// REMOVED: import Reports from "./pages/Reports.jsx";
+import LegalDocs from "./pages/LegalDocs.jsx";
+import Refunds from "./pages/Refunds.jsx";
+import Invoices from "./pages/Invoices.jsx";           // NEW
+import AdminProfile from "./pages/AdminProfile.jsx";   // CHANGED: was CompanyProfile
 import AuthPage from "./pages/Auth.jsx";
 import { useState, useEffect } from "react";
 import { ensureAuth } from "./utils/auth.js";
@@ -59,19 +60,22 @@ const App = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100"> {/* NEW: Flex layout for sidebar and content */}
+    <div className="flex min-h-screen bg-gray-100">
       <Sidebar />
-      <div className="flex-1 overflow-auto"> {/* NEW: Main content area */}
+      <div className="flex-1 overflow-auto">
         <Routes>
-          <Route path="/" element={<Navigate to="/analytics" replace />} /> {/* UPDATED: Redirect root to analytics */}
-          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} /> {/* NEW: Analytics as default */}
-          <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/legal-docs" element={<ProtectedRoute><LegalDocs /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/refunds" element={<ProtectedRoute><Refunds /></ProtectedRoute>} /> {/* NEW */}
-          <Route path="/company" element={<ProtectedRoute><CompanyProfile /></ProtectedRoute>} /> {/* UPDATED: Full page */}
-          <Route path="*" element={<Navigate to="/analytics" replace />} /> {/* UPDATED: Redirect unknown to analytics */}
+          <Route path="/" element={<Navigate to="/analytics" replace />} />
+          <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
+          <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+          {/* REMOVED: /reports route */}
+          <Route path="/legal-docs" element={<ProtectedRoute><LegalDocs /></ProtectedRoute>} />
+          <Route path="/refunds" element={<ProtectedRoute><Refunds /></ProtectedRoute>} />
+          <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />               {/* NEW */}
+          <Route path="/admin-profile" element={<ProtectedRoute><AdminProfile /></ProtectedRoute>} />       {/* CHANGED */}
+          {/* Keep /company as redirect for bookmarks */}
+          <Route path="/company" element={<Navigate to="/admin-profile" replace />} />
+          <Route path="*" element={<Navigate to="/analytics" replace />} />
         </Routes>
         <CookieConsent />
       </div>

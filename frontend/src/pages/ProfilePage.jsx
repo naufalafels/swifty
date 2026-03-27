@@ -484,7 +484,8 @@ const ProfilePage = () => {
     }, 300);
   };
 
-  const applySuggestion = (text) => {
+  const applySuggestion = async (text) => {
+    // Immediately fill the address fields with the selected text
     setPersonalForm((p) => ({
       ...p,
       addressSearch: text,
@@ -492,6 +493,45 @@ const ProfilePage = () => {
       mailingAddress: p.sameMailing ? text : p.mailingAddress,
     }));
     setAddressSuggestions([]);
+
+    // Now geocode the selected address to extract city, state, zipCode, country
+    try {
+      const res = await api.get('/api/places/geocode', { params: { address: text } });
+      const results = res?.data?.results || [];
+      if (results.length > 0) {
+        const components = results[0].address_components || [];
+        let city = '';
+        let state = '';
+        let zipCode = '';
+        let country = '';
+
+        components.forEach((c) => {
+          if (c.types.includes('locality') || c.types.includes('administrative_area_level_2')) {
+            city = c.long_name;
+          }
+          if (c.types.includes('administrative_area_level_1')) {
+            state = c.long_name;
+          }
+          if (c.types.includes('postal_code')) {
+            zipCode = c.long_name;
+          }
+          if (c.types.includes('country')) {
+            country = c.short_name; // "MY", "AU", etc.
+          }
+        });
+
+        setPersonalForm((p) => ({
+          ...p,
+          city: city || p.city,
+          state: state || p.state,
+          zipCode: zipCode || p.zipCode,
+          country: country || p.country,
+        }));
+      }
+    } catch (err) {
+      console.error('Geocode lookup failed', err);
+      // Non-blocking — the user can still manually fill city/state/zip/country
+    }
   };
 
   const handleHostNavigate = () => {
@@ -920,12 +960,18 @@ const ProfilePage = () => {
                 />
               </label>
 
-              <div className="grid sm:grid-cols-2 gap-3">
+                            <div className="grid sm:grid-cols-2 gap-3">
+                <label className="text-sm font-semibold text-slate-800">Zip Code
+                  <input value={personalForm.zipCode} onChange={(e) => setPersonalForm({ ...personalForm, zipCode: e.target.value })} className="w-full mt-1 p-2 border rounded" placeholder="e.g. 50000" />
+                </label>
                 <label className="text-sm font-semibold text-slate-800">City
-                  <input value={personalForm.city} onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })} className="w-full mt-1 p-2 border rounded" />
+                  <input value={personalForm.city} onChange={(e) => setPersonalForm({ ...personalForm, city: e.target.value })} className="w-full mt-1 p-2 border rounded" placeholder="e.g. Kuala Lumpur" />
+                </label>
+                <label className="text-sm font-semibold text-slate-800">State
+                  <input value={personalForm.state} onChange={(e) => setPersonalForm({ ...personalForm, state: e.target.value })} className="w-full mt-1 p-2 border rounded" placeholder="e.g. Selangor" />
                 </label>
                 <label className="text-sm font-semibold text-slate-800">Country
-                  <input value={personalForm.country} onChange={(e) => setPersonalForm({ ...personalForm, country: e.target.value })} className="w-full mt-1 p-2 border rounded" />
+                  <input value={personalForm.country} onChange={(e) => setPersonalForm({ ...personalForm, country: e.target.value })} className="w-full mt-1 p-2 border rounded" placeholder="e.g. MY" />
                 </label>
               </div>
 

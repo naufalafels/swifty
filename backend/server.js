@@ -134,6 +134,23 @@ app.get('/api/places/autocomplete', async (req, res) => {
   }
 });
 
+// Google Places geocode proxy (resolve address string → components)
+app.get('/api/places/geocode', async (req, res) => {
+  const { address } = req.query;
+  if (!address) return res.json({ results: [] });
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (!apiKey) return res.status(500).json({ results: [], error: 'Google Maps API key not configured' });
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return res.json({ results: data.results || [] });
+  } catch (err) {
+    console.error('Places geocode error', err);
+    return res.status(500).json({ results: [], error: 'Geocode lookup failed' });
+  }
+});
+
 // Host approval/rejection routes
 app.post('/api/admin/host/:id/approve', authMiddleware, approveHost);
 app.post('/api/admin/host/:id/reject', authMiddleware, rejectHost);

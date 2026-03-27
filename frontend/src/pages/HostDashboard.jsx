@@ -113,22 +113,23 @@ const PricingCard = ({ car, pricing, onSave }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl">
       <button
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 sm:px-4 py-3 text-left gap-2"
         onClick={() => setCollapsed((c) => !c)}
-      >
-        <div className="flex items-center gap-2 text-white font-semibold">
+        >
+        <div className="flex items-center gap-2 text-white font-semibold text-sm sm:text-base">
           <FaDollarSign className="text-emerald-400" />
           Flexible Pricing — {car.make} {car.model}
         </div>
-        <div className="flex items-center gap-3 text-sm text-slate-300">
+        <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-slate-300">
           <Pill tone="amber">RM {base}</Pill>
           <Pill tone="blue">Dep RM {baseDep}</Pill>
           <span className="text-xs text-slate-400">{collapsed ? "Expand" : "Collapse"}</span>
         </div>
       </button>
+
       {!collapsed && (
         <div className="p-4 space-y-4 border-t border-slate-800">
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             <label className="flex flex-col text-sm text-slate-200 gap-1">
               Base daily rate (RM)
               <input type="number" min="0" value={base} onChange={(e) => setBase(Number(e.target.value))}
@@ -165,7 +166,7 @@ const PricingCard = ({ car, pricing, onSave }) => {
           {peak.length > 0 && (
             <div className="space-y-3">
               {peak.map((p, idx) => (
-                <div key={idx} className="grid md:grid-cols-5 gap-3 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+                <div key={idx} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 bg-slate-800/60 border border-slate-700 rounded-lg p-3">
                   <input value={p.label} onChange={(e) => updatePeak(idx, "label", e.target.value)}
                     className="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white" placeholder="Label" />
                   <input type="date" value={p.start} onChange={(e) => updatePeak(idx, "start", e.target.value)}
@@ -659,7 +660,7 @@ const BookingHistoryTab = ({ bookings, loading, cars = [] }) => {
   return (
     <div className="space-y-6">
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
           { label: "Total", value: stats.total, color: "text-white" },
           { label: "Passed", value: stats.passed, color: "text-emerald-400" },
@@ -741,7 +742,7 @@ const BookingHistoryTab = ({ bookings, loading, cars = [] }) => {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-slate-800 text-left text-xs uppercase text-slate-500 tracking-wide">
                 <th className="px-4 py-3">Date</th>
@@ -1140,6 +1141,24 @@ const CALENDAR_STYLES = `
     position: relative !important;
   }
 
+  @media (max-width: 768px) {
+  .host-calendar .rdrMonths {
+    flex-direction: column !important;
+  }
+  .host-calendar .rdrMonth {
+    width: 100% !important;
+  }
+  .host-calendar .rdrCalendarWrapper {
+    width: 100% !important;
+  }
+  .service-calendar .rdrCalendarWrapper {
+    width: 100% !important;
+  }
+  .service-calendar .rdrMonth {
+    width: 100% !important;
+  }
+}
+
   /* ── service block calendar (amber theme) ── */
   .service-calendar .rdrCalendarWrapper,
   .service-calendar .rdrDateDisplayWrapper,
@@ -1461,7 +1480,7 @@ const HostDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-10">
+    <div className="min-h-screen bg-slate-950 text-white pb-10 overflow-x-hidden">
       <style>{CALENDAR_STYLES}</style>
 
       {/* Customer Detail Modal */}
@@ -1502,23 +1521,23 @@ const HostDashboard = () => {
               </h1>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 w-full sm:w-auto">
             <button onClick={() => navigate("/host/add-cars")}
-              className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold">
+              className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 flex items-center justify-center gap-2 font-semibold flex-1 sm:flex-none text-sm">
               <FaPlus /> Add cars
             </button>
             <button onClick={() => navigate("/profile")}
-              className="bg-slate-800 hover:bg-slate-700 rounded-lg px-4 py-2 flex items-center gap-2 font-semibold">
+               className="bg-slate-800 hover:bg-slate-700 rounded-lg px-4 py-2 flex items-center justify-center gap-2 font-semibold flex-1 sm:flex-none text-sm">
               <FaShieldAlt /> Profile & security
             </button>
           </div>
         </div>
 
         {/* ──── TAB NAVIGATION ──── */}
-        <div className="flex gap-2 border-b border-slate-800 pb-1">
+        <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-1 overflow-x-auto">
           <button
             onClick={() => setActiveTab("operations")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "operations"
                 ? "bg-slate-800 text-white border-b-2 border-emerald-400"
                 : "text-slate-400 hover:text-white hover:bg-slate-800/50"
@@ -1528,7 +1547,7 @@ const HostDashboard = () => {
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === "history"
                 ? "bg-slate-800 text-white border-b-2 border-amber-400"
                 : "text-slate-400 hover:text-white hover:bg-slate-800/50"
@@ -1548,7 +1567,7 @@ const HostDashboard = () => {
         <>
 
         {/* ──── stat cards ──── */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <StatCard title="Cars" value={cars.length} icon={<FaCar />} tone="blue" />
           <StatCard title="Today pickups" value={todayPickups.length} icon={<FaClipboardCheck />} tone="emerald" />
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
@@ -1606,7 +1625,7 @@ const HostDashboard = () => {
               </div>
             </div>
 
-            <div className="host-calendar">
+            <div className="host-calendar w-full overflow-x-auto">
               <DateRange
                 onChange={(item) => {
                   setSelectedRange([item.selection]);
@@ -1932,7 +1951,7 @@ const HostDashboard = () => {
                 </div>
               )}
 
-              <div className="service-calendar">
+              <div className="service-calendar w-full overflow-x-auto">
                 <DateRange
                   onChange={(item) => setServiceDates([item.selection])}
                   ranges={serviceDates}

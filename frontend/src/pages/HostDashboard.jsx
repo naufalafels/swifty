@@ -1494,7 +1494,11 @@ const HostDashboard = () => {
             <div>
               <div className="text-xs uppercase text-slate-500">Host Centre</div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
-                <FaHome className="text-emerald-400" /> Host Centre
+                {activeTab === "operations" ? (
+                  <><FaClipboardCheck className="text-emerald-400" /> Operations Overview</>
+                ) : (
+                  <><FaHistory className="text-amber-400" /> Booking History</>
+                )}
               </h1>
             </div>
           </div>
@@ -1549,14 +1553,6 @@ const HostDashboard = () => {
           <StatCard title="Today pickups" value={todayPickups.length} icon={<FaClipboardCheck />} tone="emerald" />
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
         </div>  
-
-        {/* ──── Booking History ──── */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xl font-bold text-white">
-            <FaHistory className="text-amber-400" /> Booking History
-          </div>
-          <BookingHistoryTab bookings={bookings} loading={loading} />
-        </div>
 
         {/* ──── quick find ──── */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">

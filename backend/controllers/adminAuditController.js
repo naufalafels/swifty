@@ -1,8 +1,20 @@
+import mongoose from 'mongoose';
 import AuditLog from '../models/auditLogModel.js';
 
 export const getAuditLogs = async (req, res) => {
   try {
-    const companyId = req.user.companyId;
+    // FIX: Superadmin sees ALL audit logs. company_admin sees only their company.
+    const rawCompanyId = req.user.companyId;
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    let companyMatch = {};
+    if (!isSuperAdmin) {
+      if (!rawCompanyId) {
+        return res.status(400).json({ success: false, message: 'No company associated with user' });
+      }
+      companyMatch = { companyId: new mongoose.Types.ObjectId(String(rawCompanyId)) };
+    }
+
     const {
       page = 1,
       limit = 50,
@@ -14,31 +26,26 @@ export const getAuditLogs = async (req, res) => {
       endDate,
     } = req.query;
 
-    const filter = { companyId };
+    const filter = { ...companyMatch };
 
-    // Category filter
     if (category && category !== 'all') {
       filter.category = category;
     }
 
-    // Severity filter
     if (severity && severity !== 'all') {
       filter.severity = severity;
     }
 
-    // User filter
     if (filterUserId) {
       filter.userId = filterUserId;
     }
 
-    // Date range filter
     if (startDate || endDate) {
       filter.createdAt = {};
       if (startDate) filter.createdAt.$gte = new Date(startDate);
       if (endDate) filter.createdAt.$lte = new Date(endDate);
     }
 
-    // Text search on action/details
     if (search) {
       filter.$or = [
         { action: { $regex: search, $options: 'i' } },
@@ -60,7 +67,7 @@ export const getAuditLogs = async (req, res) => {
 
     // Category summary for the filter bar
     const categoryCounts = await AuditLog.aggregate([
-      { $match: { companyId } },
+      { $match: { ...companyMatch } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
     ]);
 

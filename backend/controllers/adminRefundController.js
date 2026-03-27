@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Refund from '../models/refundModel.js';
 import Booking from '../models/bookingModel.js';
 import User from '../models/userModel.js';
@@ -9,10 +10,20 @@ const XENDIT_SECRET_KEY = (process.env.XENDIT_SECRET_KEY || '').trim();
 // GET /api/admin/refunds/eligible
 export const getEligibleRefunds = async (req, res) => {
   try {
-    const companyId = req.user.companyId;
+    // FIX: Superadmin sees ALL data. company_admin sees only their company.
+    const rawCompanyId = req.user.companyId;
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    let companyMatch = {};
+    if (!isSuperAdmin) {
+      if (!rawCompanyId) {
+        return res.status(400).json({ success: false, message: 'No company associated with user' });
+      }
+      companyMatch = { companyId: new mongoose.Types.ObjectId(String(rawCompanyId)) };
+    }
 
     const bookings = await Booking.find({
-      companyId,
+      ...companyMatch,
       paymentStatus: { $in: ['paid'] },
       status: { $in: ['pending', 'upcoming', 'active'] },
     })
@@ -38,7 +49,6 @@ export const getEligibleRefunds = async (req, res) => {
         try {
           const userKycFront = user?.kyc?.frontImageUrl || b.kyc?.frontImageUrl || '';
           const userKycBack = user?.kyc?.backImageUrl || b.kyc?.backImageUrl || '';
-          // If it's an S3 key (no http), generate pre-signed URL
           if (userKycFront && !userKycFront.startsWith('http')) {
             kycFrontUrl = await generateDownloadUrl(userKycFront);
           } else {
@@ -50,7 +60,6 @@ export const getEligibleRefunds = async (req, res) => {
             kycBackUrl = userKycBack;
           }
         } catch (e) {
-          // fallback to raw stored URLs
           kycFrontUrl = user?.kyc?.frontImageUrl || b.kyc?.frontImageUrl || '';
           kycBackUrl = user?.kyc?.backImageUrl || b.kyc?.backImageUrl || '';
         }
@@ -66,7 +75,6 @@ export const getEligibleRefunds = async (req, res) => {
           paymentStatus: b.paymentStatus,
           xenditInvoiceId: b.xenditInvoiceId || '',
 
-          // Insurance & Policy
           insurancePlan,
           insuranceCost: b.paymentBreakdown?.insurance || 0,
           has24hrPolicy,
@@ -76,7 +84,6 @@ export const getEligibleRefunds = async (req, res) => {
             ? new Date(bookingDate.getTime() + 24 * 60 * 60 * 1000)
             : null,
 
-          // Car details
           car: {
             id: b.car?.id,
             make: b.car?.make || '',
@@ -92,7 +99,6 @@ export const getEligibleRefunds = async (req, res) => {
             seats: b.car?.seats || 0,
           },
 
-          // User/Guest details
           user: {
             id: b.userId,
             name: user?.name || b.customer || '',
@@ -106,7 +112,6 @@ export const getEligibleRefunds = async (req, res) => {
             kycIdCountry: user?.kyc?.idCountry || b.kyc?.idCountry || '',
           },
 
-          // Payment breakdown
           paymentBreakdown: {
             rent: b.paymentBreakdown?.rent || 0,
             insurance: b.paymentBreakdown?.insurance || 0,
@@ -120,7 +125,7 @@ export const getEligibleRefunds = async (req, res) => {
     );
 
     // Past refunds
-    const pastRefunds = await Refund.find({ companyId })
+    const pastRefunds = await Refund.find(companyMatch)
       .sort({ createdAt: -1 })
       .limit(200)
       .populate('processedBy', 'name email')
@@ -144,7 +149,14 @@ export const processRefund = async (req, res) => {
     if (Number.isNaN(refundAmt) || refundAmt <= 0)
       return res.status(400).json({ success: false, message: 'amount must be a positive number' });
 
-    const booking = await Booking.findOne({ _id: bookingId, companyId: req.user.companyId });
+    // FIX: superadmin can refund any booking; company_admin only their own
+    const isSuperAdmin = req.user.role === 'superadmin';
+    const bookingQuery = { _id: bookingId };
+    if (!isSuperAdmin && req.user.companyId) {
+      bookingQuery.companyId = req.user.companyId;
+    }
+
+    const booking = await Booking.findOne(bookingQuery);
     if (!booking)
       return res.status(404).json({ success: false, message: 'Booking not found' });
 
@@ -176,7 +188,7 @@ export const processRefund = async (req, res) => {
           xenditRefundStatus = 'processed';
         } else {
           console.warn('Xendit refund API error:', xenditData);
-          xenditRefundStatus = 'pending'; // Record locally, handle manually
+          xenditRefundStatus = 'pending';
         }
       } catch (xenditErr) {
         console.error('Xendit refund API call failed:', xenditErr.message);
@@ -186,7 +198,7 @@ export const processRefund = async (req, res) => {
 
     const refund = await Refund.create({
       bookingId,
-      companyId: req.user.companyId,
+      companyId: booking.companyId || req.user.companyId,  // FIX: use the booking's companyId
       amount: refundAmt,
       reason: reason || '',
       status: xenditRefundStatus,
@@ -212,7 +224,7 @@ export const processRefund = async (req, res) => {
         userId: req.user.id,
         userName: req.user.name || '',
         userEmail: req.user.email || '',
-        companyId: req.user.companyId,
+        companyId: booking.companyId || req.user.companyId,
         category: 'refund',
         action: `Refund processed: MYR ${refundAmt} for booking ${bookingId}`,
         details: `Reason: ${reason || 'N/A'}. Xendit ID: ${xenditRefundId || 'manual/pending'}`,

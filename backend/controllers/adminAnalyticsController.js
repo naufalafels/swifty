@@ -7,23 +7,30 @@ import Refund from '../models/refundModel.js';
 
 export const getAnalytics = async (req, res) => {
   try {
+    // FIX: Superadmin sees ALL data. company_admin sees only their company.
+    // Previously: if (!rawCompanyId) return 400 "No company associated with user"
+    // This blocked superadmins who don't belong to a specific company.
     const rawCompanyId = req.user.companyId;
-    if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+    const isSuperAdmin = req.user.role === 'superadmin';
 
-    // FIX: Cast to ObjectId ONCE and use everywhere.
-    // Mongoose .find()/.countDocuments() auto-casts strings, but .aggregate() does NOT.
-    // Previously, aggregate() used the cast ObjectId while distinct()/countDocuments() used
-    // the raw string — this inconsistency could cause silent mismatches if the raw value
-    // was already an ObjectId object vs a string.
-    const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
+    // Build the companyId match condition:
+    // - superadmin → {} (no filter, sees everything)
+    // - company_admin → { companyId: ObjectId(...) }
+    let companyMatch = {};
+    if (!isSuperAdmin) {
+      if (!rawCompanyId) {
+        return res.status(400).json({ success: false, message: 'No company associated with user' });
+      }
+      const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
+      companyMatch = { companyId };
+    }
 
     const { period = '12' } = req.query;
     const monthsBack = parseInt(period) || 12;
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
 
-    // FIX: Use cast companyId (ObjectId) for distinct() too — was using rawCompanyId (string)
-    const uniqueUserIds = await Booking.distinct('userId', { companyId });
+    const uniqueUserIds = await Booking.distinct('userId', companyMatch);
 
     const [
       revenueAgg,
@@ -39,7 +46,7 @@ export const getAnalytics = async (req, res) => {
     ] = await Promise.all([
       // Monthly revenue
       Booking.aggregate([
-        { $match: { companyId, paymentStatus: 'paid', bookingDate: { $gte: startDate } } },
+        { $match: { ...companyMatch, paymentStatus: 'paid', bookingDate: { $gte: startDate } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m', date: '$bookingDate' } },
@@ -50,19 +57,18 @@ export const getAnalytics = async (req, res) => {
         { $sort: { _id: 1 } },
       ]),
 
-      // FIX: Use cast companyId for countDocuments too (was rawCompanyId)
-      Booking.countDocuments({ companyId }),
-      Car.countDocuments({ companyId }),
+      Booking.countDocuments(companyMatch),
+      Car.countDocuments(companyMatch),
 
       // Booking status breakdown
       Booking.aggregate([
-        { $match: { companyId } },
+        { $match: { ...companyMatch } },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
 
       // Daily bookings (last 30 days)
       Booking.aggregate([
-        { $match: { companyId, bookingDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
+        { $match: { ...companyMatch, bookingDate: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$bookingDate' } },
@@ -75,7 +81,7 @@ export const getAnalytics = async (req, res) => {
 
       // Top performing cars
       Booking.aggregate([
-        { $match: { companyId, paymentStatus: 'paid' } },
+        { $match: { ...companyMatch, paymentStatus: 'paid' } },
         {
           $group: {
             _id: '$car.id',
@@ -91,7 +97,7 @@ export const getAnalytics = async (req, res) => {
 
       // Refund totals
       Refund.aggregate([
-        { $match: { companyId, createdAt: { $gte: startDate } } },
+        { $match: { ...companyMatch, createdAt: { $gte: startDate } } },
         {
           $group: {
             _id: null,
@@ -101,9 +107,9 @@ export const getAnalytics = async (req, res) => {
         },
       ]),
 
-      // FIX: New customers per month — derived from BOOKINGS, not User.companyId.
+      // New customers per month (derived from bookings)
       Booking.aggregate([
-        { $match: { companyId, bookingDate: { $gte: startDate } } },
+        { $match: { ...companyMatch, bookingDate: { $gte: startDate } } },
         { $sort: { bookingDate: 1 } },
         {
           $group: {
@@ -122,7 +128,7 @@ export const getAnalytics = async (req, res) => {
 
       // Payment method breakdown
       Booking.aggregate([
-        { $match: { companyId, paymentStatus: 'paid' } },
+        { $match: { ...companyMatch, paymentStatus: 'paid' } },
         {
           $group: {
             _id: { $ifNull: ['$xenditPaymentMethod', 'unknown'] },
@@ -132,16 +138,17 @@ export const getAnalytics = async (req, res) => {
         },
       ]),
 
-      // FIX: Use cast companyId for AuditLog.countDocuments too (was rawCompanyId)
+      // Admin login count (30 days)
       AuditLog.countDocuments({
-        companyId,
+        ...companyMatch,
         category: 'auth',
         createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
       }),
     ]);
 
-    // FIX: totalUsers = unique customers who have booked from this company
-    const totalUsers = uniqueUserIds.length;
+    const totalUsers = isSuperAdmin
+      ? await User.countDocuments({})  // superadmin sees all platform users
+      : uniqueUserIds.length;
 
     // Build response
     const revenueLabels = revenueAgg.map((b) => b._id);
@@ -151,7 +158,6 @@ export const getAnalytics = async (req, res) => {
     const refundData = refundAgg[0] || { totalRefunded: 0, count: 0 };
     const netRevenue = totalRevenue - refundData.totalRefunded;
 
-    // Growth calculation (compare last 2 months)
     let growth = 0;
     if (revenueValues.length >= 2) {
       const current = revenueValues[revenueValues.length - 1] || 0;
@@ -159,11 +165,9 @@ export const getAnalytics = async (req, res) => {
       growth = Math.round(((current - previous) / (previous || 1)) * 100);
     }
 
-    // Average booking value
     const paidBookings = revenueAgg.reduce((s, b) => s + b.count, 0);
     const avgBookingValue = paidBookings > 0 ? Math.round(totalRevenue / paidBookings) : 0;
 
-    // Simple financial projection (linear regression on last 3 months)
     const lastThreeRevenues = revenueValues.slice(-3);
     let projectedNextMonth = 0;
     if (lastThreeRevenues.length >= 2) {
@@ -176,7 +180,6 @@ export const getAnalytics = async (req, res) => {
       );
     }
 
-    // Conversion rate (paid / total bookings)
     const conversionRate = totalBookings > 0
       ? Math.round((paidBookings / totalBookings) * 100)
       : 0;

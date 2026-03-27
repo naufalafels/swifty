@@ -6,20 +6,29 @@ const XENDIT_SECRET_KEY = (process.env.XENDIT_SECRET_KEY || '').trim();
 /**
  * Xendit Invoice Strategy:
  * Every booking with a xenditInvoiceId IS an invoice. We don't need a separate collection.
- * This controller queries bookings that have xenditInvoiceId set and optionally
- * fetches live data from the Xendit API.
+ * 
+ * FIX: superadmin sees ALL invoices across all companies.
+ * company_admin sees only their company's invoices.
  */
 
 // GET /api/admin/invoices
 export const listInvoices = async (req, res) => {
   try {
+    // FIX: Superadmin sees ALL data. company_admin sees only their company.
     const rawCompanyId = req.user.companyId;
-    if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company' });
-    const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    let companyMatch = {};
+    if (!isSuperAdmin) {
+      if (!rawCompanyId) {
+        return res.status(400).json({ success: false, message: 'No company associated with user' });
+      }
+      companyMatch = { companyId: new mongoose.Types.ObjectId(String(rawCompanyId)) };
+    }
 
     const { page = 1, limit = 50, status, search, startDate, endDate } = req.query;
 
-    const filter = { companyId, xenditInvoiceId: { $exists: true, $ne: '' } };
+    const filter = { ...companyMatch, xenditInvoiceId: { $exists: true, $ne: '' } };
 
     if (status && status !== 'all') {
       filter.paymentStatus = status;
@@ -49,9 +58,9 @@ export const listInvoices = async (req, res) => {
       Booking.countDocuments(filter),
     ]);
 
-    // Summary via aggregation (uses ObjectId correctly)
+    // Summary via aggregation
     const summaryAgg = await Booking.aggregate([
-      { $match: { companyId, xenditInvoiceId: { $exists: true, $ne: '' } } },
+      { $match: { ...companyMatch, xenditInvoiceId: { $exists: true, $ne: '' } } },
       {
         $group: {
           _id: null,
@@ -111,10 +120,14 @@ export const getInvoiceDetail = async (req, res) => {
     const { invoiceId } = req.params;
     if (!invoiceId) return res.status(400).json({ success: false, message: 'invoiceId required' });
 
-    const booking = await Booking.findOne({
-      xenditInvoiceId: invoiceId,
-      companyId: req.user.companyId,
-    }).lean();
+    // FIX: superadmin can view any invoice; company_admin only their own
+    const isSuperAdmin = req.user.role === 'superadmin';
+    const query = { xenditInvoiceId: invoiceId };
+    if (!isSuperAdmin && req.user.companyId) {
+      query.companyId = req.user.companyId;
+    }
+
+    const booking = await Booking.findOne(query).lean();
     if (!booking) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
     // Optionally fetch live Xendit data

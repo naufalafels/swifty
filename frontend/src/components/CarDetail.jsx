@@ -892,7 +892,6 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
                     <FaCalendarAlt /> <span>Select dates</span>
                   </div>
-                  {/* FIX 5: dayContentRenderer visually marks maintenance-blocked dates with 🔧 */}
                   <DateRange
                     ranges={range}
                     onChange={onRangeChange}
@@ -903,26 +902,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                     showDateDisplay={false}
                     disabledDates={disabledDates}
                     dayContentRenderer={(date) => {
-                      const isoStr = format(date, "yyyy-MM-dd");
-                      const isServiceBlocked = serviceBlockedDates.has(isoStr);
                       return (
                         <div style={{ position: "relative" }}>
                           <span>{date.getDate()}</span>
-                          {isServiceBlocked && (
-                            <span
-                              title="Blocked for maintenance"
-                              style={{
-                                position: "absolute",
-                                bottom: -2,
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                                fontSize: "7px",
-                                color: "#f59e0b",
-                              }}
-                            >
-                              🔧
-                            </span>
-                          )}
                         </div>
                       );
                     }}

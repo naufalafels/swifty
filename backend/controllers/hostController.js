@@ -128,7 +128,7 @@ export const createHostCar = async (req, res) => {
   }
 };
 
-// Bookings for host-owned cars
+// Bookings for host-owned cars (includes marketingConsent for host booking history)
 export const getHostBookings = async (req, res) => {
   try {
     const cars = await Car.find(hostCarFilter(req.user)).select("_id").lean();
@@ -136,10 +136,17 @@ export const getHostBookings = async (req, res) => {
     if (!carIds.length) return res.json({ success: true, data: [] });
 
     const bookings = await Booking.find({ "car.id": { $in: carIds } })
-      .populate("userId")
+      .populate("userId", "name email phone address city state country profilePicture")
+      .sort({ bookingDate: -1 })
       .lean();
 
-    return res.json({ success: true, data: bookings });
+    // Ensure marketingConsent is always present (defaults to false for older bookings)
+    const enriched = bookings.map((b) => ({
+      ...b,
+      marketingConsent: b.marketingConsent === true,
+    }));
+
+    return res.json({ success: true, data: enriched });
   } catch (err) {
     console.error("getHostBookings error", err);
     return res.status(500).json({ success: false, message: "Server error" });

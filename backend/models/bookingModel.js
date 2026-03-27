@@ -48,6 +48,9 @@ const bookingSchema = new Schema({
   bookingDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['awaiting_payment', 'pending', 'active', 'completed', 'cancelled', 'upcoming'], default: 'awaiting_payment' },
 
+  // Marketing consent: user explicitly opted-in to receive marketing from host
+  marketingConsent: { type: Boolean, default: false },
+
   amount: { type: Number, default: 0 },
   paymentStatus: { type: String, enum: ['pending', 'paid', 'failed', 'refunded', 'partially_refunded', 'expired', 'refund_failed'], default: 'pending' },
   paymentGateway: { type: String, enum: ['xendit'], default: 'xendit' },

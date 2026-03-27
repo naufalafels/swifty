@@ -148,7 +148,8 @@ export const createXenditInvoice = async (req, res) => {
       carImage,
       currency,
       kyc,
-      kycFromProfile
+      kycFromProfile,
+      marketingConsent
     } = req.body;
 
     const total = Number(amount);
@@ -274,6 +275,7 @@ export const createXenditInvoice = async (req, res) => {
       status: "awaiting_payment",
       currency: (currency || DEFAULT_CURRENCY).toUpperCase(),
       paymentBreakdown: typeof paymentBreakdown === "string" ? JSON.parse(paymentBreakdown) : (paymentBreakdown || {}),
+      marketingConsent: marketingConsent === true || marketingConsent === 'true',  // <-- ADD THIS
       kyc: {
         idType: normalizedKyc.idType || "passport",
         idNumber: normalizedKyc.idNumber || "",

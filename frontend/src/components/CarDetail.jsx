@@ -228,6 +228,7 @@ const CarDetail = () => {
   const [termsError, setTermsError] = useState("");
   const [termsText, setTermsText] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
 
   useEffect(() => setToday(todayISO()), []);
 
@@ -1211,7 +1212,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   </div>
                 </div>
 
-                <div className="mb-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+                                <div className="mb-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center gap-2 text-white font-semibold">
                     <FaFileContract className="text-orange-400" /> Terms & Conditions
                   </div>
@@ -1233,6 +1234,18 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                       className="mt-1 accent-orange-500"
                     />
                     <span>I have read and accept the Terms & Conditions.</span>
+                  </label>
+                  {/* Marketing consent opt-in */}
+                  <label className="flex items-start gap-2 text-sm text-gray-200 mt-2">
+                    <input
+                      type="checkbox"
+                      checked={marketingConsent}
+                      onChange={(e) => setMarketingConsent(e.target.checked)}
+                      className="mt-1 accent-emerald-500"
+                    />
+                    <span>
+                      I agree to receive marketing communications and promotional offers from the car host via email. You can unsubscribe anytime.
+                    </span>
                   </label>
                   {termsError && <p className="text-xs text-red-400">{termsError}</p>}
                 </div>

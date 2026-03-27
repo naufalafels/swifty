@@ -5,11 +5,15 @@ import { DateRange } from "react-date-range";
 import {
   FaCalendarAlt,
   FaCar,
+  FaCheck,
+  FaBan,
   FaClipboardCheck,
   FaDollarSign,
   FaEnvelope,
   FaExclamationTriangle,
+  FaFilter,
   FaFlag,
+  FaHistory,
   FaHome,
   FaIdCard,
   FaInfoCircle,
@@ -402,6 +406,365 @@ const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlar
             <img src={enlargedImage} alt="ID Enlarged" className="max-w-full max-h-[85vh] rounded-xl border border-slate-600 shadow-2xl" />
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+/* ───────────────────────── CarDetailPopup ───────────────────────── */
+
+const CarDetailPopup = ({ car, onClose }) => {
+  if (!car) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-auto space-y-4"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <FaCar className="text-amber-400" /> Car Details
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">
+            <FaTimes size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-24">Car ID:</span>
+              <span className="text-amber-300 font-mono text-xs bg-amber-900/30 px-2 py-1 rounded-lg break-all">
+                {car.id || car._id || "—"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-24">Make:</span>
+              <span className="text-white font-medium">{car.make || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-24">Model:</span>
+              <span className="text-white font-medium">{car.model || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-24">Year:</span>
+              <span className="text-white">{car.year || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-24">Daily Rate:</span>
+              <span className="text-emerald-300 font-semibold">RM {car.dailyRate || "—"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ───────────────────────── UserDetailPopup ───────────────────────── */
+
+const UserDetailPopup = ({ user, onClose }) => {
+  if (!user) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-auto space-y-4"
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <FaUser className="text-emerald-400" /> Customer Details
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition">
+            <FaTimes size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <FaUser className="text-slate-500 w-4" />
+              <span className="text-slate-400">Name:</span>
+              <span className="text-white font-medium">{user.name || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaEnvelope className="text-slate-500 w-4" />
+              <span className="text-slate-400">Email:</span>
+              <span className="text-white font-medium">{user.email || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaPhone className="text-slate-500 w-4" />
+              <span className="text-slate-400">Phone:</span>
+              <span className="text-white">{user.phone || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaMapMarkerAlt className="text-slate-500 w-4" />
+              <span className="text-slate-400">Address:</span>
+              <span className="text-white">{user.address || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaMapMarkerAlt className="text-slate-500 w-4" />
+              <span className="text-slate-400">City:</span>
+              <span className="text-white">{user.city || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaMapMarkerAlt className="text-slate-500 w-4" />
+              <span className="text-slate-400">State:</span>
+              <span className="text-white">{user.state || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FaMapMarkerAlt className="text-slate-500 w-4" />
+              <span className="text-slate-400">Country:</span>
+              <span className="text-white">{user.country || "—"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ───────────────────────── BookingHistoryTab ───────────────────────── */
+
+const STATUS_CONFIG = {
+  completed: { label: "Passed", tone: "green", icon: <FaCheck className="text-emerald-400" /> },
+  cancelled: { label: "Failed", tone: "red", icon: <FaBan className="text-rose-400" /> },
+  awaiting_payment: { label: "Awaiting Payment", tone: "amber", icon: <FaDollarSign className="text-amber-400" /> },
+  pending: { label: "Pending", tone: "blue", icon: <FaClipboardCheck className="text-blue-400" /> },
+  active: { label: "Active", tone: "blue", icon: <FaClipboardCheck className="text-blue-400" /> },
+  upcoming: { label: "Upcoming", tone: "blue", icon: <FaCalendarAlt className="text-sky-400" /> },
+};
+
+const BookingHistoryTab = ({ bookings, loading }) => {
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [carFilter, setCarFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCar, setSelectedCar] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  // Derive unique car names for the filter dropdown
+  const uniqueCarNames = useMemo(() => {
+    const names = new Set();
+    bookings.forEach((b) => {
+      const name = getCarLabel(b);
+      if (name && name !== "Car") names.add(name);
+    });
+    return Array.from(names).sort();
+  }, [bookings]);
+
+  // Map status for display: completed → Passed, cancelled → Failed, awaiting_payment → Awaiting Payment
+  const getDisplayStatus = (status) => {
+    return STATUS_CONFIG[status]?.label || status || "Unknown";
+  };
+
+  const getStatusTone = (status) => {
+    return STATUS_CONFIG[status]?.tone || "slate";
+  };
+
+  // Filter bookings
+  const filtered = useMemo(() => {
+    return bookings.filter((b) => {
+      // Status filter
+      if (statusFilter !== "all" && b.status !== statusFilter) return false;
+      // Car name filter
+      if (carFilter && getCarLabel(b) !== carFilter) return false;
+      // Search by customer name or email
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const customerName = (b.customer || b.userId?.name || "").toLowerCase();
+        const email = (b.email || b.userId?.email || "").toLowerCase();
+        if (!customerName.includes(q) && !email.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [bookings, statusFilter, carFilter, searchQuery]);
+
+  // Stats
+  const stats = useMemo(() => ({
+    total: bookings.length,
+    passed: bookings.filter((b) => b.status === "completed").length,
+    failed: bookings.filter((b) => b.status === "cancelled").length,
+    awaiting: bookings.filter((b) => b.status === "awaiting_payment").length,
+    subscribed: bookings.filter((b) => b.marketingConsent === true).length,
+  }), [bookings]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-slate-400 gap-2">
+        <FaSpinner className="animate-spin" /> Loading booking history…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[
+          { label: "Total", value: stats.total, color: "text-white" },
+          { label: "Passed", value: stats.passed, color: "text-emerald-400" },
+          { label: "Failed", value: stats.failed, color: "text-rose-400" },
+          { label: "Awaiting Payment", value: stats.awaiting, color: "text-amber-400" },
+          { label: "Subscribed", value: stats.subscribed, color: "text-sky-400" },
+        ].map((s) => (
+          <div key={s.label} className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-center">
+            <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-xs text-slate-400 mt-1">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters row */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-slate-200 font-semibold mb-3">
+          <FaFilter className="text-amber-400" /> Filters
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Status filter */}
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="all">All Statuses</option>
+              <option value="completed">Passed (Completed)</option>
+              <option value="cancelled">Failed (Cancelled)</option>
+              <option value="awaiting_payment">Awaiting Payment</option>
+              <option value="pending">Pending</option>
+              <option value="active">Active</option>
+              <option value="upcoming">Upcoming</option>
+            </select>
+          </div>
+          {/* Car name filter */}
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Car Name</label>
+            <select
+              value={carFilter}
+              onChange={(e) => setCarFilter(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="">All Cars</option>
+              {uniqueCarNames.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          </div>
+          {/* Search */}
+          <div>
+            <label className="text-xs text-slate-400 mb-1 block">Search Customer</label>
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Name or email…"
+                className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg pl-9 pr-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Results count */}
+      <div className="text-sm text-slate-400">
+        Showing {filtered.length} of {bookings.length} bookings
+      </div>
+
+      {/* Booking history table */}
+      {filtered.length === 0 ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 text-center text-slate-500">
+          <FaHistory className="mx-auto text-3xl mb-2" />
+          No bookings match your filters.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-800 text-left text-xs uppercase text-slate-500 tracking-wide">
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Car Name</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3 text-center">Subscribed?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((b) => {
+                const carName = getCarLabel(b);
+                const customerName = b.customer || b.userId?.name || "Unknown";
+                const customerEmail = b.email || b.userId?.email || "—";
+                const statusCfg = STATUS_CONFIG[b.status] || {};
+                const subscribed = b.marketingConsent === true;
+
+                return (
+                  <tr key={b._id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition">
+                    {/* Date */}
+                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">
+                      {formatDate(b.bookingDate)}
+                    </td>
+
+                    {/* Car Name — clickable to show Car Detail popup */}
+                    <td className="px-4 py-3">
+                      <button
+                        className="text-amber-300 hover:text-amber-200 underline decoration-dotted underline-offset-4 font-medium transition"
+                        onClick={() => setSelectedCar(b.car || null)}
+                        title="Click to view full car details"
+                      >
+                        {carName}
+                      </button>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <Pill tone={getStatusTone(b.status)}>
+                        {getDisplayStatus(b.status)}
+                      </Pill>
+                    </td>
+
+                    {/* Customer — clickable to show User Detail popup */}
+                    <td className="px-4 py-3">
+                      <button
+                        className="text-emerald-300 hover:text-emerald-200 underline decoration-dotted underline-offset-4 font-medium transition"
+                        onClick={() => setSelectedUser(b.userId || { name: customerName, email: customerEmail, phone: b.phone || "" })}
+                        title="Click to view full customer details"
+                      >
+                        {customerName}
+                      </button>
+                    </td>
+
+                    {/* Email */}
+                    <td className="px-4 py-3 text-slate-300">
+                      {customerEmail}
+                    </td>
+
+                    {/* Subscribed? ✓ or ✗ */}
+                    <td className="px-4 py-3 text-center">
+                      {subscribed ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-400" title="Subscribed to marketing">
+                          <FaCheck className="text-emerald-400" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-rose-400" title="Not subscribed — do not disturb">
+                          <FaBan className="text-rose-400" />
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pop-up modals */}
+      {selectedCar && (
+        <CarDetailPopup car={selectedCar} onClose={() => setSelectedCar(null)} />
+      )}
+      {selectedUser && (
+        <UserDetailPopup user={selectedUser} onClose={() => setSelectedUser(null)} />
       )}
     </div>
   );

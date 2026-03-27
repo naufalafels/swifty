@@ -397,15 +397,11 @@ const ProfilePage = () => {
     try {
       const formDataFront = new FormData();
       formDataFront.append('file', kycForm.frontImage);
-      const frontRes = await api.post('/api/auth/kyc/upload', formDataFront, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const frontRes = await api.post('/api/auth/kyc/upload', formDataFront);
 
       const formDataBack = new FormData();
       formDataBack.append('file', kycForm.backImage);
-      const backRes = await api.post('/api/auth/kyc/upload', formDataBack, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const backRes = await api.post('/api/auth/kyc/upload', formDataBack);
 
       setKycForm({ ...kycForm, frontKey: frontRes.data.key, backKey: backRes.data.key });
       return true;

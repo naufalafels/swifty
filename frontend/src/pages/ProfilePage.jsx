@@ -341,11 +341,10 @@ const ProfilePage = () => {
     }
   };
 
-    const saveEditExtras = async (e) => {
+  const saveEditExtras = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Build the payload WITHOUT profilePicture by default
       const payload = {
         school: editExtras.school,
         work: editExtras.work,
@@ -355,18 +354,18 @@ const ProfilePage = () => {
         live: editExtras.live,
       };
 
-      // Only upload & include profilePicture if user selected a new file
+      // Convert the selected file to a Base64 data URI and send it directly
       if (editExtras.profilePic instanceof File) {
-        const uploadForm = new FormData();
-        uploadForm.append('file', editExtras.profilePic);
-        const uploadRes = await api.post('/api/auth/profile-picture/upload', uploadForm, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);  // result is "data:<mime>;base64,..."
+          reader.onerror = reject;
+          reader.readAsDataURL(editExtras.profilePic);
         });
-        // Send the raw S3 KEY (not a URL) to the backend
-        payload.profilePicture = uploadRes.data.key || '';
+        payload.profilePicture = base64;
       }
       // If no new file selected, do NOT send profilePicture at all —
-      // the backend keeps the existing value untouched (line 401: "if profilePicture !== undefined")
+      // the backend keeps the existing value untouched
 
       const res = await api.put('/api/auth/update-profile', payload);
 
@@ -374,7 +373,6 @@ const ProfilePage = () => {
       setUser(updatedUser);
       authService.setCurrentUser(updatedUser);
 
-      // Sync editExtras with saved data
       setEditExtras({
         profilePic: null,
         school: updatedUser?.school || '',
@@ -554,11 +552,7 @@ const ProfilePage = () => {
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-600 to-slate-800 border border-slate-700 flex items-center justify-center text-2xl text-white shadow-inner overflow-hidden">
                   {user?.profilePicture && !user?.privacy?.hideProfilePicture ? (
                     <img
-                      src={
-                        user.profilePicture.startsWith('http')
-                        ? user.profilePicture
-                        : `${import.meta.env.VITE_API_URL || 'http://localhost:7889'}/uploads/${user.profilePicture}`
-                      }
+                      src={user.profilePicture}
                     alt="Profile"
                     className="w-full h-full object-cover"
                     onError={(e) => {

@@ -106,16 +106,8 @@ async function buildSignedKycUrl(s3Key) {
 
 // async userResponse with signed profile picture URL:
 async function userResponse(user) {
+  // profilePicture is now stored as a Base64 data URI — use it directly
   let profilePictureUrl = user.profilePicture || '';
-  // If profilePicture is an S3 key (not a URL and not empty), generate a signed URL
-  if (profilePictureUrl && !profilePictureUrl.startsWith('http')) {
-    try {
-      profilePictureUrl = await generateDownloadUrl(profilePictureUrl);
-    } catch (err) {
-      console.error('Failed to generate signed URL for profile picture:', err);
-      profilePictureUrl = '';
-    }
-  }
 
   return {
     id: user._id,

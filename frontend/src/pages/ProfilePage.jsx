@@ -97,6 +97,15 @@ const ProfilePage = () => {
   const [passwordValue, setPasswordValue] = useState('');
   const [submittingKyc, setSubmittingKyc] = useState(false);
 
+  // Ref that tracks whether ANY modal is open (readable from stale closures)
+  const isAnyModalOpenRef = useRef(false);
+
+  // Keep the ref in sync with modal open state
+  useEffect(() => {
+    isAnyModalOpenRef.current =
+      isEditModalOpen || isPersonalModalOpen || isAboutModalOpen || isPasswordModalOpen;
+  }, [isEditModalOpen, isPersonalModalOpen, isAboutModalOpen, isPasswordModalOpen]);
+
   const [personalForm, setPersonalForm] = useState({
     legalName: '',
     birthdate: '',
@@ -160,7 +169,7 @@ const ProfilePage = () => {
     };
 
     const load = async () => {
-      console.log('Loading data');  // DEBUG
+      console.log('Loading data');
       setLoading(true);
       try {
         const [meRes, statsData] = await Promise.allSettled([
@@ -170,7 +179,7 @@ const ProfilePage = () => {
 
         if (meRes.status === 'fulfilled') {
           const profile = meRes.value?.data?.user ?? meRes.value?.data ?? null;
-          console.log('Fetched user KYC status:', profile?.kyc?.status);  // DEBUG
+          console.log('Fetched user KYC status:', profile?.kyc?.status);
           if (mounted) {
             setUser(profile);
             setPersonalForm({
@@ -223,11 +232,16 @@ const ProfilePage = () => {
 
     load();
 
-    // Add refetch on window focus to update after external changes (e.g., admin approval)
+    // ===================== FIX: Use the REF, not stale state variables =====================
     const handleFocus = () => {
-      console.log('Window focused, reloading data');  // DEBUG
+      // Skip refetch when any modal is open — the OS file picker triggers
+      // a window focus event which calls load(), resetting editExtras.profilePic
+      // to null and silently discarding the user's chosen image file.
+      if (isAnyModalOpenRef.current) return;
+      console.log('Window focused, reloading data');
       load();
     };
+    // ========================================================================================
     window.addEventListener('focus', handleFocus);
 
     return () => {
@@ -424,7 +438,7 @@ const ProfilePage = () => {
       const uploaded = await uploadToS3();
       if (!uploaded) return;
 
-      await api.post('/api/auth/kyc/submit', {  // FIXED: Correct path
+      await api.post('/api/auth/kyc/submit', {
         idType: kycForm.idType,
         idNumber: kycForm.idNumber,
         idCountry: 'MY',

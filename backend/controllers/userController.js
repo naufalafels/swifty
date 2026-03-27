@@ -390,7 +390,7 @@ export async function updateProfile(req, res) {
     if (country !== undefined) user.country = String(country).trim();
     if (about !== undefined) user.about = String(about);
 
-    if (profilePicture !== undefined) user.profilePicture = String(profilePicture).trim();
+    if (profilePicture !== undefined) user.profilePicture = profilePicture;
     if (school !== undefined) user.school = String(school).trim();
     if (work !== undefined) user.work = String(work).trim();
     if (pets !== undefined) user.pets = String(pets).trim();

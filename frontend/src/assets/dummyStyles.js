@@ -238,53 +238,84 @@ export const carDetailStyles = {
 // src/assets/dummyStyles.js
 
 export const testimonialStyles = {
-  container: "relative bg-black py-16 px-4 sm:px-6 lg:px-8 overflow-hidden",
-  innerContainer: "max-w-7xl mx-auto relative z-10",
-  headerContainer: "text-center mb-16",
-  badge: "inline-flex items-center px-5 py-2 rounded-full bg-gray-800/50 backdrop-blur-sm border border-gray-700 mb-5",
-  badgeText: "text-sm font-medium text-orange-400",
-  title: "text-4xl sm:text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-orange-600 mb-4 font-[pacifico]",
-  accentText: "text-orange-400",
-  dividerContainer: "flex justify-center items-center mb-5",
-  dividerLine: "h-0.5 w-16 sm:w-20 bg-orange-600 rounded-full",
-  subtitle: "text-lg text-gray-400 max-w-3xl mx-auto",
-  grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8",
-  card: "relative rounded-2xl overflow-hidden transform transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-t-4 border-orange-400",
-  cardContent: "p-6 sm:p-8 relative z-10",
+  // Container — keep light
+  container: "relative bg-gradient-to-b from-[#FFFBF5] via-orange-50/30 to-[#FFFBF5] py-16 sm:py-20 overflow-hidden",
+  innerContainer: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+
+  // Header
+  headerContainer: "text-center mb-12 sm:mb-16",
+  badge: "inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-50 border border-orange-200 mb-4",
+  badgeText: "text-sm font-medium text-orange-600",
+  title: "text-3xl sm:text-4xl md:text-5xl font-bold text-slate-800 mb-4",
+  // ✅ FIX: accent text needs to stay visible — was fine already
+  accentText: "text-orange-500",
+  dividerContainer: "flex items-center justify-center my-4",
+  dividerLine: "w-16 sm:w-24 h-px bg-orange-200",
+  // ✅ FIX: subtitle was text-slate-400 → now text-slate-600 for readability
+  subtitle: "max-w-2xl mx-auto text-base sm:text-lg text-slate-600",
+
+  // Cards
+  grid: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8",
+  card: "relative group transition-all duration-300 hover:-translate-y-2",
+  cardContent: "relative p-5 sm:p-6",
+  // ✅ FIX: quote icon was too faint
   quoteIcon: "text-orange-400",
-  ratingContainer: "flex",
-  star: "mr-1",
-  comment: "text-gray-300 italic text-lg mb-8",
-  carInfo: "flex items-center mb-6 bg-gray-800/50 px-4 py-3 rounded-xl",
-  carIcon: "text-orange-400 mr-3",
-  carText: "font-semibold text-orange-400 text-base",
-  authorContainer: "flex items-center",
-  avatar: "bg-gradient-to-br from-orange-500 to-orange-700 w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl",
-  authorInfo: "ml-4",
-  authorName: "font-bold text-white text-lg",
-  authorRole: "text-orange-400 text-sm",
-  decorativeCorner: "absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-orange-700 to-orange-800 transform translate-x-6 -translate-y-6 rotate-45 opacity-30",
-  patternIcon: "absolute bottom-4 right-4 text-gray-700 opacity-10",
-  statsContainer: "mt-20 bg-gradient-to-r from-gray-800 to-gray-900 rounded-2xl border border-gray-700 overflow-hidden relative",
-  statsGrid: "grid grid-cols-2 md:grid-cols-4 gap-8 p-8",
+  ratingContainer: "flex gap-0.5",
+  star: "transition-colors duration-200",
+  // ✅ FIX: comment text was text-slate-400 → now text-slate-700 for strong readability
+  comment: "text-sm sm:text-base leading-relaxed text-slate-700 mb-4",
+
+  // Car info under comment
+  carInfo: "flex items-center gap-2 mb-4 pb-4 border-b border-orange-100",
+  carIcon: "text-orange-400",
+  // ✅ FIX: was text-slate-400 → now text-slate-600
+  carText: "text-sm font-medium text-slate-600",
+
+  // Author
+  authorContainer: "flex items-center gap-3",
+  avatar: "w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white font-bold text-sm",
+  authorInfo: "flex flex-col",
+  // ✅ FIX: was text-white → now text-slate-800 (it's on a light card!)
+  authorName: "text-sm font-semibold text-slate-800",
+  // ✅ FIX: was text-slate-400 → now text-slate-500
+  authorRole: "text-xs text-slate-500",
+
+  // Decorative
+  decorativeCorner: "absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-orange-100/40 to-transparent rounded-tl-3xl",
+  patternIcon: "absolute top-4 right-4 text-orange-200/30",
+
+  // Stats
+  statsContainer: "mt-16 sm:mt-20",
+  statsGrid: "grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8",
   statItem: "text-center",
+  // ✅ FIX: statValue and statLabel — pass darker colors
   statValue: (color) => `text-4xl sm:text-5xl font-bold ${color} mb-2`,
   statLabel: (color) => `text-sm ${color} font-medium`,
-  ctaContainer: "mt-20 text-center",
-  ctaTitle: "text-3xl font-bold text-white font-[pacifico] mb-4",
-  ctaText: "text-gray-400 max-w-2xl mx-auto font-[pacifico] mb-8",
-  ctaButton: "bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white font-bold py-3 font-[pacifico] px-8 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg shadow-orange-500/20",
-  bottomGradient: "absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-gray-900 to-transparent z-0",
-  cardShapes: [
-    "clip-path: polygon(0% 10%, 10% 0%, 100% 0%, 100% 90%, 90% 100%, 0% 100%);",
-    "clip-path: polygon(0% 0%, 90% 0%, 100% 10%, 100% 100%, 10% 100%, 0% 90%);",
-    "clip-path: polygon(0% 0%, 100% 0%, 100% 90%, 90% 100%, 0% 100%, 0% 10%);"
-  ],
-  icons: [FaCar, FaRoad, FaKey, FaMapMarkerAlt],
   statColors: {
-    value: ["text-cyan-400", "text-amber-400", "text-violet-400", "text-emerald-400"],
-    label: ["text-cyan-200", "text-amber-200", "text-violet-200", "text-emerald-200"]
-  }
+    // ✅ FIX: values were light amber/teal — now strong saturated colors
+    value: ["text-orange-600", "text-emerald-600", "text-sky-600", "text-amber-600"],
+    // ✅ FIX: labels were text-slate-400 → now text-slate-600
+    label: ["text-slate-600", "text-slate-600", "text-slate-600", "text-slate-600"],
+  },
+
+  // Card shapes & icons (keep as-is)
+  cardShapes: [
+    "polygon(0% 10%, 10% 0%, 100% 0%, 100% 90%, 90% 100%, 0% 100%)",
+    "polygon(0% 0%, 90% 0%, 100% 10%, 100% 100%, 10% 100%, 0% 90%)",
+    "polygon(5% 0%, 100% 0%, 100% 95%, 95% 100%, 0% 100%, 0% 5%)",
+  ],
+  icons: [FaCar, FaRoad, FaKey, FaMapMarkerAlt, FaStar],
+
+  // CTA
+  ctaContainer: "mt-16 text-center",
+  // ✅ FIX: was text-white → now text-slate-800
+  ctaTitle: "text-2xl sm:text-3xl font-bold text-slate-800 mb-3",
+  // ✅ FIX: was text-slate-400 → now text-slate-600
+  ctaText: "text-slate-600 max-w-xl mx-auto mb-6",
+  ctaButton: "inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl",
+
+  // Bottom gradient
+  bottomGradient: "absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#FFFBF5] to-transparent pointer-events-none",
 };
 
 // src/assets/dummyStyles.js

@@ -12,7 +12,23 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
 const TOKEN_EXPIRES = process.env.TOKEN_EXPIRES || '24h';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:7889';
 
-const signToken = (userId) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES });
+// FIX: signToken now accepts a user object and embeds role, companyId, roles in the JWT.
+// Previously it only embedded { id }, which meant after signup the auth middleware
+// fast-path would set companyId: null — breaking analytics, invoices, refunds, etc.
+const signToken = (userOrId) => {
+  if (typeof userOrId === 'object' && userOrId !== null) {
+    return jwt.sign({
+      id: userOrId._id?.toString() || userOrId.id?.toString(),
+      name: userOrId.name || '',
+      email: userOrId.email || '',
+      role: userOrId.role || 'user',
+      roles: Array.isArray(userOrId.roles) ? userOrId.roles : ['renter'],
+      companyId: userOrId.companyId?.toString() || null,
+    }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES });
+  }
+  // Fallback for plain string ID (shouldn't happen after fix, but safe)
+  return jwt.sign({ id: userOrId }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES });
+};
 
 const buildLogoUrl = (file) => {
   if (!file) return '';
@@ -67,7 +83,8 @@ export const signupCompany = async (req, res) => {
     company.ownerUserId = user._id;
     await company.save();
 
-    const token = signToken(user._id.toString());
+    // FIX: Pass the full user object so JWT includes role + companyId
+    const token = signToken(user);
 
     return res.status(201).json({
       success: true,
@@ -146,8 +163,8 @@ export const createAdminCar = async (req, res) => {
       fuelType: body.fuelType || 'Gasoline',
       mileage: Number(body.mileage) || 0,
       dailyRate: Number(body.dailyRate || 0),
-      deposit: Number(body.deposit || 0),  // Added for consistency
-      gasUsage: body.gasUsage || '',       // Added for consistency
+      deposit: Number(body.deposit || 0),
+      gasUsage: body.gasUsage || '',
       image: imageUrl,
       status: body.status || 'available',
       companyId,
@@ -347,10 +364,10 @@ export const getKycList = async (req, res) => {
       let frontUrl = null;
       if (kyc.frontImageUrl) {
         if (kyc.frontImageUrl.startsWith('http')) {
-          frontUrl = kyc.frontImageUrl;  // Old local URL
+          frontUrl = kyc.frontImageUrl;
         } else {
           try {
-            frontUrl = await generateDownloadUrl(kyc.frontImageUrl);  // New S3 key
+            frontUrl = await generateDownloadUrl(kyc.frontImageUrl);
           } catch (err) {
             console.error('Error generating front URL', err);
           }
@@ -393,10 +410,10 @@ export const getKycList = async (req, res) => {
         statusReason: kyc.statusReason || '',
         payoutReference: user.hostProfile?.payoutAccountRef || '',
         isHost: Array.isArray(user.roles) ? user.roles.includes('host') : false,
-        isApplyingForHost: !!user.applyingForHost,  // Flag for host applications
-        hostStatus: user.hostStatus || 'none',  // UPDATED: Use the hostStatus field
-        companyName: user.hostProfile?.companyName || '',  
-        ssmNumber: user.hostProfile?.ssmNumber || '',     
+        isApplyingForHost: !!user.applyingForHost,
+        hostStatus: user.hostStatus || 'none',
+        companyName: user.hostProfile?.companyName || '',
+        ssmNumber: user.hostProfile?.ssmNumber || '',
         carId: firstCar?._id || null,
         carMake: firstCar?.make || '',
         carModel: firstCar?.model || '',
@@ -409,8 +426,8 @@ export const getKycList = async (req, res) => {
         carPetrolType: firstCar?.petrolType || [],
         carMileage: firstCar?.mileage || '',
         carDailyRate: firstCar?.dailyRate || '',
-        carDeposit: firstCar?.deposit || '',      // Added for display
-        carGasUsage: firstCar?.gasUsage || '',    // Added for display
+        carDeposit: firstCar?.deposit || '',
+        carGasUsage: firstCar?.gasUsage || '',
         carImage: firstCar?.image || '',
       };
     }));
@@ -434,9 +451,9 @@ export const approveKyc = async (req, res) => {
     if (user.applyingForHost) {
       user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
       user.applyingForHost = false;
-      user.hostStatus = 'approved';  // UPDATED: Set host status
-      if (!user.notifications) user.notifications = [];  // ADD
-      user.notifications.unshift({ message: 'Your host application has been approved! You are now a host.', read: false, createdAt: new Date() });  // UPDATED: Add to top as object
+      user.hostStatus = 'approved';
+      if (!user.notifications) user.notifications = [];
+      user.notifications.unshift({ message: 'Your host application has been approved! You are now a host.', read: false, createdAt: new Date() });
     }
 
     await user.save();
@@ -463,8 +480,8 @@ export const rejectKyc = async (req, res) => {
       user.applyingForHost = false;
       user.hostStatus = 'rejected';
       user.rejectionReason = reason || 'Rejected by admin';
-      if (!user.notifications) user.notifications = [];  // ADD
-      user.notifications.unshift({ message: `Your host application was rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });  // UPDATED: Add to top as object
+      if (!user.notifications) user.notifications = [];
+      user.notifications.unshift({ message: `Your host application was rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });
     }
 
     await user.save();
@@ -484,7 +501,7 @@ export const approveHost = async (req, res) => {
     user.roles = Array.isArray(user.roles) ? [...new Set([...user.roles, 'host'])] : ['host'];
     user.applyingForHost = false;
     user.hostStatus = 'approved';
-    if (!user.notifications) user.notifications = [];  // ADD
+    if (!user.notifications) user.notifications = [];
     user.notifications.unshift({ message: 'Host Application is Approved: Host Centre is available.', read: false, createdAt: new Date() });
     if (user.initialCar && user.initialCar.make && user.initialCar.model && user.initialCar.year && user.initialCar.dailyRate) {
       try {
@@ -500,13 +517,13 @@ export const approveHost = async (req, res) => {
           fuelType: user.initialCar.fuelType || 'Gasoline',
           petrolType: user.initialCar.petrolType || [],
           mileage: user.initialCar.mileage || 0,
-          deposit: user.initialCar.deposit || 0,      // ADDED
-          gasUsage: user.initialCar.gasUsage || "",  // ADDED
+          deposit: user.initialCar.deposit || 0,
+          gasUsage: user.initialCar.gasUsage || "",
           image: user.initialCar.image || '',
           companyId: user._id,
-          companyName: user.hostProfile?.companyName || '',  // ADDED optional chaining
+          companyName: user.hostProfile?.companyName || '',
           status: 'available',
-          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] }, // Default to KL if missing
+          location: user.hostProfile?.location || { type: 'Point', coordinates: [101.6869, 3.1390] },
         };
         await Car.create(carData);
         user.initialCar = null;
@@ -536,7 +553,7 @@ export const rejectHost = async (req, res) => {
     user.applyingForHost = false;
     user.hostStatus = 'rejected';
     user.rejectionReason = reason || 'Rejected by admin';
-    if (!user.notifications) user.notifications = [];  // ADD
+    if (!user.notifications) user.notifications = [];
     user.notifications.unshift({ message: `Host Application is Rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });
     await user.save();
     res.json({ message: 'Host rejected' });

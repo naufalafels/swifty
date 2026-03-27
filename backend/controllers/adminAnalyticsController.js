@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';  // FIX: Added mongoose import for ObjectId casting
+import mongoose from 'mongoose';
 import Booking from '../models/bookingModel.js';
 import User from '../models/userModel.js';
 import Car from '../models/carModel.js';
@@ -11,7 +11,6 @@ export const getAnalytics = async (req, res) => {
     if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
 
     // FIX: Cast to ObjectId. Mongoose .find() auto-casts strings, but .aggregate() does NOT.
-    // This was the root cause of "Failed to load analytics data" — every $match returned 0 results.
     const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
 
     const { period = '12' } = req.query;
@@ -19,9 +18,13 @@ export const getAnalytics = async (req, res) => {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
 
+    // FIX: Get unique user IDs from bookings (actual customers of THIS company).
+    // Regular users/renters do NOT have companyId on their User document —
+    // only company_admin users do. So User.countDocuments({ companyId }) was returning ~1.
+    const uniqueUserIds = await Booking.distinct('userId', { companyId: rawCompanyId });
+
     const [
       revenueAgg,
-      totalUsers,
       totalBookings,
       totalCars,
       statusBreakdown,
@@ -44,7 +47,6 @@ export const getAnalytics = async (req, res) => {
         },
         { $sort: { _id: 1 } },
       ]),
-      User.countDocuments({ companyId: rawCompanyId }),  // .countDocuments auto-casts
       Booking.countDocuments({ companyId: rawCompanyId }),
       Car.countDocuments({ companyId: rawCompanyId }),
 
@@ -95,12 +97,20 @@ export const getAnalytics = async (req, res) => {
         },
       ]),
 
-      // New users per month
-      User.aggregate([
-        { $match: { companyId, createdAt: { $gte: startDate } } },
+      // FIX: New customers per month — derived from BOOKINGS, not User.companyId.
+      // Groups by userId → takes their earliest booking date → groups by month.
+      Booking.aggregate([
+        { $match: { companyId, bookingDate: { $gte: startDate } } },
+        { $sort: { bookingDate: 1 } },
         {
           $group: {
-            _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+            _id: '$userId',
+            firstBooking: { $first: '$bookingDate' },
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m', date: '$firstBooking' } },
             count: { $sum: 1 },
           },
         },
@@ -121,11 +131,14 @@ export const getAnalytics = async (req, res) => {
 
       // "Active visits" proxy — count admin logins in last 30 days
       AuditLog.countDocuments({
-        companyId: rawCompanyId,  // .countDocuments auto-casts
+        companyId: rawCompanyId,
         category: 'auth',
         createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
       }),
     ]);
+
+    // FIX: totalUsers = unique customers who have booked from this company
+    const totalUsers = uniqueUserIds.length;
 
     // Build response
     const revenueLabels = revenueAgg.map((b) => b._id);

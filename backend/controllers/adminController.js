@@ -103,21 +103,40 @@ export const signupCompany = async (req, res) => {
 export const getAdminCars = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
-    const cars = await Car.find({ companyId }).lean();
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
+
+    const filter = isSuperAdmin ? {} : { companyId };
+    const cars = await Car.find(filter).lean();
     return res.json({ success: true, cars });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
-};
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};  
 
 // create car for company (accepts image on req.file)
 // Updated: when request doesn't provide a valid location, fall back to company's location (if any)
 export const createAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+    const isSuperAdmin = req.user.role === 'superadmin';
 
-    // load company to possibly use its location if car location is missing
-    const company = await Company.findById(companyId).lean();
+    // Superadmin can create cars for any company (pass companyId in body)
+    // company_admin creates for their own company
+    let targetCompanyId = companyId;
+    if (isSuperAdmin) {
+      targetCompanyId = req.body.companyId || companyId;
+    }
+    if (!targetCompanyId) {
+      return res.status(400).json({ success: false, message: 'No company associated. Superadmin: pass companyId in body.' });
+    }
+
+    const company = await Company.findById(targetCompanyId).lean();
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
 
     const body = req.body || {};
     const required = ['make','model','year','dailyRate'];
@@ -125,13 +144,9 @@ export const createAdminCar = async (req, res) => {
 
     const imageUrl = req.file ? buildCarImageUrl(req.file) : (body.image || "");
 
-    // Determine car location:
-    // - if body.location supplied, attempt to parse/normalize it
-    // - otherwise fallback to company's location (if present)
     let carLocation;
     if (body.location) {
       try {
-        // body.location could be JSON-stringified array, an array, or a GeoJSON object
         if (typeof body.location === 'string' && body.location.trim().startsWith('[')) {
           const coords = JSON.parse(body.location);
           if (Array.isArray(coords) && coords.length >= 2) {
@@ -143,7 +158,6 @@ export const createAdminCar = async (req, res) => {
           carLocation = body.location;
         }
       } catch (err) {
-        // ignore parse errors and fallback below
         carLocation = undefined;
       }
     }
@@ -167,7 +181,7 @@ export const createAdminCar = async (req, res) => {
       gasUsage: body.gasUsage || '',
       image: imageUrl,
       status: body.status || 'available',
-      companyId,
+      companyId: targetCompanyId,
       companyName: company.name,
       location: carLocation ? carLocation : undefined
     });
@@ -175,26 +189,32 @@ export const createAdminCar = async (req, res) => {
     return res.status(201).json({ success: true, car });
   } catch (err) {
     console.error('createAdminCar error', err);
-    return res.status(500).json({ success:false, message:'Server error' });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
 // update car for company (accepts image on req.file)
-// FIX: Now creates audit logs for price changes and car updates
 export const updateAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
+    const isSuperAdmin = req.user.role === 'superadmin';
     const carId = req.params.id;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
 
     const car = await Car.findById(carId);
-    if (!car) return res.status(404).json({ success:false, message:'Car not found' });
-    if (!car.companyId || car.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
+    if (!car) return res.status(404).json({ success: false, message: 'Car not found' });
+
+    // company_admin can only update their own company's cars
+    if (!isSuperAdmin && (!car.companyId || car.companyId.toString() !== companyId.toString())) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
 
     const body = req.body || {};
     const allowed = ['make','model','year','color','category','seats','transmission','fuelType','mileage','dailyRate','deposit','gasUsage','status','location'];
 
-    // FIX: Capture previous values BEFORE applying changes (for audit log)
     const previousValues = {};
     const newValues = {};
     allowed.forEach(k => {
@@ -213,7 +233,7 @@ export const updateAdminCar = async (req, res) => {
 
     await car.save();
 
-    // FIX: Create audit log — detect price changes vs general updates
+    // Create audit log
     try {
       const { default: AuditLog } = await import('../models/auditLogModel.js');
 
@@ -244,7 +264,7 @@ export const updateAdminCar = async (req, res) => {
         userId: req.user.id,
         userName: req.user.name || '',
         userEmail: req.user.email || '',
-        companyId: req.user.companyId,
+        companyId: car.companyId || req.user.companyId || null,  // Use car's companyId for superadmin
         category,
         action,
         details,
@@ -265,65 +285,107 @@ export const updateAdminCar = async (req, res) => {
     return res.json({ success: true, car });
   } catch (err) {
     console.error('updateAdminCar', err);
-    return res.status(500).json({ success:false, message:'Server error' });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
 export const deleteAdminCar = async (req, res) => {
   try {
     const companyId = req.user.companyId;
+    const isSuperAdmin = req.user.role === 'superadmin';
     const carId = req.params.id;
-    if (!companyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
 
     const car = await Car.findById(carId);
-    if (!car) return res.status(404).json({ success:false, message:'Car not found' });
-    if (!car.companyId || car.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
+    if (!car) return res.status(404).json({ success: false, message: 'Car not found' });
+
+    if (!isSuperAdmin && (!car.companyId || car.companyId.toString() !== companyId.toString())) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
 
     await car.remove();
     return res.json({ success: true, message: 'Car deleted' });
   } catch (err) {
     console.error('deleteAdminCar', err);
-    return res.status(500).json({ success:false, message:'Server error' });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// bookings
+// bookings (superadmin sees ALL)
 export const getAdminBookings = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success:false, message:'No company associated with user' });
-    const bookings = await Booking.find({ companyId }).sort({ bookingDate: -1 }).lean();
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
+
+    const filter = isSuperAdmin ? {} : { companyId };
+    const bookings = await Booking.find(filter).sort({ bookingDate: -1 }).lean();
     return res.json({ success: true, bookings });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
 export const updateAdminBookingStatus = async (req, res) => {
   try {
     const companyId = req.user.companyId;
+    const isSuperAdmin = req.user.role === 'superadmin';
     const bookingId = req.params.id;
     const { status } = req.body;
-    if (!companyId) return res.status(400).json({ success:false, message:'No company associated with user' });
-    if (!status) return res.status(400).json({ success:false, message:'Status is required' });
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
+    if (!status) return res.status(400).json({ success: false, message: 'Status is required' });
 
     const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ success:false, message:'Booking not found' });
-    if (!booking.companyId || booking.companyId.toString() !== companyId.toString()) return res.status(403).json({ success:false, message:'Forbidden' });
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+
+    // company_admin can only update their own company's bookings
+    if (!isSuperAdmin && (!booking.companyId || booking.companyId.toString() !== companyId.toString())) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
 
     booking.status = status;
     await booking.save();
-    return res.json({ success:true, booking });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+    return res.json({ success: true, booking });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
-// company profile
+// company profile — superadmin sees first company or a summary
 export const getCompanyProfile = async (req, res) => {
   try {
     const companyId = req.user.companyId;
-    if (!companyId) return res.status(400).json({ success:false, message:'No company associated with user' });
-    const company = await Company.findById(companyId).lean();
-    if (!company) return res.status(404).json({ success:false, message:'Company not found' });
-    return res.json({ success:true, company });
-  } catch (err) { console.error(err); return res.status(500).json({ success:false, message:'Server error' }); }
+    const isSuperAdmin = req.user.role === 'superadmin';
+
+    if (!isSuperAdmin && !companyId) {
+      return res.status(400).json({ success: false, message: 'No company associated with user' });
+    }
+
+    let company;
+    if (isSuperAdmin && !companyId) {
+      // Superadmin has no company — return the first one or null (graceful)
+      company = await Company.findOne({}).lean();
+    } else {
+      company = await Company.findById(companyId).lean();
+    }
+
+    if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+    return res.json({ success: true, company });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 };
 
 export const updateCompanyProfile = async (req, res) => {

@@ -228,8 +228,8 @@ export async function login(req, res) {
     await saveRefreshToken({ token: refreshToken, userId: user._id, expiresAt, createdByIp: req.ip || '' });
     setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
-    // NEW: Set admin token cookie if user is admin
-    if (user.role === 'company_admin') {
+    // FIX: Set admin token cookie for BOTH company_admin AND superadmin
+    if (user.role === 'company_admin' || user.role === 'superadmin') {
       setAdminTokenCookie(res, accessToken);
     }
 
@@ -245,13 +245,6 @@ export async function login(req, res) {
   }
 }
 
-// FIX: refresh() now includes role/companyId/roles in the new access token.
-// Previously it called createAccessToken(userId) with NO extras, so the refreshed JWT
-// had only { id }. The auth middleware fast-path (line 30 of auth.js) checks for
-// payload.role || payload.companyId || payload.roles — without these, it falls through
-// to a DB lookup, which works but means companyId could be null if the user doc doesn't
-// have it in the expected format. More critically, the adminToken cookie was set with
-// sameSite:'strict' so it was invisible cross-origin, making all subsequent API calls fail.
 export async function refresh(req, res) {
   try {
     const token = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -265,14 +258,14 @@ export async function refresh(req, res) {
     if (saved.revoked) {
       await revokeAllUserRefreshTokens(saved.userId);
       clearRefreshCookie(res);
-      clearAdminTokenCookie(res);  // NEW: Clear admin cookie on revoke
+      clearAdminTokenCookie(res);
       return res.status(401).json({ success: false, message: 'Refresh token revoked. Please login again.' });
     }
 
     if (new Date(saved.expiresAt) < new Date()) {
       await revokeRefreshTokenByHash(saved.tokenHash);
       clearRefreshCookie(res);
-      clearAdminTokenCookie(res);  // NEW: Clear admin cookie on expiry
+      clearAdminTokenCookie(res);
       return res.status(401).json({ success: false, message: 'Refresh token expired. Please login again.' });
     }
 
@@ -284,13 +277,8 @@ export async function refresh(req, res) {
       { revoked: true, replacedByToken: hashToken(newToken), revokedByIp: req.ip || '' }
     ).exec();
 
-    // FIX: Fetch user BEFORE creating access token so we can include role/companyId/roles
     const user = await User.findById(saved.userId).lean();
 
-    // FIX: Include role, companyId, roles in the refreshed access token.
-    // Previously: createAccessToken(saved.userId.toString()) — JWT had only { id }.
-    // Now: includes all fields so auth middleware fast-path works and admin controllers
-    // get req.user.companyId from the token without needing an extra DB lookup.
     const accessToken = createAccessToken(saved.userId.toString(), {
       role: user?.role || 'user',
       companyId: user?.companyId ? user.companyId.toString() : null,
@@ -299,8 +287,8 @@ export async function refresh(req, res) {
 
     setRefreshCookie(res, newToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
-    // NEW: Set admin token cookie if user is admin
-    if (user && user.role === 'company_admin') {
+    // FIX: Set admin token cookie for BOTH company_admin AND superadmin
+    if (user && (user.role === 'company_admin' || user.role === 'superadmin')) {
       setAdminTokenCookie(res, accessToken);
     }
 

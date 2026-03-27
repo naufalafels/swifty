@@ -746,6 +746,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
         form.append("kyc[idCountry]", countryCode);
         form.append("kycFront", frontFile);
         form.append("kycBack", backFile);
+
+        // Marketing consent — send to backend for storage
+        form.append("marketingConsent", marketingConsent ? "true" : "false");
       }
 
       const res = await createXenditInvoice(form);

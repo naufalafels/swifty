@@ -1450,6 +1450,14 @@ const HostDashboard = () => {
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
         </div>
 
+        {/* ──── Booking History ──── */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xl font-bold text-white">
+            <FaHistory className="text-amber-400" /> Booking History
+          </div>
+          <BookingHistoryTab bookings={bookings} loading={loading} />
+        </div>
+
         {/* ──── quick find ──── */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-slate-200">

@@ -20,24 +20,24 @@ const VerifyPaymentPage = () => {
   }, [location.search]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-white p-4 bg-gray-900">
-      <div className="text-center max-w-lg bg-gray-800/60 border border-gray-700 rounded-2xl p-8 shadow-xl">
-        <p className={`text-xl font-semibold ${isSuccess ? "text-green-400" : "text-orange-300"}`}>
+    <div className="min-h-screen flex items-center justify-center text-slate-800 p-4 sm:p-6 bg-[#FFFBF5]">
+      <div className="text-center max-w-lg w-full bg-white border border-orange-100 rounded-2xl p-6 sm:p-8 shadow-lg shadow-orange-100/40">
+        <p className={`text-lg sm:text-xl font-semibold ${isSuccess ? "text-green-600" : "text-orange-500"}`}>
           {statusMsg}
         </p>
-        <p className="text-sm opacity-80 mt-3">
-          You’ll also receive an email with your booking details. If you need help, contact support with your booking ID.
+        <p className="text-sm text-slate-500 mt-3">
+          You'll also receive an email with your booking details. If you need help, contact support with your booking ID.
         </p>
-        <div className="mt-6 flex justify-center gap-3">
+        <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
           <button
             onClick={() => navigate("/bookings", { replace: true })}
-            className="px-5 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white"
+            className="px-5 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors"
           >
             View My Bookings
           </button>
           <button
             onClick={() => navigate("/", { replace: true })}
-            className="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+            className="px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium transition-colors"
           >
             Back to Home
           </button>

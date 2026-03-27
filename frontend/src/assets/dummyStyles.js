@@ -69,90 +69,91 @@ export const heroStyles = {
 
 // assets/dummyStyles.js
 export const loginStyles = {
-  pageContainer: "min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-500 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4 sm:px-6 md:px-8 text-white",
+  pageContainer: "min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-500 bg-gradient-to-br from-[#FFFBF5] via-orange-50 to-[#FFF7ED] px-4 sm:px-6 md:px-8 text-slate-800",
   
   animatedBackground: {
     base: "absolute inset-0 z-0 overflow-hidden",
-    orb1: "absolute top-1/4 left-1/5 rounded-full blur-3xl transition-all duration-1000 w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 bg-gradient-to-r from-orange-400/10 to-orange-600/10",
-    orb2: "absolute top-3/4 right-1/4 rounded-full blur-3xl transition-all duration-1000 w-40 h-40 sm:w-44 sm:h-44 md:w-48 md:h-48 bg-gradient-to-r from-orange-300/10 to-orange-500/10",
-    orb3: "absolute bottom-1/3 left-2/3 rounded-full blur-3xl transition-all duration-1000 w-28 h-28 sm:w-32 sm:h-32 bg-gradient-to-r from-orange-200/10 to-orange-400/10"
+    orb1: "absolute top-1/4 left-1/5 rounded-full blur-3xl transition-all duration-1000 w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 bg-gradient-to-r from-orange-200/30 to-orange-300/20",
+    orb2: "absolute top-3/4 right-1/4 rounded-full blur-3xl transition-all duration-1000 w-40 h-40 sm:w-44 sm:h-44 md:w-48 md:h-48 bg-gradient-to-r from-amber-200/25 to-orange-200/20",
+    orb3: "absolute bottom-1/3 left-2/3 rounded-full blur-3xl transition-all duration-1000 w-28 h-28 sm:w-32 sm:h-32 bg-gradient-to-r from-sky-200/20 to-orange-200/15"
   },
   
-  backButton: "absolute top-3 left-6 z-10 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 rounded-full transition-shadow duration-300 shadow-lg hover:shadow-xl bg-white/5 text-white hover:bg-white/10",
+  backButton: "absolute top-3 left-6 z-10 flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 rounded-full transition-shadow duration-300 shadow-md hover:shadow-lg bg-white/70 text-slate-700 hover:bg-white/90",
   
   loginCard: {
     container: "w-full max-w-md sm:mt-14 z-10 transform transition-all duration-500 hover:scale-[1.02]",
-    card: "relative overflow-hidden p-6 sm:p-8 rounded-3xl shadow-2xl transition-colors duration-500 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900",
-    decor1: "absolute -top-8 -right-8 w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-r from-orange-400/10 to-orange-500/10 blur-2xl z-0",
-    decor2: "absolute -bottom-6 -left-6 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-r from-orange-300/10 to-orange-400/10 blur-2xl z-0",
+    card: "relative overflow-hidden p-6 sm:p-8 rounded-3xl shadow-xl transition-colors duration-500 bg-white border border-orange-100",
+    decor1: "absolute -top-8 -right-8 w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-r from-orange-200/30 to-orange-300/20 blur-2xl z-0",
+    decor2: "absolute -bottom-6 -left-6 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-r from-amber-200/25 to-orange-200/20 blur-2xl z-0",
     headerContainer: "relative z-10 text-center mb-6 sm:mb-8",
     logoContainer: "mx-auto mb-4 w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center",
-    logoText: "flex flex-col items-center text-xl md:text-2xl lg:text-2xl leading-none font-bold tracking-wider text-white",
-    title: "text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-orange-300 to-white bg-clip-text text-transparent",
-    subtitle: "mt-1 sm:mt-2 font-light tracking-wider text-xs sm:text-sm text-orange-300/60"
+    logoText: "flex flex-col items-center text-xl md:text-2xl lg:text-2xl leading-none font-bold tracking-wider text-slate-800",
+    title: "text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent",
+    subtitle: "mt-1 sm:mt-2 font-light tracking-wider text-xs sm:text-sm text-slate-400"
   },
   
   form: {
     container: "space-y-4 sm:space-y-6",
     inputContainer: "relative z-10",
     inputWrapper: "relative",
-    inputIcon: "absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-300/80",
-    input: "w-full pl-10 pr-3 py-3 sm:py-4 rounded-xl text-sm sm:text-base placeholder-opacity-70 border transition duration-300 focus:outline-none focus:ring-2 focus:border-transparent bg-white/5 backdrop-blur-sm text-white/90 placeholder-orange-200/40 border-white/10 focus:ring-orange-500/70",
-    passwordToggle: "absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer transition-colors text-orange-300/80 hover:text-orange-200/90",
-    submitButton: "w-full py-3 sm:py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-transform duration-300 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 relative overflow-hidden group bg-gradient-to-r from-orange-500/90 to-orange-600/90 text-white/95 hover:from-orange-600/90 hover:to-orange-700/90 focus:ring-orange-500/70",
+    inputIcon: "absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-400",
+    input: "w-full pl-10 pr-3 py-3 sm:py-4 rounded-xl text-sm sm:text-base placeholder-opacity-70 border transition duration-300 focus:outline-none focus:ring-2 focus:border-transparent bg-orange-50/50 text-slate-800 placeholder-slate-400 border-orange-200 focus:ring-orange-500",
+    passwordToggle: "absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer transition-colors text-orange-400 hover:text-orange-600",
+    submitButton: "w-full py-3 sm:py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-transform duration-300 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 relative overflow-hidden group bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 focus:ring-orange-400",
     buttonText: "relative cursor-pointer z-10 text-sm sm:text-base",
-    buttonHover: "absolute inset-0 transition-opacity duration-300 z-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-orange-400/50 to-orange-500/50"
+    buttonHover: "absolute inset-0 transition-opacity duration-300 z-0 opacity-0 group-hover:opacity-100 bg-gradient-to-r from-orange-400/40 to-orange-500/40"
   },
   
-  signupSection: "mt-6 pt-6 border-t border-white/10 text-center text-xs sm:text-sm",
-  signupText: "text-orange-200/70",
-  signupButton: "inline-block mt-2 w-full cursor-pointer px-4 py-2 rounded-xl font-medium transition-transform duration-300 transform hover:-translate-y-0.5 bg-transparent border border-orange-500/50 text-orange-300/90 hover:bg-orange-500/10 hover:text-white/90"
+  signupSection: "mt-6 pt-6 border-t border-orange-100 text-center text-xs sm:text-sm",
+  signupText: "text-slate-500",
+  signupButton: "inline-block mt-2 w-full cursor-pointer px-4 py-2 rounded-xl font-medium transition-transform duration-300 transform hover:-translate-y-0.5 bg-transparent border border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
 };
 
 
 // assets/dummyStyles.js
 export const signupStyles = {
-  pageContainer: "min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-500 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white",
+  pageContainer: "min-h-screen flex items-center justify-center relative overflow-hidden transition-colors duration-500 bg-gradient-to-br from-[#FFFBF5] via-orange-50 to-[#FFF7ED] text-slate-800",
   
   animatedBackground: {
     base: "absolute inset-0 z-0 overflow-hidden",
-    orb1: "absolute top-[10%] sm:top-1/4 left-[5%] sm:left-1/5 w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 rounded-full transition-all duration-1000 bg-gradient-to-r from-orange-200/10 to-orange-400/10 blur-3xl",
-    orb2: "absolute top-[75%] sm:top-3/4 right-[5%] sm:right-1/4 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full transition-all duration-1000 bg-gradient-to-r from-orange-200/8 to-orange-300/8 blur-3xl",
-    orb3: "absolute bottom-[15%] sm:bottom-1/3 left-[65%] sm:left-2/3 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full transition-all duration-1000 bg-gradient-to-r from-orange-100/8 to-orange-300/10 blur-3xl"
+    orb1: "absolute top-[10%] sm:top-1/4 left-[5%] sm:left-1/5 w-40 h-40 sm:w-52 sm:h-52 md:w-64 md:h-64 rounded-full transition-all duration-1000 bg-gradient-to-r from-orange-200/30 to-orange-300/20 blur-3xl",
+    orb2: "absolute top-[75%] sm:top-3/4 right-[5%] sm:right-1/4 w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 rounded-full transition-all duration-1000 bg-gradient-to-r from-amber-200/20 to-orange-200/15 blur-3xl",
+    orb3: "absolute bottom-[15%] sm:bottom-1/3 left-[65%] sm:left-2/3 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full transition-all duration-1000 bg-gradient-to-r from-sky-200/15 to-orange-200/20 blur-3xl"
   },
   
-  backButton: "absolute top-4 sm:top-6 left-4 sm:left-6 z-10 flex items-center gap-1 sm:gap-2 px-3 py-2 sm:px-4 sm:py-3 rounded-full transition-all duration-300 group shadow-lg hover:shadow-xl bg-white/5 text-white hover:bg-white/10",
+  backButton: "absolute top-4 sm:top-6 left-4 sm:left-6 z-10 flex items-center gap-1 sm:gap-2 px-3 py-2 sm:px-4 sm:py-3 rounded-full transition-all duration-300 group shadow-md hover:shadow-lg bg-white/70 text-slate-700 hover:bg-white/90",
   
   signupCard: {
     container: "w-full max-w-[90%] sm:max-w-md py-5 sm:py-7 mt-9 z-10 transform transition-all duration-500 hover:scale-[1.02] px-2 sm:px-4",
-    card: "rounded-3xl shadow-2xl overflow-hidden p-4 sm:p-6 md:p-8 relative transition-all duration-500 bg-gradient-to-br from-gray-800/90 to-gray-900/90 backdrop-blur-xl border border-gray-700",
-    decor1: "absolute -top-6 sm:-top-8 -right-6 sm:-right-8 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-orange-300/10 to-orange-400/10 blur-2xl z-0",
-    decor2: "absolute -bottom-4 sm:-bottom-6 -left-4 sm:-left-6 w-20 h-20 sm:w-22 sm:h-22 md:w-24 md:h-24 rounded-full bg-gradient-to-r from-orange-200/8 to-orange-300/10 blur-2xl z-0",
+    card: "rounded-3xl shadow-xl overflow-hidden p-4 sm:p-6 md:p-8 relative transition-all duration-500 bg-white border border-orange-100",
+    decor1: "absolute -top-6 sm:-top-8 -right-6 sm:-right-8 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-orange-200/30 to-orange-300/20 blur-2xl z-0",
+    decor2: "absolute -bottom-4 sm:-bottom-6 -left-4 sm:-left-6 w-20 h-20 sm:w-22 sm:h-22 md:w-24 md:h-24 rounded-full bg-gradient-to-r from-amber-200/20 to-orange-200/15 blur-2xl z-0",
     headerContainer: "relative z-10 text-center mb-6 sm:mb-8",
     logoContainer: "mx-auto mb-4 w-24 h-24 sm:w-28 sm:h-28 rounded-full flex items-center justify-center",
     logoText: "flex flex-col items-center text-xl md:text-2xl lg:text-2xl leading-none",
-    title: "text-2xl sm:text-3xl md:text-4xl font-bold mt-2 sm:mt-3 md:mt-4 tracking-tight bg-gradient-to-r from-orange-300 to-white bg-clip-text text-transparent",
-    subtitle: "mt-1 sm:mt-2 text-xs sm:text-sm md:text-base font-light tracking-wider text-orange-300/60"
+    title: "text-2xl sm:text-3xl md:text-4xl font-bold mt-2 sm:mt-3 md:mt-4 tracking-tight bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent",
+    subtitle: "mt-1 sm:mt-2 text-xs sm:text-sm md:text-base font-light tracking-wider text-slate-400"
   },
   
   form: {
     container: "space-y-3 sm:space-y-4 md:space-y-5",
     inputContainer: "relative z-10",
     inputWrapper: "relative",
-    inputIcon: "absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-300/80",
-    input: "w-full pl-10 pr-3 py-2 sm:py-3 md:py-4 rounded-xl text-xs sm:text-sm placeholder-opacity-70 border focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-300 bg-white/5 backdrop-blur-sm text-white/90 placeholder-orange-200/40 border-white/10 focus:ring-orange-500/70",
-    passwordToggle: "absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer transition-colors text-orange-300/80 hover:text-orange-200/90",
-    checkbox: "h-4 w-4 sm:h-5 sm:w-5 rounded focus:ring-0 border text-orange-600 border-gray-500 bg-gray-700/30 checked:bg-orange-500/80",
-    checkboxLabel: "ml-2 sm:ml-3 text-xs sm:text-sm text-orange-200/80 cursor-pointer select-none",
-    checkboxLink: "font-medium text-orange-300 hover:underline",
-    submitButton: "w-full py-2 sm:py-3 md:py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer focus:outline-none focus:ring-2 relative overflow-hidden group bg-gradient-to-r from-orange-500/90 to-orange-600/90 text-white/95 hover:from-orange-600/90 hover:to-orange-700/90 focus:ring-orange-500/70",
+    inputIcon: "absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-400",
+    input: "w-full pl-10 pr-3 py-2 sm:py-3 md:py-4 rounded-xl text-xs sm:text-sm placeholder-opacity-70 border focus:outline-none focus:ring-2 focus:border-transparent transition-all duration-300 bg-orange-50/50 text-slate-800 placeholder-slate-400 border-orange-200 focus:ring-orange-500",
+    passwordToggle: "absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer transition-colors text-orange-400 hover:text-orange-600",
+    checkbox: "h-4 w-4 sm:h-5 sm:w-5 rounded focus:ring-0 border text-orange-500 border-orange-300 bg-orange-50/30 checked:bg-orange-500",
+    checkboxLabel: "ml-2 sm:ml-3 text-xs sm:text-sm text-slate-600 cursor-pointer select-none",
+    checkboxLink: "font-medium text-orange-600 hover:underline",
+    submitButton: "w-full py-2 sm:py-3 md:py-4 rounded-full font-bold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 cursor-pointer focus:outline-none focus:ring-2 relative overflow-hidden group bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 focus:ring-orange-400",
     buttonText: "relative z-10 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm md:text-base",
-    buttonHover: "absolute inset-0 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-0 bg-gradient-to-r from-orange-400/50 to-orange-500/50"
+    buttonHover: "absolute inset-0 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-0 bg-gradient-to-r from-orange-400/40 to-orange-500/40"
   },
   
   signinSection: "mt-2 pt-2 sm:pt-3 border-t text-center",
-  signinText: "mb-2 sm:mb-3 md:mb-4 text-xs sm:text-sm md:text-base text-orange-200/70",
-  signinButton: "inline-block w-full px-3 py-2 sm:px-4 sm:py-2 md:px-6 md:py-3 rounded-xl font-medium transition-all duration-300 transform hover:-translate-y-0.5 text-xs sm:text-sm md:text-base bg-transparent border border-orange-500/50 text-orange-300/90 hover:bg-orange-500/10 hover:text-white/90"
+  // NOTE: also update signinText and signinButton if present below this line in your file:
+  // signinText: "text-slate-500",
+  // signinButton: "... border-orange-300 text-orange-600 hover:bg-orange-50 ..."
 };
 
 // src/assets/dummyStyles.js
@@ -182,8 +183,8 @@ export const homeCarsStyles = {
   // FIX: responsive spec grid — 2 cols on mobile, 4 on larger
   specsGrid: "grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 my-4 sm:my-5",
   specItem: "flex flex-col items-center",
-  specIconContainer: (isHovered) => `p-2 sm:p-2.5 rounded-xl mb-1.5 transition-all ${isHovered ? 'bg-gradient-to-r from-sky-500/10 to-teal-500/10' : 'bg-slate-800'}`,
-  specIcon: (isHovered) => `w-4 h-4 ${isHovered ? 'text-orange-400' : 'text-slate-500'}`,
+  specIconContainer: (isHovered) => `p-2 sm:p-2.5 rounded-xl mb-1.5 transition-all ${isHovered ? 'bg-gradient-to-r from-orange-100 to-amber-100' : 'bg-orange-50'}`,
+  specIcon: (isHovered) => `w-4 h-4 ${isHovered ? 'text-orange-500' : 'text-slate-500'}`,
   specValue: "text-xs font-medium text-slate-300",
   specLabel: "text-[10px] text-slate-500 mt-0.5",
   bookButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 cursor-pointer",

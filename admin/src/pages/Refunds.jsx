@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { getAdminToken } from '../utils/auth.js';
+import { getAdminToken, ensureAuth } from '../utils/auth.js';
 import {
   CreditCard, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp,
   Car, User, FileText, Shield, Calendar, DollarSign, Image,
@@ -47,19 +47,31 @@ const Refunds = () => {
   const [refundReasons, setRefundReasons] = useState({});
   const [tab, setTab] = useState('eligible');
   const [modalImg, setModalImg] = useState(null);
-  const token = getAdminToken();
+
+  // FIX: Removed `const token = getAdminToken();` from here.
+  // Token was captured ONCE at mount and went stale after ensureAuth() refreshed it.
 
   const fetchData = async () => {
     setLoading(true);
     try {
+      // FIX: Ensure auth is valid, THEN get fresh token
+      await ensureAuth();
+      const token = getAdminToken();
+      if (!token) {
+        toast.error('Not authenticated. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
       const res = await axios.get(`${API_BASE}/api/admin/refunds/eligible`, {
         headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setEligible(res.data.eligible || []);
       setPastRefunds(res.data.pastRefunds || []);
     } catch (err) {
       console.error('Failed to fetch refund data', err);
-      toast.error('Failed to load refund data');
+      toast.error(err?.response?.data?.message || 'Failed to load refund data');
     } finally {
       setLoading(false);
     }
@@ -79,10 +91,14 @@ const Refunds = () => {
 
     setProcessingId(bookingId);
     try {
+      // FIX: Get fresh token for the POST request too
+      await ensureAuth();
+      const token = getAdminToken();
+
       const res = await axios.post(
         `${API_BASE}/api/admin/refunds`,
         { bookingId, amount, reason },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
       );
       toast.success(
         `Refund ${res.data.xenditRefundStatus === 'processed' ? 'processed via Xendit' : 'recorded (pending Xendit)'}`
@@ -134,39 +150,38 @@ const Refunds = () => {
                 onClick={() => setExpandedId(expandedId === b.bookingId ? null : b.bookingId)}
               >
                 {b.car?.image && (
-                  <img src={b.car.image} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
+                  <img src={b.car.image} alt="" className="w-16 h-12 rounded-lg object-cover" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{b.car?.make} {b.car?.model} {b.car?.year}</p>
-                  <p className="text-xs text-gray-400 truncate">
-                    Booking: ...{String(b.bookingId).slice(-8)} &bull; {b.user?.name}
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{b.car?.make} {b.car?.model} {b.car?.year}</span>
+                    <PolicyBadge b={b} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {b.user?.name} • {b.user?.email} • Booked: {b.bookingDate ? new Date(b.bookingDate).toLocaleDateString() : '—'}
                   </p>
                 </div>
-                <PolicyBadge b={b} />
-                <div className="text-right flex-shrink-0">
+                <div className="text-right">
                   <p className="font-bold text-sm">{fmt(b.amount)}</p>
-                  <p className="text-xs text-gray-400">{new Date(b.bookingDate).toLocaleDateString()}</p>
+                  <p className="text-xs text-gray-400">{b.status}</p>
                 </div>
-                {expandedId === b.bookingId ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                {expandedId === b.bookingId ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
               </div>
 
-              {/* Expanded Detail */}
+              {/* Expanded Details */}
               {expandedId === b.bookingId && (
-                <div className="border-t p-5 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="border-t p-4 bg-gray-50">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Car Details */}
                     <div className="space-y-3">
                       <h4 className="font-semibold text-sm flex items-center gap-2"><Car size={16} /> Car Details</h4>
-                      {b.car?.image && (
-                        <img
-                          src={b.car.image} alt="" className="w-full h-36 rounded-lg object-cover cursor-pointer"
-                          onClick={() => setModalImg(b.car.image)}
-                        />
-                      )}
-                      <div className="text-sm space-y-1 bg-white p-3 rounded-lg">
-                        <p><strong>Car:</strong> {b.car?.make} {b.car?.model} ({b.car?.year})</p>
-                        <p><strong>Plate:</strong> {b.car?.plateNumber || '—'}</p>
+                      <div className="bg-white p-3 rounded-lg space-y-1 text-sm">
+                        {b.car?.image && <img src={b.car.image} alt="" className="w-full h-32 object-cover rounded-lg mb-2" />}
+                        <p><strong>Make:</strong> {b.car?.make || '—'}</p>
+                        <p><strong>Model:</strong> {b.car?.model || '—'}</p>
+                        <p><strong>Year:</strong> {b.car?.year || '—'}</p>
                         <p><strong>Color:</strong> {b.car?.color || '—'}</p>
+                        <p><strong>Plate:</strong> {b.car?.plateNumber || '—'}</p>
                         <p><strong>Category:</strong> {b.car?.category || '—'}</p>
                         <p><strong>Transmission:</strong> {b.car?.transmission || '—'}</p>
                         <p><strong>Fuel:</strong> {b.car?.fuelType || '—'}</p>
@@ -181,20 +196,19 @@ const Refunds = () => {
                       <div className="bg-white p-3 rounded-lg space-y-3">
                         <div className="flex items-center gap-3">
                           {b.user?.profileImage ? (
-                            <img src={b.user.profileImage} alt="" className="w-14 h-14 rounded-full object-cover cursor-pointer" onClick={() => setModalImg(b.user.profileImage)} />
+                            <img src={b.user.profileImage} alt="" className="w-12 h-12 rounded-full object-cover cursor-pointer" onClick={() => setModalImg(b.user.profileImage)} />
                           ) : (
-                            <div className="w-14 h-14 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 font-bold text-lg">
-                              {(b.user?.name || '?')[0]?.toUpperCase()}
-                            </div>
+                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-400"><User size={20} /></div>
                           )}
                           <div>
-                            <p className="font-medium">{b.user?.name}</p>
-                            <p className="text-xs text-gray-400">{b.user?.email}</p>
-                            <p className="text-xs text-gray-400">{b.user?.phone}</p>
+                            <p className="font-medium text-sm">{b.user?.name || '—'}</p>
+                            <p className="text-xs text-gray-500">{b.user?.email || '—'}</p>
+                            <p className="text-xs text-gray-500">{b.user?.phone || '—'}</p>
                           </div>
                         </div>
                         <hr />
-                        <p className="text-xs font-medium text-gray-500 uppercase">ID Document ({b.user?.kycIdType || '—'})</p>
+                        <h5 className="text-xs font-semibold text-gray-500 uppercase">KYC / ID Documents</h5>
+                        <p className="text-sm"><strong>ID Type:</strong> {b.user?.kycIdType || '—'}</p>
                         <p className="text-sm"><strong>ID Number:</strong> {b.user?.kycIdNumber || '—'}</p>
                         <p className="text-sm"><strong>Country:</strong> {b.user?.kycIdCountry || '—'}</p>
 
@@ -219,61 +233,54 @@ const Refunds = () => {
                       </div>
                     </div>
 
-                    {/* Booking & Policy Details + Refund Action */}
+                    {/* Booking & Payment Details + Refund Action */}
                     <div className="space-y-3">
-                      <h4 className="font-semibold text-sm flex items-center gap-2"><Shield size={16} /> Booking & Policy</h4>
-                      <div className="bg-white p-3 rounded-lg text-sm space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-2"><FileText size={16} /> Booking & Payment</h4>
+                      <div className="bg-white p-3 rounded-lg space-y-1 text-sm">
                         <p><strong>Booking ID:</strong> <span className="font-mono text-xs">{b.bookingId}</span></p>
-                        <p className="flex items-center gap-1"><Calendar size={14} /> <strong>Pickup:</strong> {new Date(b.pickupDate).toLocaleDateString()}</p>
-                        <p className="flex items-center gap-1"><Calendar size={14} /> <strong>Return:</strong> {new Date(b.returnDate).toLocaleDateString()}</p>
-                        <hr />
-                        <p><strong>Total:</strong> {fmt(b.amount)}</p>
-                        <p className="text-xs text-gray-400">Rent: {fmt(b.paymentBreakdown?.rent)} &bull; Insurance: {fmt(b.paymentBreakdown?.insurance)} &bull; Deposit: {fmt(b.paymentBreakdown?.deposit)}</p>
-                        <hr />
-                        <p><strong>Insurance Plan:</strong> <span className="capitalize">{b.insurancePlan?.replace(/_/g, ' ')}</span></p>
-                        <p><strong>24hr Policy:</strong> <PolicyBadge b={b} /></p>
-                        {b.has24hrPolicy && b.policyExpiresAt && (
-                          <p className="text-xs text-gray-400">Expires: {new Date(b.policyExpiresAt).toLocaleString()}</p>
-                        )}
-                        <p><strong>Hours Since Booking:</strong> {b.hoursSinceBooking}h</p>
-                        {b.xenditInvoiceId && <p className="text-xs text-gray-400">Xendit: {b.xenditInvoiceId}</p>}
+                        <p><strong>Pickup:</strong> {b.pickupDate ? new Date(b.pickupDate).toLocaleDateString() : '—'}</p>
+                        <p><strong>Return:</strong> {b.returnDate ? new Date(b.returnDate).toLocaleDateString() : '—'}</p>
+                        <p><strong>Status:</strong> {b.status}</p>
+                        <p><strong>Payment:</strong> {b.paymentStatus}</p>
+                        <p><strong>Xendit Invoice:</strong> <span className="font-mono text-xs">{b.xenditInvoiceId || '—'}</span></p>
+                        <hr className="my-2" />
+                        <p><strong>Insurance Plan:</strong> {b.insurancePlan}</p>
+                        <p><strong>Insurance Cost:</strong> {fmt(b.insuranceCost)}</p>
+                        <hr className="my-2" />
+                        <p><strong>Rent:</strong> {fmt(b.paymentBreakdown?.rent)}</p>
+                        <p><strong>Insurance:</strong> {fmt(b.paymentBreakdown?.insurance)}</p>
+                        <p><strong>Deposit:</strong> {fmt(b.paymentBreakdown?.deposit)}</p>
+                        <p className="font-semibold"><strong>Total:</strong> {fmt(b.amount)}</p>
                       </div>
 
-                      {/* Refund Action */}
-                      <div className="bg-white p-3 rounded-lg border-2 border-dashed border-red-200 space-y-3">
-                        <h5 className="font-semibold text-sm text-red-600 flex items-center gap-1">
-                          <DollarSign size={14} /> Process Refund
-                        </h5>
-                        <div>
-                          <label className="text-xs text-gray-500">Amount (MYR)</label>
+                      {/* Refund Form */}
+                      <div className="bg-white p-3 rounded-lg border-2 border-dashed border-gray-300">
+                        <h5 className="text-xs font-semibold text-gray-500 uppercase mb-2">Process Refund</h5>
+                        <div className="space-y-2">
                           <input
                             type="number"
-                            min="0"
-                            max={b.amount}
+                            placeholder={`Max: ${b.amount}`}
                             value={refundAmounts[b.bookingId] || ''}
                             onChange={(e) => setRefundAmounts((a) => ({ ...a, [b.bookingId]: e.target.value }))}
-                            placeholder={`Max: ${b.amount}`}
-                            className="w-full p-2 border rounded text-sm mt-1"
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                            max={b.amount}
+                            min={0}
                           />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-500">Reason</label>
-                          <textarea
-                            rows={2}
+                          <input
+                            type="text"
+                            placeholder="Reason (optional)"
                             value={refundReasons[b.bookingId] || ''}
                             onChange={(e) => setRefundReasons((r) => ({ ...r, [b.bookingId]: e.target.value }))}
-                            placeholder="e.g., 24hr cancellation policy"
-                            className="w-full p-2 border rounded text-sm mt-1"
+                            className="w-full px-3 py-2 border rounded-lg text-sm"
                           />
+                          <button
+                            onClick={() => handleProcessRefund(b.bookingId)}
+                            disabled={processingId === b.bookingId}
+                            className="w-full py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {processingId === b.bookingId ? 'Processing...' : 'Process Refund'}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleProcessRefund(b.bookingId)}
-                          disabled={processingId === b.bookingId}
-                          className="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                          <CreditCard size={16} />
-                          {processingId === b.bookingId ? 'Processing...' : 'Process Refund via Xendit'}
-                        </button>
                       </div>
                     </div>
                   </div>

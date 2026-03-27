@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { getAdminToken } from '../utils/auth.js';
+import { getAdminToken, ensureAuth } from '../utils/auth.js';
 import {
   Search, ChevronLeft, ChevronRight, ExternalLink, FileText,
   CheckCircle, Clock, XCircle, RotateCcw, DollarSign,
@@ -40,11 +40,22 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: 'all', search: '', startDate: '', endDate: '' });
   const [expandedId, setExpandedId] = useState(null);
-  const token = getAdminToken();
+
+  // FIX: Removed `const token = getAdminToken();` from here.
+  // The token was captured ONCE at mount and went stale after ensureAuth() refreshed it.
 
   const fetchInvoices = useCallback(async (page = 1) => {
     setLoading(true);
     try {
+      // FIX: Ensure auth is valid, THEN get fresh token
+      await ensureAuth();
+      const token = getAdminToken();
+      if (!token) {
+        toast.error('Not authenticated. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
       const params = new URLSearchParams({ page, limit: 50 });
       if (filters.status !== 'all') params.append('status', filters.status);
       if (filters.search) params.append('search', filters.search);
@@ -53,17 +64,18 @@ const Invoices = () => {
 
       const res = await axios.get(`${API_BASE}/api/admin/invoices?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
       setInvoices(res.data.invoices || []);
       setPagination(res.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
       setSummary(res.data.summary || {});
     } catch (err) {
       console.error('Failed to fetch invoices', err);
-      toast.error('Failed to load invoices');
+      toast.error(err?.response?.data?.message || 'Failed to load invoices');
     } finally {
       setLoading(false);
     }
-  }, [filters, token]);
+  }, [filters]);  // FIX: Removed `token` from deps
 
   useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
 
@@ -110,7 +122,7 @@ const Invoices = () => {
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">Status</label>
           <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-            className="px-3 py-2 border rounded-lg text-sm">
+            className="px-3 py-2 border rounded-lg text-sm bg-white">
             <option value="all">All</option>
             <option value="paid">Paid</option>
             <option value="pending">Pending</option>
@@ -153,12 +165,10 @@ const Invoices = () => {
                   <React.Fragment key={inv.bookingId}>
                     <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedId(expandedId === inv.bookingId ? null : inv.bookingId)}>
                       <td className="px-4 py-3">{statusIcon(inv.paymentStatus)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{new Date(inv.bookingDate).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-xs font-mono text-gray-500 max-w-[120px] truncate" title={inv.xenditInvoiceId}>
-                        ...{String(inv.xenditInvoiceId).slice(-10)}
-                      </td>
+                      <td className="px-4 py-3 text-sm whitespace-nowrap">{inv.bookingDate ? new Date(inv.bookingDate).toLocaleDateString() : '—'}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">...{String(inv.xenditInvoiceId || '').slice(-10)}</td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="font-medium">{inv.customer}</div>
+                        <div>{inv.customer}</div>
                         <div className="text-xs text-gray-400">{inv.email}</div>
                       </td>
                       <td className="px-4 py-3 text-sm">
@@ -200,21 +210,25 @@ const Invoices = () => {
                               <p className="capitalize">{inv.xenditPaymentChannel || '—'}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-400">Rent</p>
-                              <p>{fmt(inv.paymentBreakdown?.rent)}</p>
+                              <p className="text-xs text-gray-400">Phone</p>
+                              <p>{inv.phone || '—'}</p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-400">Insurance</p>
-                              <p>{fmt(inv.paymentBreakdown?.insurance)}</p>
+                              <p className="text-xs text-gray-400">Currency</p>
+                              <p>{inv.currency}</p>
                             </div>
-                            <div>
-                              <p className="text-xs text-gray-400">Deposit</p>
-                              <p>{fmt(inv.paymentBreakdown?.deposit)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-400">Full Xendit Invoice ID</p>
-                              <p className="font-mono text-xs break-all">{inv.xenditInvoiceId}</p>
-                            </div>
+                            {inv.paymentBreakdown && (
+                              <>
+                                <div>
+                                  <p className="text-xs text-gray-400">Rent</p>
+                                  <p>{fmt(inv.paymentBreakdown.rent)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-gray-400">Insurance</p>
+                                  <p>{fmt(inv.paymentBreakdown.insurance)}</p>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -222,15 +236,16 @@ const Invoices = () => {
                   </React.Fragment>
                 ))}
                 {invoices.length === 0 && (
-                  <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400">No invoices found</td></tr>
+                  <tr><td colSpan={9} className="px-6 py-10 text-center text-gray-400">No invoices found. Invoices appear here after a booking is created with Xendit payment.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
+
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
             <span className="text-sm text-gray-500">
-              Showing {((pagination.page - 1) * pagination.limit) + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+              Showing {invoices.length > 0 ? ((pagination.page - 1) * pagination.limit) + 1 : 0}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
             </span>
             <div className="flex gap-2">
               <button disabled={pagination.page <= 1} onClick={() => fetchInvoices(pagination.page - 1)}

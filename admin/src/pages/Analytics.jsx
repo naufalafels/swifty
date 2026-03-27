@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import axios from 'axios';
-import { getAdminToken } from '../utils/auth.js';
+import { getAdminToken, ensureAuth } from '../utils/auth.js';
 import { TrendingUp, TrendingDown, Users, DollarSign, Activity, Car, ShoppingCart, ArrowUpRight, Percent, CalendarClock } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement, Title, Tooltip, Legend, Filler);
@@ -30,26 +30,49 @@ const Analytics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('12');
-  const token = getAdminToken();
+  const [error, setError] = useState('');
+
+  // FIX: Do NOT capture token at mount. Instead, get a fresh token inside each fetch call.
+  // Previously: const token = getAdminToken(); — this was stale because ProtectedRoute's
+  // ensureAuth() may have refreshed the token AFTER this component rendered.
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       setLoading(true);
+      setError('');
       try {
+        // FIX: Ensure we have a valid token before fetching.
+        // ensureAuth() will refresh if the current token is missing/expired.
+        await ensureAuth();
+        const token = getAdminToken();  // FIX: Get token FRESH, after ensureAuth()
+        if (!token) {
+          setError('Not authenticated. Please log in again.');
+          setLoading(false);
+          return;
+        }
+
         const res = await axios.get(`${API_BASE}/api/admin/analytics?period=${period}`, {
           headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
         });
-        setData(res.data);
+        if (res.data && res.data.success !== false) {
+          setData(res.data);
+        } else {
+          setError(res.data?.message || 'Failed to load analytics data.');
+        }
       } catch (err) {
         console.error('Failed to fetch analytics', err);
+        const msg = err?.response?.data?.message || err.message || 'Failed to load analytics data.';
+        setError(msg);
       } finally {
         setLoading(false);
       }
     };
     fetchAnalytics();
-  }, [period, token]);
+  }, [period]);  // FIX: Removed `token` from deps — we get it fresh inside the effect
 
   if (loading) return <div className="p-6 text-gray-500">Loading analytics...</div>;
+  if (error) return <div className="p-6 text-red-500">{error}</div>;
   if (!data) return <div className="p-6 text-red-500">Failed to load analytics data.</div>;
 
   const fmt = (n) => new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR', minimumFractionDigits: 0 }).format(n || 0);

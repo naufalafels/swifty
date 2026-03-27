@@ -33,6 +33,15 @@ const carSummarySchema = new Schema({
   year: Number,
   dailyRate: Number,
   image: String,
+  category: String,
+  color: String,
+  seats: Number,
+  transmission: String,
+  fuelType: String,
+  plateNumber: String,
+  deposit: Number,
+  mileage: Number,
+  description: String,
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', default: null },
 }, { _id: false });
 

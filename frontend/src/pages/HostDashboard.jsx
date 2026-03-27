@@ -413,8 +413,12 @@ const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlar
 
 /* ───────────────────────── CarDetailPopup ───────────────────────── */
 
-const CarDetailPopup = ({ car, onClose }) => {
+const CarDetailPopup = ({ car, fullCar, onClose }) => {
   if (!car) return null;
+  // Merge: prefer fullCar (from host's cars[]) if available, fall back to booking snapshot
+  const c = { ...car, ...fullCar };
+  const imageUrl = c.image || car.image || null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}>
@@ -429,30 +433,82 @@ const CarDetailPopup = ({ car, onClose }) => {
           </button>
         </div>
 
+        {/* Car Image */}
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={`${c.make || ""} ${c.model || ""}`}
+            className="w-full h-48 object-cover rounded-xl border border-slate-700"
+          />
+        ) : (
+          <div className="w-full h-48 rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center text-slate-500 text-sm">
+            <FaCar className="mr-2" /> No image available
+          </div>
+        )}
+
         <div className="space-y-3 text-sm">
           <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-2">
+            {/* Car ID — highlighted */}
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 w-24">Car ID:</span>
+              <span className="text-slate-400 w-28">Car ID:</span>
               <span className="text-amber-300 font-mono text-xs bg-amber-900/30 px-2 py-1 rounded-lg break-all">
-                {car.id || car._id || "—"}
+                {c.id || c._id || "—"}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 w-24">Make:</span>
-              <span className="text-white font-medium">{car.make || "—"}</span>
+              <span className="text-slate-400 w-28">Make:</span>
+              <span className="text-white font-medium">{c.make || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 w-24">Model:</span>
-              <span className="text-white font-medium">{car.model || "—"}</span>
+              <span className="text-slate-400 w-28">Model:</span>
+              <span className="text-white font-medium">{c.model || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 w-24">Year:</span>
-              <span className="text-white">{car.year || "—"}</span>
+              <span className="text-slate-400 w-28">Year:</span>
+              <span className="text-white">{c.year || "—"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 w-24">Daily Rate:</span>
-              <span className="text-emerald-300 font-semibold">RM {car.dailyRate || "—"}</span>
+              <span className="text-slate-400 w-28">Category/Type:</span>
+              <span className="text-white">{c.category || "—"}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Color:</span>
+              <span className="text-white">{c.color || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Seats:</span>
+              <span className="text-white">{c.seats || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Transmission:</span>
+              <span className="text-white">{c.transmission || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Fuel Type:</span>
+              <span className="text-white">{c.fuelType || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Plate Number:</span>
+              <span className="text-white font-mono">{c.plateNumber || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Mileage:</span>
+              <span className="text-white">{c.mileage ? `${c.mileage.toLocaleString()} km` : "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Daily Rate:</span>
+              <span className="text-emerald-300 font-semibold">RM {c.dailyRate || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 w-28">Deposit:</span>
+              <span className="text-emerald-300 font-semibold">RM {c.deposit || "—"}</span>
+            </div>
+            {c.description && (
+              <div className="flex gap-2 pt-1">
+                <span className="text-slate-400 w-28 shrink-0">Description:</span>
+                <span className="text-slate-200 text-xs leading-relaxed">{c.description}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -533,12 +589,18 @@ const STATUS_CONFIG = {
   upcoming: { label: "Upcoming", tone: "blue", icon: <FaCalendarAlt className="text-sky-400" /> },
 };
 
-const BookingHistoryTab = ({ bookings, loading }) => {
+const BookingHistoryTab = ({ bookings, loading, cars = [] }) => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [carFilter, setCarFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCar, setSelectedCar] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  // Build a lookup map: carId → full car object (from host's owned cars)
+  const carById = useMemo(() => {
+    const map = {};
+    cars.forEach((c) => { map[c._id] = c; });
+    return map;
+  }, [cars]);
 
   // Derive unique car names for the filter dropdown
   const uniqueCarNames = useMemo(() => {
@@ -761,7 +823,11 @@ const BookingHistoryTab = ({ bookings, loading }) => {
 
       {/* Pop-up modals */}
       {selectedCar && (
-        <CarDetailPopup car={selectedCar} onClose={() => setSelectedCar(null)} />
+        <CarDetailPopup
+          car={selectedCar}
+          fullCar={carById[selectedCar.id || selectedCar._id] || null}
+          onClose={() => setSelectedCar(null)}
+        />
       )}
       {selectedUser && (
         <UserDetailPopup user={selectedUser} onClose={() => setSelectedUser(null)} />
@@ -1156,6 +1222,7 @@ const HostDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [serviceError, setServiceError] = useState("");
+  const [activeTab, setActiveTab] = useState("operations");
     // Service car detail modal state
   const [serviceCarModal, setServiceCarModal] = useState(null);
 
@@ -1416,7 +1483,7 @@ const HostDashboard = () => {
         />
       )}
 
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
         {/* ──── header ──── */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -1427,7 +1494,7 @@ const HostDashboard = () => {
             <div>
               <div className="text-xs uppercase text-slate-500">Host Centre</div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
-                <FaHome className="text-emerald-400" /> Operations overview
+                <FaHome className="text-emerald-400" /> Host Centre
               </h1>
             </div>
           </div>
@@ -1443,12 +1510,45 @@ const HostDashboard = () => {
           </div>
         </div>
 
+        {/* ──── TAB NAVIGATION ──── */}
+        <div className="flex gap-2 border-b border-slate-800 pb-1">
+          <button
+            onClick={() => setActiveTab("operations")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
+              activeTab === "operations"
+                ? "bg-slate-800 text-white border-b-2 border-emerald-400"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            <FaClipboardCheck className="text-emerald-400" /> Operations Overview
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
+              activeTab === "history"
+                ? "bg-slate-800 text-white border-b-2 border-amber-400"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            <FaHistory className="text-amber-400" /> Booking History
+          </button>
+        </div>
+
+        {/* ──── TAB: Booking History ──── */}
+        {activeTab === "history" && (
+          <BookingHistoryTab bookings={bookings} loading={loading} cars={cars} />
+        )}
+
+        {/* ──── TAB: Operations Overview ──── */}
+        {activeTab === "operations" && (
+        <>
+
         {/* ──── stat cards ──── */}
         <div className="grid md:grid-cols-3 gap-4">
           <StatCard title="Cars" value={cars.length} icon={<FaCar />} tone="blue" />
           <StatCard title="Today pickups" value={todayPickups.length} icon={<FaClipboardCheck />} tone="emerald" />
           <StatCard title="Today returns" value={todayReturns.length} icon={<FaClipboardCheck />} tone="amber" />
-        </div>
+        </div>  
 
         {/* ──── Booking History ──── */}
         <div className="space-y-4">
@@ -1924,6 +2024,8 @@ const HostDashboard = () => {
             ))}
           </div>
         </section>
+        </>
+        )}
       </div>
     </div>
   );

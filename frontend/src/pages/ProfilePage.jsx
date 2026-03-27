@@ -359,9 +359,7 @@ const ProfilePage = () => {
       if (editExtras.profilePic instanceof File) {
         const uploadForm = new FormData();
         uploadForm.append('file', editExtras.profilePic);
-        const uploadRes = await api.post('/api/auth/profile-picture/upload', uploadForm, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const uploadRes = await api.post('/api/auth/profile-picture/upload', uploadForm);
         // Send the raw S3 KEY (not a URL) to the backend
         payload.profilePicture = uploadRes.data.key || '';
       }

@@ -21,7 +21,7 @@ const Footer = () => {
                         <div className={styles.logoContainer}>
                             <img 
                                 src={logo} 
-                                alt="logo"
+                                alt="Swifty Car Rental logo"
                                 className='h-[1em] w-auto block'
                                 style={{
                                     display: "block",
@@ -43,32 +43,37 @@ const Footer = () => {
                             FaLinkedinIn, 
                             FaYoutube
                         ].map((Icon, i) => (
-                            <a href="#" key={i} className={styles.socialIcon}>
+                            <a href="#" key={i} className={styles.socialIcon} aria-label={`Social link ${i + 1}`}>
                                 <Icon />
                             </a>
                         ))}
                     </div>
                 </div>
 
-                {/* QUICK LINKS */}
-                <div>
+                {/* QUICK LINKS — FIX: use <Link> instead of <a href> for SPA routing */}
+                <nav aria-label="Quick links">
                     <h3 className={styles.sectionTitle}>
                         Quick Links
                         <span className={styles.underline} />
                     </h3>
                     <ul className={styles.linkList}>
-                        {['Home', 'Cars', 'Contact Us'].map((link, i) => (
+                        {[
+                            { label: 'Home', to: '/' },
+                            { label: 'Cars', to: '/cars' },
+                            { label: 'Contact Us', to: '/contact' },
+                        ].map((link, i) => (
                             <li key={i}>
-                                <a 
-                                    href={link === 'Home' ? '/' : link === 'Contact Us' ? '/contact' : '/cars'}
+                                <Link
+                                    to={link.to}
                                     className={styles.linkItem}
                                 >
-                                    {link}
-                                </a>
+                                    <span className={styles.bullet} />
+                                    {link.label}
+                                </Link>
                             </li>
                         ))}
                     </ul>
-                </div>
+                </nav>
 
                 {/* CONTACT */}
                 <div>
@@ -78,7 +83,8 @@ const Footer = () => {
                     </h3>
 
                     <ul className={styles.contactList}>
-                        <li className={styles.contactList}>
+                        {/* FIX: was styles.contactList on <li>, should be styles.contactItem */}
+                        <li className={styles.contactItem}>
                             <FaMapMarkedAlt className={styles.contactIcon} />
                             <span>Bayan Baru, 11950, Pulau Pinang, Malaysia </span>
                         </li>
@@ -114,11 +120,12 @@ const Footer = () => {
                         Subscribe for special offers and updates
                     </p>
 
-                    <form className=' space-y-3'>
+                    <form className=' space-y-3' onSubmit={(e) => e.preventDefault()}>
                         <input 
                             type="email" 
                             placeholder='Your Email Address'
                             className={styles.input}
+                            aria-label="Email address for newsletter"
                         />
 
                         <button type='submit' className={styles.subscribeButton}>
@@ -137,6 +144,7 @@ const Footer = () => {
                     <a 
                         href="/"
                         target='_blank'
+                        rel="noopener noreferrer"
                         className={styles.designerLink}
                     >
                         Naufalafels Software Services

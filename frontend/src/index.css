@@ -1,6 +1,23 @@
 @import "tailwindcss";
 
-/* stroke animations */
+/* ── Design Tokens (Professional Yet Fun Palette) ── */
+:root {
+  --color-primary: #F97316;        /* warm orange */
+  --color-primary-hover: #EA580C;  /* deeper orange */
+  --color-primary-light: #FDBA74;  /* light orange */
+  --color-accent: #0EA5E9;         /* sky blue — trust */
+  --color-accent-light: #7DD3FC;
+  --color-surface: #0F172A;        /* slate-900 — sophisticated dark */
+  --color-surface-card: rgba(255, 255, 255, 0.06);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-text-primary: #F1F5F9;   /* slate-100 */
+  --color-text-secondary: #94A3B8; /* slate-400 */
+  --color-success: #10B981;        /* emerald */
+  --mx: 0.5;
+  --my: 0.5;
+}
+
+/* ── Stroke Animations ── */
 .center-path {
   stroke-dasharray: 900;
   stroke-dashoffset: 900;
@@ -26,15 +43,12 @@
     stroke-dashoffset: 900;
     opacity: 0;
   }
-
   8% {
     opacity: 1;
   }
-
   45% {
     stroke-dashoffset: 120;
   }
-
   100% {
     stroke-dashoffset: -900;
     opacity: 0;
@@ -46,30 +60,27 @@
     stroke-dashoffset: 700;
     opacity: 0;
   }
-
   10% {
     opacity: 0.9;
   }
-
   50% {
     stroke-dashoffset: 140;
   }
-
   100% {
     stroke-dashoffset: -700;
     opacity: 0;
   }
 }
 
+/* ── Metal Button (SINGLE definition — removed duplicate) ── */
 .metal-btn {
-  background: linear-gradient(180deg, #ff6a00 0%, #ff8800 50%, #ff4d00 100%);
-  /* bright orange gradient */
+  background: linear-gradient(180deg, var(--color-primary) 0%, #FB923C 50%, var(--color-primary-hover) 100%);
   color: #fff;
   font-weight: 600;
   border: none;
   border-radius: 8px;
   padding: 0.75rem 1.5rem;
-  box-shadow: 0 6px 20px #ff6a0080, inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   position: relative;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -82,7 +93,7 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.35), transparent);
   transform: rotate(25deg);
   transition: all 0.6s ease;
 }
@@ -93,12 +104,11 @@
 
 .metal-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(255, 106, 0, 0.7);
+  box-shadow: 0 8px 28px rgba(249, 115, 22, 0.6);
 }
 
-
-/* card pop */
-.backdrop-blur-md {
+/* ── Card Pop Animation (scoped — no longer overrides backdrop-blur-md globally) ── */
+.card-pop {
   animation: pop 640ms cubic-bezier(.2, .9, .25, 1) both;
 }
 
@@ -107,22 +117,14 @@
     transform: translateY(8px) scale(.993);
     opacity: 0;
   }
-
   to {
     transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
 
-
-/* cursor vars fallback and mobile fallback */
-:root {
-  --mx: 0.5;
-  --my: 0.5;
-}
-
+/* ── Mobile Fallbacks ── */
 @media (max-width: 640px) {
-
   .center-path,
   .side-path,
   .dot {
@@ -135,10 +137,10 @@
   }
 }
 
-/* Glass card styles */
+/* ── Glass Card Styles ── */
 .glass-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -153,51 +155,24 @@
   bottom: -1px;
   border-radius: 1rem;
   background: linear-gradient(120deg,
-      rgba(255, 255, 255, 0.05),
-      rgba(255, 255, 255, 0.01),
-      rgba(255, 255, 255, 0.05));
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.01),
+    rgba(255, 255, 255, 0.05));
   z-index: -1;
 }
 
-/* Glass badge style */
+/* ── Glass Badge Style ── */
 .glass-badge {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--color-surface-card);
+  border: 1px solid var(--color-border);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 
-/* Metal button style */
-.metal-btn {
-  background: linear-gradient(180deg, #ff6a00 0%, #ff8800 50%, #ff4d00 100%);
-  color: #fff;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  padding: 0.75rem 1.5rem;
-  box-shadow: 0 6px 20px rgba(255, 106, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.metal-btn::before {
-  content: "";
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  transform: rotate(25deg);
-  transition: all 0.6s ease;
-}
-
-.metal-btn:hover::before {
-  left: 100%;
-}
-
-.metal-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(255, 106, 0, 0.7);
+/* ── Disable hover effects on touch devices ── */
+@media (hover: none) {
+  .metal-btn:hover {
+    transform: none;
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
 }

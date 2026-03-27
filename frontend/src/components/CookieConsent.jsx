@@ -1,35 +1,22 @@
 import React, { useEffect, useState } from "react";
 
-/**
- * CookieConsent
- * - Shows a bottom bar on first visit or if consent expires/cleared.
- * - Stores 'cookie_consent' in localStorage as 'accepted' | 'declined'.
- * - Accessible, responsive, enterprise-minded UI.
- *
- * Behavior:
- * - Accept: sets 'accepted'. If you want server-side to set cookies only after accept,
- *   send the user's choice with auth requests and the server should respect it.
- * - Decline: sets 'declined'. Client will avoid sending credentials when possible (frontend decisions).
- *
- * Styling: Tailwind CSS is used across the project.
- */
-
 const Banner = ({ onAccept, onDecline }) => {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50">
-      <div className="max-w-screen-xl mx-auto bg-gray-900/95 text-white shadow-lg rounded-t-lg p-4 md:p-6 flex flex-col md:flex-row items-center md:justify-between gap-4">
+    <div className="fixed inset-x-0 bottom-0 z-50 px-3 sm:px-4 pb-3 sm:pb-4">
+      <div className="max-w-screen-xl mx-auto bg-slate-900/95 backdrop-blur-md text-white shadow-2xl rounded-2xl p-4 sm:p-5 md:p-6 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 border border-slate-700/50">
         <div className="flex-1">
-          <p className="text-sm md:text-base leading-snug">
+          <p className="text-xs sm:text-sm md:text-base leading-relaxed text-slate-300">
             We use cookies to provide essential authentication, preferences, and to improve your experience.
             By clicking "Accept", you consent to cookies (including secure, httpOnly tokens used for authentication).
-            You can also choose "Decline" to disable non-essential cookies. Essential authentication may be limited if you decline.
+            You can also choose "Decline" to disable non-essential cookies.
           </p>
         </div>
 
-        <div className="flex-shrink-0 flex gap-2 items-center">
+        {/* FIX: Larger tap targets (min 44px), full-width on mobile, inline on sm+ */}
+        <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={onDecline}
-            className="px-3 py-2 rounded-md bg-gray-700 text-sm md:text-base hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-lg bg-slate-700 text-sm font-medium hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500 transition-colors"
             aria-label="Decline cookies"
           >
             Decline
@@ -37,7 +24,7 @@ const Banner = ({ onAccept, onDecline }) => {
 
           <button
             onClick={onAccept}
-            className="px-3 py-2 rounded-md bg-emerald-500 text-sm md:text-base font-semibold hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-300"
+            className="w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-lg bg-orange-500 text-sm font-semibold hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-400 transition-colors"
             aria-label="Accept cookies"
           >
             Accept
@@ -63,10 +50,8 @@ const CookieConsent = () => {
   const handleAccept = () => {
     try {
       localStorage.setItem("cookie_consent", "accepted");
-      // optional: record timestamp for expiration or analytics
       localStorage.setItem("cookie_consent_at", Date.now().toString());
       setConsent("accepted");
-      // emit event for the app to react
       window.dispatchEvent(new CustomEvent("cookie-consent-changed", { detail: { consent: "accepted" } }));
     } catch {
       setConsent("accepted");
@@ -84,7 +69,6 @@ const CookieConsent = () => {
     }
   };
 
-  // show banner if not set
   if (consent === "accepted" || consent === "declined") return null;
 
   return <Banner onAccept={handleAccept} onDecline={handleDecline} />;

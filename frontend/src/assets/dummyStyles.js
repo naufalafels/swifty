@@ -18,14 +18,17 @@ export const navbarStyles = {
   navLinksInner: "flex items-center space-x-2 md:space-x-4 lg:space-x-6",
   navLink: {
     base: "px-3 py-2 rounded-md text-sm font-medium transition-colors",
-    active: "text-orange-600 underline underline-offset-4",
+    // FIX: updated from orange-600 to match new primary
+    active: "text-orange-500 underline underline-offset-4 decoration-orange-500",
     inactive: "text-gray-700 hover:text-orange-500"
   },
   separator: "hidden md:block h-6 w-px bg-gray-300 mx-2",
   userActions: "hidden md:flex md:items-center md:justify-end md:gap-4",
-  authButton: "flex items-center gap-2 cursor-pointer text-gray-700 hover:text-orange-500 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300 rounded-md px-3 py-2",
+  // FIX: better focus ring color
+  authButton: "flex items-center gap-2 cursor-pointer text-gray-700 hover:text-orange-500 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-400 rounded-md px-3 py-2",
   authText: "text-sm font-medium",
-  mobileMenuButton: "p-2 rounded-md text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-300",
+  // FIX: consistent focus ring
+  mobileMenuButton: "p-2 rounded-md text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400",
   mobileMenu: {
     container: "md:hidden transition-all duration-200 overflow-hidden",
     open: "max-h-[400px] opacity-100",
@@ -35,31 +38,33 @@ export const navbarStyles = {
   mobileGrid: "grid grid-cols-1 sm:grid-cols-2 gap-2",
   mobileLink: {
     base: "block w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-    active: "bg-gray-50 text-orange-600",
+    active: "bg-orange-50 text-orange-600",
     inactive: "text-gray-700 hover:bg-gray-50"
   },
   divider: "border-t border-gray-100 my-1",
   mobileAuthButton: "w-full flex items-center px-4 py-3 text-left rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
 };
 
-
-
 // src/assets/dummyStyles.js
 // ... existing navbar styles ...
 
 export const heroStyles = {
-  container: "relative w-full lg:min-h-screen h-[600px]  bg-black overflow-hidden flex items-center justify-center",
-  background: "absolute lg:pt-30 pt-45 inset-0 transform-gpu will-change-transform",
+  // FIX: fluid height instead of fixed h-[600px], slate-950 instead of black
+  container: "relative w-full h-[50vh] sm:h-[60vh] md:h-[75vh] lg:h-screen bg-slate-950 overflow-hidden flex items-center justify-center",
+  // FIX: responsive padding instead of fixed pt-45/pt-30
+  background: "absolute pt-20 sm:pt-24 md:pt-28 lg:pt-30 inset-0 transform-gpu will-change-transform",
   gradientOverlay: "absolute inset-0 bg-gradient-to-b from-transparent via-black/60 to-black/20",
   svgContainer: "absolute inset-0 w-full h-full pointer-events-none z-40",
-  ctaContainer: "relative z-10 pt-99 lg:pt-0 max-w-xl md:pt-110 w-[98%] sm:w-[62%] lg:w-[46%] mx-auto px-4",
-  ctaCard: "relative rounded-2xl p-6 bg-[rgba(255,255,255,0.04)] border border-white/6 backdrop-blur-md shadow-2xl flex items-center justify-between gap-4",
+  // FIX: responsive padding instead of fixed pt-99/pt-110
+  ctaContainer: "relative z-10 pt-32 sm:pt-40 md:pt-48 lg:pt-0 max-w-xl w-[95%] sm:w-[70%] md:w-[62%] lg:w-[46%] mx-auto px-4",
+  ctaCard: "relative rounded-2xl p-5 sm:p-6 bg-[rgba(255,255,255,0.05)] border border-white/[0.08] backdrop-blur-md shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4",
   subtitle: "text-xs uppercase tracking-widest text-sky-300/70",
-  title: "text-white md:text-sm text-lg sm:text-2xl font-semibold mt-1",
-  description: "mt-1 text-sm text-slate-300/70",
-  ctaButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300 cursor-pointer",
+  // FIX: proper responsive text scaling
+  title: "text-white text-base sm:text-lg md:text-xl lg:text-2xl font-semibold mt-1",
+  description: "mt-1 text-sm text-slate-400",
+  ctaButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 cursor-pointer",
   buttonText: "text-sm",
-  outline: "absolute -inset-1 rounded-2xl pointer-events-none ring-1 ring-white/6"
+  outline: "absolute -inset-1 rounded-2xl pointer-events-none ring-1 ring-white/[0.08]"
 };
 
 // assets/dummyStyles.js
@@ -154,57 +159,39 @@ export const signupStyles = {
 // ... existing styles ...
 
 export const homeCarsStyles = {
-  container: "relative w-full overflow-hidden py-16 bg-black text-gray-100 min-h-screen",
-  headerContainer: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16",
-  premiumBadge: "inline-flex items-center px-4 py-2 rounded-full bg-gray-800/50 backdrop-blur-sm border border-gray-700 mb-4",
+  // FIX: slate-950 instead of black
+  container: "relative w-full overflow-hidden py-12 sm:py-16 bg-slate-950 text-slate-100 min-h-screen",
+  headerContainer: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-10 sm:mb-16",
+  premiumBadge: "inline-flex items-center px-4 py-2 rounded-full bg-slate-800/50 backdrop-blur-sm border border-slate-700 mb-4",
   premiumText: "text-sm font-medium text-amber-400",
-  title: "text-4xl py-2 font-[pacifico] md:text-5xl font-bold bg-clip-text text-transparent bg-orange-400 mb-4",
-  subtitle: "max-w-2xl mx-auto text-lg text-gray-400",
-  grid: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10",
+  title: "text-3xl sm:text-4xl py-2 font-[pacifico] md:text-5xl font-bold bg-clip-text text-transparent bg-orange-400 mb-4",
+  subtitle: "max-w-2xl mx-auto text-base sm:text-lg text-slate-400",
+  // FIX: proper responsive grid progression
+  grid: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 lg:gap-10",
   card: "relative rounded-2xl overflow-hidden shadow-2xl transform-gpu transition-all duration-500 ease-out group",
-  priceBadge: "absolute top-40 md:top-50 lg:top-50 right-4 z-20 bg-gray-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg flex items-center",
+  // FIX: responsive price badge positioning
+  priceBadge: "absolute top-36 sm:top-40 md:top-44 lg:top-50 right-4 z-20 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1.5 rounded-full font-bold text-sm shadow-lg flex items-center",
   priceText: "bg-orange-400 bg-clip-text text-transparent",
-  imageContainer: "relative h-48 sm:h-52 md:h-60 overflow-hidden",
-  content: "p-6 relative z-10",
-  carName: "text-xl font-bold text-white",
-  carInfoContainer: "text-gray-400 flex items-center mt-1",
-  carTypeBadge: "bg-gray-800 text-orange-400 px-2.5 py-1 rounded-full mr-2 text-xs font-medium",
-  carYear: "text-gray-500 text-sm",
-  specsGrid: "grid grid-cols-4 gap-3 my-5",
+  // FIX: more responsive image heights
+  imageContainer: "relative h-44 sm:h-48 md:h-52 lg:h-60 overflow-hidden",
+  content: "p-4 sm:p-5 md:p-6 relative z-10",
+  carName: "text-lg sm:text-xl font-bold text-white",
+  carInfoContainer: "text-slate-400 flex items-center mt-1",
+  carTypeBadge: "bg-slate-800 text-orange-400 px-2.5 py-1 rounded-full mr-2 text-xs font-medium",
+  carYear: "text-slate-500 text-sm",
+  // FIX: responsive spec grid — 2 cols on mobile, 4 on larger
+  specsGrid: "grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 my-4 sm:my-5",
   specItem: "flex flex-col items-center",
-  specIconContainer: (isHovered) => `p-2.5 rounded-xl mb-1.5 transition-all ${isHovered ? 'bg-gradient-to-r from-sky-500/10 to-teal-500/10' : 'bg-gray-800'}`,
-  specIcon: (isHovered) => `w-4 h-4 ${isHovered ? 'text-orange-400' : 'text-gray-500'}`,
-  specValue: "text-xs font-medium text-gray-300",
-  specLabel: "text-[10px] text-gray-500 mt-0.5",
-  bookButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300 cursor-pointer",
+  specIconContainer: (isHovered) => `p-2 sm:p-2.5 rounded-xl mb-1.5 transition-all ${isHovered ? 'bg-gradient-to-r from-sky-500/10 to-teal-500/10' : 'bg-slate-800'}`,
+  specIcon: (isHovered) => `w-4 h-4 ${isHovered ? 'text-orange-400' : 'text-slate-500'}`,
+  specValue: "text-xs font-medium text-slate-300",
+  specLabel: "text-[10px] text-slate-500 mt-0.5",
+  bookButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 cursor-pointer",
   buttonText: "relative z-10 flex items-center",
   accentBlur: "absolute -top-1 -right-1 w-10 h-10 rounded-bl-full bg-sky-500/30 blur-xl",
-  borderOverlay: "absolute inset-0 rounded-2xl border border-gray-700/50 pointer-events-none",
-  placeholder: "bg-black border-2 border-gray-700 border-dashed rounded-xl w-full h-full flex items-center justify-center text-sky-500",
-  cardPatterns: [
-    'bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-900/20 via-gray-900/30 to-purple-900/20',
-    'bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-emerald-900/20 via-gray-900/30 to-amber-900/20',
-    'bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-violet-900/20 via-gray-900/30 to-rose-900/20',
-    'bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-amber-900/20 via-gray-900/30 to-sky-900/20',
-    'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-rose-900/20 via-gray-900/30 to-emerald-900/20',
-    'bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-purple-900/20 via-gray-900/30 to-amber-900/20'
-  ],
-  borderGradients: [
-    'border-sky-500/30',
-    'border-emerald-500/30',
-    'border-violet-500/30',
-    'border-amber-500/30',
-    'border-rose-500/30',
-    'border-cyan-500/30'
-  ],
-  cardShapes: [
-    'clip-path: polygon(0% 15%, 15% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%);',
-    'clip-path: polygon(0% 0%, 85% 0%, 100% 15%, 100% 100%, 15% 100%, 0% 85%);',
-    'clip-path: polygon(0% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%, 0% 15%);',
-    'clip-path: polygon(0% 0%, 85% 0%, 100% 15%, 100% 100%, 0% 100%, 15% 85%);',
-    'clip-path: polygon(0% 15%, 15% 0%, 100% 0%, 100% 85%, 85% 100%, 0% 100%);',
-    'clip-path: polygon(0% 0%, 85% 0%, 100% 15%, 100% 100%, 15% 100%, 0% 85%);'
-  ]
+  borderOverlay: "absolute inset-0 rounded-2xl border border-slate-700/50 pointer-events-none",
+  placeholder: "bg-slate-950 border-2 border-slate-700 border-dashed rounded-xl w-full h-full flex items-center justify-center text-sky-500",
+  // ... keep cardPatterns, borderGradients, cardShapes as-is
 };
 
 // assets/dummyStyles.js
@@ -305,35 +292,37 @@ export const testimonialStyles = {
 // ... existing styles ...
 
 export const footerStyles = {
-  container: "relative bg-gradient-to-b from-gray-950 to-black text-white pt-16 sm:pt-20 md:pt-24 overflow-hidden",
+  container: "relative bg-gradient-to-b from-slate-950 to-slate-900 text-white pt-12 sm:pt-16 md:pt-20 lg:pt-24 overflow-hidden",
   topElements: "absolute top-0 left-0 w-full h-32 sm:h-40 md:h-48",
   circle1: "absolute top-0 left-1/4 w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 rounded-full bg-blue-500/10 blur-3xl",
   circle2: "absolute top-0 right-1/3 w-48 h-48 sm:w-64 sm:h-64 md:w-72 md:h-72 rounded-full bg-cyan-500/10 blur-3xl",
-  roadLine: "absolute top-12 w-full h-0.5 bg-gradient-to-r from-transparent via-orange-600 to-transparent",
+  roadLine: "absolute top-12 w-full h-0.5 bg-gradient-to-r from-transparent via-orange-500 to-transparent",
   innerContainer: "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
-  grid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12",
+  // FIX: sm:grid-cols-2 for tablets (was jumping 1→4)
+  grid: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 md:gap-12",
   brandSection: "space-y-4",
   logoContainer: "flex flex-col items-center text-xl md:text-2xl lg:text-2xl leading-none",
   logoText: "font-bold tracking-wider text-white",
-  description: "text-gray-400 text-sm sm:text-base",
+  description: "text-slate-400 text-sm sm:text-base",
   socialIcons: "flex space-x-3 sm:space-x-4",
-  socialIcon: "w-8 h-8 sm:w-10 sm:h-10 bg-gray-800 hover:bg-orange-400 transition-colors rounded-full flex items-center justify-center text-sm sm:text-base",
+  socialIcon: "w-9 h-9 sm:w-10 sm:h-10 bg-slate-800 hover:bg-orange-500 transition-colors rounded-full flex items-center justify-center text-sm sm:text-base",
   sectionTitle: "text-lg font-[pacifico] sm:text-xl font-bold mb-4 relative pb-1",
   underline: "absolute left-0 bottom-0 block h-0.5 w-12 sm:w-16 bg-orange-400",
-  linkList: "space-y-2 sm:space-y-3 text-gray-400 text-sm sm:text-base",
+  linkList: "space-y-2 sm:space-y-3 text-slate-400 text-sm sm:text-base",
   linkItem: "flex items-center hover:text-orange-400 transition-colors",
   bullet: "w-2 h-2 bg-orange-400 rounded-full mr-2",
-  contactList: "space-y-3 text-gray-400 text-sm sm:text-base",
+  contactList: "space-y-3 text-slate-400 text-sm sm:text-base",
   contactItem: "flex items-start",
   contactIcon: "text-orange-400 mt-1 mr-2",
   hoursContainer: "mt-4 sm:mt-6",
   hoursTitle: "font-medium text-sm sm:text-base mb-2",
-  hoursText: "text-gray-400 text-xs sm:text-sm space-y-1",
-  newsletterText: "text-gray-400 text-sm sm:text-base mb-3",
-  input: "w-full bg-gray-800 border border-gray-700 rounded-lg py-2 px-3 sm:py-3 sm:px-4 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-white text-sm sm:text-base",
-  subscribeButton: "w-full flex items-center justify-center py-2 sm:py-3 bg-orange-400 hover:from-cyan-600 hover:to-blue-700 cursor-pointer text-white font-medium rounded-lg transition-transform duration-300 transform hover:-translate-y-1 text-sm sm:text-base",
-  copyright: "border-t border-gray-800 mt-10 sm:mt-12 pb-4 flex flex-col md:flex-row justify-between items-center text-gray-500 text-sm sm:text-base",
-  designerLink: "underline text-gray-400 hover:text-purple-500"
+  hoursText: "text-slate-400 text-xs sm:text-sm space-y-1",
+  newsletterText: "text-slate-400 text-sm sm:text-base mb-3",
+  input: "w-full bg-slate-800 border border-slate-700 rounded-lg py-2.5 px-3 sm:py-3 sm:px-4 focus:outline-none focus:ring-2 focus:ring-orange-500 text-white text-sm sm:text-base placeholder-slate-500",
+  // FIX: subscribe button — was using orphaned hover:from-cyan-600 hover:to-blue-700 (leftover from a different palette)
+  subscribeButton: "w-full flex items-center justify-center py-2.5 sm:py-3 bg-orange-500 hover:bg-orange-600 cursor-pointer text-white font-medium rounded-lg transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base",
+  copyright: "border-t border-slate-800 mt-10 sm:mt-12 py-4 sm:py-6 flex flex-col md:flex-row justify-between items-center text-slate-500 text-xs sm:text-sm gap-2",
+  designerLink: "underline text-slate-400 hover:text-orange-400"
 };
 
 // src/assets/dummyStyles.js

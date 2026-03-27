@@ -22,6 +22,14 @@ import CookieConsent from './components/CookieConsent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+// Branded loading spinner for auth checks
+const AuthLoadingScreen = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white gap-4">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500" />
+    <p className="text-sm text-slate-400 tracking-wide">Verifying your session…</p>
+  </div>
+);
+
 // PROTECTED ROUTE that supports async token refresh on page load
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -41,7 +49,7 @@ const ProtectedRoute = ({ children }) => {
   }, []);
 
   if (checking) {
-    return <div className="min-h-screen flex items-center justify-center text-white">Checking authentication...</div>;
+    return <AuthLoadingScreen />;
   }
   if (!ok) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -187,14 +195,16 @@ const App = () => {
         <Route path='*' element={<Navigate to='/' replace />} />
       </Routes>
 
-      {showButton && (
-        <button
-          onClick={scrollUp}
-          className="fixed bottom-4 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
-        >
-          <FaArrowUp />
-        </button>
-      )}
+      {/* FIX: Scroll-to-top — brand color, z-index, proper touch target (min 44x44), smooth transition */}
+      <button
+        onClick={scrollUp}
+        aria-label="Scroll to top"
+        className={`fixed bottom-5 right-5 z-50 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white p-3.5 rounded-full shadow-lg shadow-orange-500/30 transition-all duration-300 ${
+          showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+      >
+        <FaArrowUp className="w-4 h-4" />
+      </button>
 
       {/* Add ToastContainer for global toasts */}
       <ToastContainer />

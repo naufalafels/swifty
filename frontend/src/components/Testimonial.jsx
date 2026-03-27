@@ -44,10 +44,10 @@ const Testimonial = () => {
                             className={styles.card}
                             style={{
                                 clipPath: "polygon(0% 10%, 10% 0%, 100% 0%, 100% 90%, 90% 100%, 0% 100%)",
-                                background: "linear-gradient(145deg, rgba(30,30,40,0.8), rgba(20,20,30,0.8))",
+                                background: "linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,247,237,0.9))",
                                 backdropFilter: "blur(10px)",
-                                border: "1px solid rgba(100,100,120,0.2)",
-                                boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+                                border: "1px solid rgba(251,191,36,0.15)",
+                                boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
                             }}
                         >
                             <div className={styles.cardContent}>

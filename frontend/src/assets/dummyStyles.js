@@ -195,7 +195,6 @@ export const homeCarsStyles = {
 };
 
 // assets/dummyStyles.js
-// assets/dummyStyles.js
 export const carDetailStyles = {
   pageContainer: "relative min-h-screen overflow-hidden py-6 px-4 sm:px-6 lg:px-8 bg-black",
   contentContainer: "relative z-10 max-w-7xl mx-auto",
@@ -236,7 +235,6 @@ export const carDetailStyles = {
 };
 
 // src/assets/dummyStyles.js
-// ... existing styles ...
 
 export const testimonialStyles = {
   container: "relative bg-black py-16 px-4 sm:px-6 lg:px-8 overflow-hidden",
@@ -328,102 +326,102 @@ export const footerStyles = {
 // src/assets/dummyStyles.js
 // ... existing styles ...
 
+// ... (everything above contactPageStyles.title stays the same as provided) ...
+
 export const contactPageStyles = {
-  container: "relative min-h-screen py-8 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-gray-950 to-black",
+  container: "relative min-h-screen py-8 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-[#FFFBF5] to-orange-50/30",
   diamondPattern: "absolute inset-0 opacity-9 pointer-events-none",
   floatingTriangles: "absolute inset-0 pointer-events-none",
   triangle: "absolute w-6 h-6 opacity-10",
   content: "relative z-10 pt-20 max-w-4xl mx-auto",
   titleContainer: "text-center mb-8 sm:mb-10 md:mb-12",
-  title: "text-3xl font-['Pacifico'] sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500 mb-2 flex items-center justify-center",
+  title: "text-3xl font-['Pacifico'] sm:text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-orange-600 mb-2 flex items-center justify-center",
   divider: "w-16 sm:w-20 md:w-24 h-0.5 bg-gradient-to-r from-orange-500 to-orange-400 mx-auto mb-3",
-  subtitle: "text-base sm:text-lg md:text-xl text-gray-300 max-w-xl mx-auto",
+  subtitle: "text-base sm:text-lg md:text-xl text-slate-500 max-w-xl mx-auto",
   cardContainer: "flex flex-col md:flex-row gap-6",
-  infoCard: "md:w-2/5 bg-gray-800/60 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-6 relative overflow-hidden border border-gray-700",
-  infoCardCircle1: "absolute -top-4 -right-4 w-16 h-16 bg-orange-500/10 rounded-full",
-  infoCardCircle2: "absolute -bottom-4 -left-4 w-14 h-14 bg-orange-400/10 rounded-full",
-  infoTitle: "text-xl sm:text-xl font-semibold text-white flex items-center",
-  infoIcon: "mr-3 text-orange-400 text-lg",
+  infoCard: "md:w-2/5 bg-white rounded-2xl shadow-lg p-5 sm:p-6 relative overflow-hidden border border-orange-100",
+  infoCardCircle1: "absolute -top-4 -right-4 w-16 h-16 bg-orange-200/30 rounded-full",
+  infoCardCircle2: "absolute -bottom-4 -left-4 w-14 h-14 bg-sky-200/20 rounded-full",
+  infoTitle: "text-xl sm:text-xl font-semibold text-slate-800 flex items-center",
+  infoIcon: "mr-3 text-orange-500 text-lg",
   infoItemContainer: "space-y-3",
-  infoItem: "flex items-start bg-gray-700/40 p-3 rounded-lg hover:bg-gray-700/60 transition-all",
+  infoItem: "flex items-start bg-orange-50/60 p-3 rounded-lg hover:bg-orange-50 transition-all",
   iconContainer: (color) => `p-2 rounded-md mr-3 ${color}`,
-  infoLabel: "font-medium text-gray-300 text-sm sm:text-base",
-  infoValue: "text-gray-400 text-xs sm:text-sm",
-  offerContainer: "mt-4 bg-gradient-to-r from-orange-900/30 to-orange-800/30 p-3 rounded-lg border border-orange-500/20",
-  offerIcon: "text-orange-400 mr-2",
-  offerTitle: "text-gray-300 font-medium text-sm sm:text-base",
-  offerText: "text-gray-400 text-xs sm:text-sm mt-1",
-  formCard: "md:w-3/5 bg-gray-800/60 backdrop-blur-sm rounded-2xl shadow-lg p-5 sm:p-6 relative overflow-hidden border border-gray-700",
-  formCircle1: "absolute top-0 right-0 w-16 h-16 bg-orange-500/10 rounded-bl-full",
-  formCircle2: "absolute bottom-0 left-0 w-14 h-14 bg-orange-500/10 rounded-tr-full",
-  formTitle: "text-lg sm:text-xl font-semibold text-white mb-1 flex items-center",
-  formSubtitle: "text-gray-400 text-sm",
+  infoLabel: "font-medium text-slate-700 text-sm sm:text-base",
+  infoValue: "text-slate-500 text-xs sm:text-sm",
+  offerContainer: "mt-4 bg-gradient-to-r from-orange-50 to-amber-50 p-3 rounded-lg border border-orange-200/50",
+  offerIcon: "text-orange-500 mr-2",
+  offerTitle: "text-slate-700 font-medium text-sm sm:text-base",
+  offerText: "text-slate-500 text-xs sm:text-sm mt-1",
+  formCard: "md:w-3/5 bg-white rounded-2xl shadow-lg p-5 sm:p-6 relative overflow-hidden border border-orange-100",
+  formCircle1: "absolute top-0 right-0 w-16 h-16 bg-orange-200/20 rounded-bl-full",
+  formCircle2: "absolute bottom-0 left-0 w-14 h-14 bg-sky-200/15 rounded-tr-full",
+  formTitle: "text-lg sm:text-xl font-semibold text-slate-800 mb-1 flex items-center",
+  formSubtitle: "text-slate-400 text-sm",
   form: "space-y-3",
   formGrid: "grid grid-cols-1 md:grid-cols-2 gap-3",
   inputContainer: "relative",
   inputIcon: "absolute inset-y-0 left-0 pl-3 flex items-center text-orange-400",
-  input: (isActive) => `w-full pl-10 pr-3 py-2 bg-gray-700/50 text-white rounded-lg border ${
-    isActive ? 'border-orange-500' : 'border-gray-600'
+  input: (isActive) => `w-full pl-10 pr-3 py-2 bg-orange-50/50 text-slate-800 rounded-lg border ${
+    isActive ? 'border-orange-500' : 'border-orange-200'
   } focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm transition-all`,
-  select: (isActive) => `w-full pl-10 pr-3 py-2 bg-gray-700/50 cursor-pointer text-white rounded-lg border ${
-    isActive ? 'border-orange-500' : 'border-gray-600'
+  select: (isActive) => `w-full pl-10 pr-3 py-2 bg-orange-50/50 cursor-pointer text-slate-800 rounded-lg border ${
+    isActive ? 'border-orange-500' : 'border-orange-200'
   } focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm appearance-none transition-all`,
   textareaIcon: "absolute top-2.5 left-3 text-orange-400",
-  textarea: (isActive) => `w-full pl-10 pr-3 py-2 bg-gray-700/50 text-white rounded-lg border ${
-    isActive ? 'border-orange-500' : 'border-gray-600'
+  textarea: (isActive) => `w-full pl-10 pr-3 py-2 bg-orange-50/50 text-slate-800 rounded-lg border ${
+    isActive ? 'border-orange-500' : 'border-orange-200'
   } focus:outline-none focus:ring-1 focus:ring-orange-500 text-sm transition-all`,
-  submitButton: "w-full cursor-pointer flex items-center justify-center py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 rounded-lg text-white font-medium text-sm shadow-md transition-all transform hover:-translate-y-0.5 group mt-2",
+  submitButton: "w-full cursor-pointer flex items-center justify-center py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-lg text-white font-medium text-sm shadow-md transition-all transform hover:-translate-y-0.5 group mt-2",
   whatsappIcon: "ml-2 text-lg transform group-hover:scale-110 transition-transform"
 };
 
-// assets/dummyStyles.js
 export const carPageStyles = {
-  pageContainer: "relative min-h-screen py-8 pt-12 sm:py-12 md:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-gray-950 to-black",
+  pageContainer: "relative min-h-screen py-8 pt-12 sm:py-12 md:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-[#FFFBF5] to-orange-50/30",
   contentContainer: "relative z-10 max-w-7xl mx-auto",
   headerContainer: "text-center mb-10 sm:mb-12 pt-13 md:mb-16",
-  headerDecoration: "absolute -bottom-3 -right-3 w-6 h-6 rounded-full bg-gradient-to-r from-amber-500 to-rose-500",
-  title: "relative text-3xl sm:text-4xl md:text-5xl font-bold mb-2 z-10 font-['Pacifico'] bg-orange-400 bg-clip-text text-transparent",
-  subtitle: "text-slate-400 max-w-2xl mx-auto text-sm sm:text-base",
+  headerDecoration: "absolute -bottom-3 -right-3 w-6 h-6 rounded-full bg-gradient-to-r from-orange-300 to-amber-300",
+  title: "relative text-3xl sm:text-4xl md:text-5xl font-bold mb-2 z-10 font-['Pacifico'] bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent",
+  subtitle: "text-slate-500 max-w-2xl mx-auto text-sm sm:text-base",
   gridContainer: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 md:gap-10",
-  carCard: "group relative rounded-2xl overflow-hidden border border-slate-700 shadow-xl transition-all duration-300 hover:shadow-2xl hover:-translate-y-1",
+  carCard: "group relative rounded-2xl overflow-hidden border border-orange-100 shadow-lg bg-white transition-all duration-300 hover:shadow-xl hover:-translate-y-1",
   glowEffect: "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
   imageContainer: "relative h-48 sm:h-52 md:h-56 overflow-hidden",
   carImage: "w-full h-full object-cover transition-transform duration-500",
-  priceBadge: "absolute bottom-3 left-3 bg-orange-400 text-white px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium shadow-lg",
+  priceBadge: "absolute bottom-3 left-3 bg-orange-500 text-white px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium shadow-lg",
   cardContent: "p-4 sm:p-5 md:p-6",
   headerRow: "flex justify-between items-center mb-4",
-  carName: "text-lg sm:text-xl font-bold text-white",
-  carType: "text-sm text-orange-400",
-  specsGrid: "grid grid-cols-2 gap-3 mb-5 text-sm text-slate-300",
+  carName: "text-lg sm:text-xl font-bold text-slate-800",
+  carType: "text-sm text-orange-500",
+  specsGrid: "grid grid-cols-2 gap-3 mb-5 text-sm text-slate-600",
   specItem: "flex items-center space-x-2",
-  specIconContainer: "bg-slate-700 p-1.5 rounded-lg",
-  bookButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-sky-300 cursor-pointer",
+  specIconContainer: "bg-orange-50 p-1.5 rounded-lg",
+  bookButton: "metal-btn inline-flex items-center gap-3 px-5 py-3 rounded-lg font-medium transform-gpu hover:scale-[1.03] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-orange-400 cursor-pointer",
   buttonText: "group-hover:tracking-wider transition-all",
   buttonIcon: "ml-3 h-4 w-4 transition-transform group-hover:translate-x-1",
-  decor1: "absolute -top-16 -left-16 w-32 h-32 rounded-full bg-gradient-to-r from-sky-500/10 to-teal-500/10 blur-3xl z-0",
-  decor2: "absolute -bottom-20 -right-20 w-40 h-40 rounded-full bg-gradient-to-r from-amber-500/10 to-rose-500/10 blur-3xl z-0"
+  decor1: "absolute -top-16 -left-16 w-32 h-32 rounded-full bg-gradient-to-r from-orange-200/20 to-amber-200/15 blur-3xl z-0",
+  decor2: "absolute -bottom-20 -right-20 w-40 h-40 rounded-full bg-gradient-to-r from-sky-200/15 to-cyan-200/10 blur-3xl z-0"
 };
 
 
-// src/assets/dummyStyles.js
 export const myBookingsStyles = {
   // Page container
-  pageContainer: "min-h-screen bg-gradient-to-b pt-40 from-gray-900 to-black text-white py-12 px-4 sm:px-6 lg:px-8",
+  pageContainer: "min-h-screen bg-gradient-to-b pt-40 from-[#FFFBF5] to-orange-50/30 text-slate-800 py-12 px-4 sm:px-6 lg:px-8",
   
   // Title
-  title: "text-3xl sm:text-4xl pb-3 md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-orange-500",
-  subtitle: "text-gray-400 max-w-2xl mx-auto",
+  title: "text-3xl sm:text-4xl pb-3 md:text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-orange-600",
+  subtitle: "text-slate-500 max-w-2xl mx-auto",
   
   // Filter buttons
   filterButton: (isActive, type) => {
     const base = "px-4 py-2 rounded-full flex items-center gap-2 transition-all";
-    if (!isActive) return `${base} bg-gray-800 text-gray-300 hover:bg-gray-700`;
+    if (!isActive) return `${base} bg-gray-100 text-slate-600 hover:bg-gray-200`;
     
     switch(type) {
-      case "all": return `${base} bg-orange-600 text-white`;
-      case "upcoming": return `${base} bg-blue-600 text-white`;
-      case "completed": return `${base} bg-green-600 text-white`;
-      case "cancelled": return `${base} bg-red-600 text-white`;
+      case "all": return `${base} bg-orange-500 text-white`;
+      case "upcoming": return `${base} bg-sky-500 text-white`;
+      case "completed": return `${base} bg-emerald-500 text-white`;
+      case "cancelled": return `${base} bg-red-500 text-white`;
       default: return base;
     }
   },
@@ -432,62 +430,62 @@ export const myBookingsStyles = {
   loadingSpinner: "animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500",
   
   // Error state
-  errorContainer: "text-center py-8 bg-gray-800/50 rounded-2xl border border-gray-700",
-  errorText: "text-red-400",
-  retryButton: "mt-4 px-4 py-2 bg-orange-600 rounded-lg text-white",
+  errorContainer: "text-center py-8 bg-white rounded-2xl border border-red-100 shadow-sm",
+  errorText: "text-red-500",
+  retryButton: "mt-4 px-4 py-2 bg-orange-500 rounded-lg text-white hover:bg-orange-600",
   
   // Empty state
-  emptyState: "text-center py-16 bg-gray-800/50 rounded-2xl border border-gray-700",
-  emptyIconContainer: "mx-auto w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center mb-6",
+  emptyState: "text-center py-16 bg-white rounded-2xl border border-orange-100 shadow-sm",
+  emptyIconContainer: "mx-auto w-24 h-24 rounded-full bg-orange-50 flex items-center justify-center mb-6",
   emptyIcon: "text-4xl text-orange-500",
-  emptyTitle: "text-2xl font-semibold mb-2",
-  emptyText: "text-gray-400 max-w-md mx-auto",
-  browseButton: "inline-block mt-6 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg flex items-center justify-center gap-2",
+  emptyTitle: "text-2xl font-semibold text-slate-800 mb-2",
+  emptyText: "text-slate-500 max-w-md mx-auto",
+  browseButton: "inline-block mt-6 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg flex items-center justify-center gap-2 hover:from-orange-600 hover:to-orange-700",
   
   // Booking card
-  bookingCard: "bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl overflow-hidden border border-gray-700 shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-transform",
+  bookingCard: "bg-white rounded-2xl overflow-hidden border border-orange-100 shadow-lg hover:shadow-xl hover:-translate-y-1 transition-transform",
   cardImageContainer: "relative h-48 overflow-hidden",
   cardImage: "w-full h-full object-cover transition-transform duration-500 hover:scale-105",
   cardContent: "p-5",
   cardHeader: "flex justify-between items-start mb-3",
-  carTitle: "text-xl font-bold",
-  carSubtitle: "text-gray-400",
-  priceText: "text-orange-400 font-bold text-xl",
-  daysText: "text-gray-500 text-sm",
-  detailSection: "space-y-4 mt-2 pt-4 border-t border-gray-700",
+  carTitle: "text-xl font-bold text-slate-800",
+  carSubtitle: "text-slate-400",
+  priceText: "text-orange-500 font-bold text-xl",
+  daysText: "text-slate-400 text-sm",
+  detailSection: "space-y-4 mt-2 pt-4 border-t border-orange-100",
   detailItem: "flex items-center gap-3",
-  detailIcon: "w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center text-orange-400",
-  detailLabel: "text-gray-400 text-sm",
-  detailValue: "font-medium",
-  cardActions: "mt-6 pt-4 border-t border-gray-700 flex gap-3",
-  viewDetailsButton: "flex-1 py-2 px-4 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center gap-2",
-  bookAgainButton: "flex-1 py-2 px-4 bg-orange-600 hover:bg-orange-700 rounded-lg flex items-center justify-center gap-2",
+  detailIcon: "w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center text-orange-500",
+  detailLabel: "text-slate-400 text-sm",
+  detailValue: "font-medium text-slate-700",
+  cardActions: "mt-6 pt-4 border-t border-orange-100 flex gap-3",
+  viewDetailsButton: "flex-1 py-2 px-4 bg-gray-100 hover:bg-gray-200 text-slate-700 rounded-lg flex items-center justify-center gap-2 transition-colors",
+  bookAgainButton: "flex-1 py-2 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors",
   
   // Stats cards
-  statsCard: "bg-gray-800/50 p-6 rounded-2xl border border-gray-700",
+  statsCard: "bg-white p-6 rounded-2xl border border-orange-100 shadow-sm",
   statsValue: (color) => `text-3xl font-bold ${color} mb-2`,
-  statsLabel: "text-gray-400",
+  statsLabel: "text-slate-500",
   
   // Modal
-  modalOverlay: "fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4",
-  modalContainer: "bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-gray-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto",
+  modalOverlay: "fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4",
+  modalContainer: "bg-white rounded-2xl border border-orange-100 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto",
   modalHeader: "flex justify-between items-center mb-6",
-  modalTitle: "text-2xl font-bold flex items-center gap-2",
-  modalCloseButton: "p-2 rounded-full hover:bg-gray-700 transition-colors",
-  cancelButton: "px-3 py-2 bg-red-600 hover:bg-red-700 rounded-md text-white mr-2",
+  modalTitle: "text-2xl font-bold text-slate-800 flex items-center gap-2",
+  modalCloseButton: "p-2 rounded-full hover:bg-gray-100 transition-colors text-slate-500",
+  cancelButton: "px-3 py-2 bg-red-500 hover:bg-red-600 rounded-md text-white mr-2",
   modalContent: "p-6",
   modalGrid: "grid grid-cols-1 md:grid-cols-2 gap-6 mb-8",
   carImageModal: "w-full h-48 object-cover rounded-xl",
   carTags: "flex flex-wrap gap-2 mt-2",
-  carTag: "px-2 py-1 bg-gray-700 rounded text-sm",
+  carTag: "px-2 py-1 bg-orange-50 text-orange-700 rounded text-sm",
   infoGrid: "mt-4 grid grid-cols-2 gap-3",
-  infoLabel: "text-gray-400 text-sm",
-  infoValue: "font-medium",
-  priceValue: "font-medium text-orange-400",
-  infoCard: "bg-gray-800/50 p-4 rounded-xl",
+  infoLabel: "text-slate-400 text-sm",
+  infoValue: "font-medium text-slate-700",
+  priceValue: "font-medium text-orange-500",
+  infoCard: "bg-orange-50/50 p-4 rounded-xl",
   infoRow: "flex justify-between mb-2",
-  infoDivider: "mt-3 pt-3 border-t border-gray-700",
+  infoDivider: "mt-3 pt-3 border-t border-orange-100",
   modalActions: "flex gap-4",
-  closeButton: "flex-1 py-3 px-4 bg-gray-700 hover:bg-gray-600 rounded-lg",
-  modalBookButton: "flex-1 py-3 px-4 bg-orange-600 hover:bg-orange-700 rounded-lg flex items-center justify-center gap-2",
+  closeButton: "flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-slate-700 rounded-lg transition-colors",
+  modalBookButton: "flex-1 py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors",
 };

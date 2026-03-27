@@ -326,25 +326,25 @@ const Navbar = () => {
                 </button>
 
                 {showNotif && (
-                  <div className="absolute right-0 top-10 w-64 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50">
-                    <div className="p-3 border-b border-gray-800 text-sm text-white font-semibold flex items-center justify-between">
+                  <div className="absolute right-0 top-10 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+                    <div className="p-3 border-b border-gray-100 text-sm text-slate-800 font-semibold flex items-center justify-between">
                       <span>Notifications</span>
                       <button
-                        className="text-xs text-orange-300 hover:text-orange-200"
+                        className="text-xs text-orange-500 hover:text-orange-600"
                         onClick={() => { setNotifCount(0); }}
                       >
                         Clear badge
                       </button>
                     </div>
-                    <div className="max-h-64 overflow-y-auto divide-y divide-gray-800">
+                    <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
                       {notifItems.length === 0 ? (
-                        <div className="p-3 text-xs text-gray-400">No notifications yet.</div>
+                        <div className="p-3 text-xs text-slate-400">No notifications yet.</div>
                       ) : (
                         notifItems.map((n, idx) => (
-                          <div key={idx} className="p-3 text-xs text-gray-200">
-                            <div className="font-semibold text-orange-200">{n.from || "Activity"}</div>
-                            <div className="text-gray-300 line-clamp-2">{n.text}</div>
-                            <div className="text-[10px] text-gray-500 mt-1">
+                          <div key={idx} className="p-3 text-xs text-slate-700 hover:bg-orange-50/50 transition-colors">
+                            <div className="font-semibold text-orange-600">{n.from || "Activity"}</div>
+                            <div className="text-slate-500 line-clamp-2">{n.text}</div>
+                            <div className="text-[10px] text-slate-400 mt-1">
                               {new Date(n.ts).toLocaleString()}
                             </div>
                           </div>

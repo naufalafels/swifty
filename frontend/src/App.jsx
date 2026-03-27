@@ -22,11 +22,11 @@ import CookieConsent from './components/CookieConsent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// Branded loading spinner for auth checks
+// Branded loading spinner for auth checks — cheerful light theme
 const AuthLoadingScreen = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white gap-4">
+  <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFBF5] text-slate-800 gap-4">
     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500" />
-    <p className="text-sm text-slate-400 tracking-wide">Verifying your session…</p>
+    <p className="text-sm text-slate-500 tracking-wide">Verifying your session…</p>
   </div>
 );
 

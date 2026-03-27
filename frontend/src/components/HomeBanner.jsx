@@ -88,11 +88,11 @@ export default function HeroSleek() {
   const ty = (mouse.y - 0.5) * 2 * (maxTranslate * 0.55);
 
   return (
-    <section className="bg-slate-950" aria-label="Hero banner">
-      {/* ── CAROUSEL BANNER — FIX: fluid height instead of fixed h-[600px] ── */}
+    <section className="bg-[#FFFBF5]" aria-label="Hero banner">
+      {/* ── CAROUSEL BANNER ── */}
       <div
         ref={wrapRef}
-        className="relative w-full h-[50vh] sm:h-[60vh] md:h-[75vh] lg:h-screen bg-slate-950 overflow-hidden flex items-center justify-center"
+        className="relative w-full h-[50vh] sm:h-[60vh] md:h-[75vh] lg:h-screen max-h-[700px] bg-gray-100 overflow-hidden flex items-center justify-center rounded-b-3xl"
         style={{ ["--mx"]: 0.5, ["--my"]: 0.5 }}
       >
         {/* BACKGROUND — carousel of promo images */}
@@ -106,7 +106,6 @@ export default function HeroSleek() {
             transition: "transform 220ms cubic-bezier(.2,.9,.25,1)",
           }}
         >
-          {/* ── PROMOTION CAROUSEL — FIX: lazy load non-first slides ── */}
           {slides.map((slide, i) => (
             <img
               key={i}
@@ -120,25 +119,25 @@ export default function HeroSleek() {
           ))}
         </div>
 
-        {/* ── Carousel controls — FIX: larger touch targets (min 44x44) ── */}
+        {/* ── Carousel controls ── */}
         {slides.length > 1 && (
           <>
             <button
               onClick={prev}
               aria-label="Previous slide"
-              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-50 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white p-3 sm:p-3.5 rounded-full transition-all"
+              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-50 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
             >
               <FaChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={next}
               aria-label="Next slide"
-              className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-50 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white p-3 sm:p-3.5 rounded-full transition-all"
+              className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-50 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
             >
               <FaChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
-            {/* Dot indicators — FIX: larger tap targets */}
+            {/* Dot indicators */}
             <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-2.5">
               {slides.map((_, i) => (
                 <button
@@ -147,8 +146,8 @@ export default function HeroSleek() {
                   aria-label={`Go to slide ${i + 1}`}
                   className={`w-3 h-3 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-300 ${
                     i === current
-                      ? "bg-orange-400 scale-125"
-                      : "bg-white/40 hover:bg-white/70"
+                      ? "bg-orange-500 scale-125"
+                      : "bg-slate-400/50 hover:bg-slate-500/70"
                   }`}
                 />
               ))}
@@ -157,17 +156,17 @@ export default function HeroSleek() {
         )}
       </div>
 
-      {/* ── CTA SECTION — FIX: flex-col on mobile, md:flex-row for tablets, centered text ── */}
-      <div className="bg-slate-950 py-8 sm:py-10 flex justify-center px-4">
-        <div className="relative rounded-2xl p-5 sm:p-6 bg-[rgba(255,255,255,0.05)] border border-white/[0.08] backdrop-blur-md shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 max-w-xl w-full text-center md:text-left">
+      {/* ── CTA SECTION — light cheerful card ── */}
+      <div className="bg-[#FFFBF5] py-8 sm:py-10 flex justify-center px-4">
+        <div className="relative rounded-2xl p-5 sm:p-6 bg-white border border-orange-100 shadow-lg shadow-orange-100/50 flex flex-col md:flex-row items-center justify-between gap-4 max-w-xl w-full text-center md:text-left">
           <div>
-            <p className="text-xs uppercase tracking-widest text-sky-300/70">
+            <p className="text-xs uppercase tracking-widest text-orange-500/80">
               Swifty Car Rental
             </p>
-            <h2 className="text-white text-lg sm:text-xl md:text-2xl font-semibold mt-1">
+            <h2 className="text-slate-800 text-lg sm:text-xl md:text-2xl font-semibold mt-1">
               Find Your Perfect Ride
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-500">
               Browse our premium fleet and book instantly.
             </p>
           </div>
@@ -178,7 +177,6 @@ export default function HeroSleek() {
             <span className={styles.buttonText}>Browse Cars</span>
             <FaArrowRight className="w-4 h-4" />
           </button>
-          <span className="absolute -inset-1 rounded-2xl pointer-events-none ring-1 ring-white/[0.08]" />
         </div>
       </div>
     </section>

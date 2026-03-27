@@ -8,8 +8,12 @@ const RefundSchema = new mongoose.Schema(
     reason: { type: String, default: '' },
     status: { type: String, enum: ['processed', 'failed', 'pending'], default: 'processed' },
     processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    xenditRefundId: { type: String, default: '' },
   },
   { timestamps: true }
 );
+
+RefundSchema.index({ companyId: 1, createdAt: -1 });
+RefundSchema.index({ bookingId: 1 });
 
 export default mongoose.model('Refund', RefundSchema);

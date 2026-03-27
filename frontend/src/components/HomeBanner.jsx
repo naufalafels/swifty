@@ -1,12 +1,33 @@
-import React, { useEffect, useRef, useState } from "react";
-import img1 from "../assets/hero.jpg";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaChevronLeft, FaChevronRight, FaArrowRight } from "react-icons/fa";
 import { heroStyles as styles } from "../assets/dummyStyles";
 
+// Import all your marketing / promo images
+import hc1 from "../assets/HC1.jpeg";
+import hc2 from "../assets/HC2.png";
+import hc3 from "../assets/HC3.png";
+import hc4 from "../assets/HC4.png";
+
+// ── slide data (add / remove entries here and the carousel adapts) ──
+const slides = [
+  { src: hc1, alt: "Swifty Promotion 1" },
+  { src: hc2, alt: "Swifty Promotion 2" },
+  { src: hc3, alt: "Swifty Promotion 3" },
+  { src: hc4, alt: "Swifty Promotion 4" },
+];
+
+const AUTOPLAY_MS = 5000; // 5 seconds per slide
+
 export default function HeroSleek() {
+  const navigate = useNavigate();
   const wrapRef = useRef(null);
   const bgRef = useRef(null);
   const [mouse, setMouse] = useState({ x: 0.5, y: 0.5 });
+  const [current, setCurrent] = useState(0);
+  const timerRef = useRef(null);
 
+  // ── parallax mouse tracking ──
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -41,18 +62,40 @@ export default function HeroSleek() {
     };
   }, []);
 
+  // ── autoplay loop ──
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % slides.length);
+    }, AUTOPLAY_MS);
+  }, []);
+
+  useEffect(() => {
+    resetTimer();
+    return () => clearInterval(timerRef.current);
+  }, [resetTimer]);
+
+  const goTo = (idx) => {
+    setCurrent(idx);
+    resetTimer();
+  };
+  const prev = () => goTo((current - 1 + slides.length) % slides.length);
+  const next = () => goTo((current + 1) % slides.length);
+
+  // ── parallax values ──
   const maxTranslate = 14;
   const tx = (mouse.x - 0.5) * 2 * maxTranslate;
   const ty = (mouse.y - 0.5) * 2 * (maxTranslate * 0.55);
 
   return (
-    <div className="">
+    <div className="bg-black">
+      {/* ── CAROUSEL BANNER ── */}
       <div
         ref={wrapRef}
         className={styles.container}
         style={{ ["--mx"]: 0.5, ["--my"]: 0.5 }}
       >
-        {/* BACKGROUND */}
+        {/* BACKGROUND — carousel of promo images */}
         <div
           ref={bgRef}
           className={styles.background}
@@ -63,78 +106,84 @@ export default function HeroSleek() {
             transition: "transform 220ms cubic-bezier(.2,.9,.25,1)",
           }}
         >
+          {/* ── PROMOTION CAROUSEL ── */}
+          {slides.map((slide, i) => (
+            <img
+              key={i}
+              src={slide.src}
+              alt={slide.alt}
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
+              style={{ opacity: i === current ? 1 : 0 }}
+              draggable={false}
+            />
+          ))}
 
-          { /* PROMOTION */ }
-          {/*<img
-            src={img1}
-            alt="Futuristic car"
-            className="w-full object-center opacity-95"
-          />*/}
-
-          <div className={styles.gradientOverlay} />
+          {/* REMOVED: <div className={styles.gradientOverlay} /> — this was the dark screen */}
         </div>
 
-        {/* SVG sweeps */}
-        <svg
-          className={styles.svgContainer}
-          viewBox="0 0 1590 900"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <defs>
-            <linearGradient id="gCenter" x1="0" x2="1">
-              <stop offset="0%" stopColor="#8ee6ff" stopOpacity="0" />
-              <stop offset="20%" stopColor="#58a6ff" stopOpacity="0.9" />
-              <stop offset="80%" stopColor="#b78bff" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#ff88c2" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="gSide" x1="0" x2="1">
-              <stop offset="0%" stopColor="#6ee7b7" stopOpacity="0" />
-              <stop offset="30%" stopColor="#60a5fa" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#a78bfa" stopOpacity="0" />
-            </linearGradient>
-            <filter id="glow2" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="8" result="b" />
-              <feMerge>
-                <feMergeNode in="b" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+        {/* ── Carousel controls ── */}
+        {slides.length > 1 && (
+          <>
+            {/* Left / Right arrows */}
+            <button
+              onClick={prev}
+              aria-label="Previous slide"
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-50 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white p-3 rounded-full transition-all"
+            >
+              <FaChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={next}
+              aria-label="Next slide"
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-50 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white p-3 rounded-full transition-all"
+            >
+              <FaChevronRight className="w-4 h-4" />
+            </button>
 
-          <path
-            id="centerPath"
-            d="M320 420 C 520 220, 720 170, 880 190 C 1040 210, 1160 280, 1240 320"
-            stroke="url(#gCenter)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            fill="none"
-            filter="url(#glow2)"
-            className="center-path"
-          />
-          <path
-            id="leftArc"
-            d="M180 460 C 280 360, 480 300, 720 260"
-            stroke="url(#gSide)"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            fill="none"
-            filter="url(#glow2)"
-            className="side-path left"
-          />
-          <path
-            id="rightArc"
-            d="M1420 460 C 1240 360, 1040 300, 780 260"
-            stroke="url(#gSide)"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            fill="none"
-            filter="url(#glow2)"
-            className="side-path right"
-          />
-        </svg>
+            {/* Dot indicators */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-2">
+              {slides.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  aria-label={`Go to slide ${i + 1}`}
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    i === current
+                      ? "bg-orange-400 scale-125"
+                      : "bg-white/40 hover:bg-white/70"
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
-        {/* Refined glass CTA card */}
-    
+        {/* REMOVED: SVG sweeps — decorative glowing paths that also sat on top of the images */}
+      </div>
+
+      {/* ── CTA SECTION — sits BELOW the carousel, no overlap ── */}
+      <div className="bg-black py-10 flex justify-center px-4">
+        <div className="relative rounded-2xl p-6 bg-[rgba(255,255,255,0.04)] border border-white/[0.06] backdrop-blur-md shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 max-w-xl w-full">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-sky-300/70">
+              Swifty Car Rental
+            </p>
+            <h2 className="text-white text-lg sm:text-2xl font-semibold mt-1">
+              Find Your Perfect Ride
+            </h2>
+            <p className="mt-1 text-sm text-slate-300/70">
+              Browse our premium fleet and book instantly.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/cars")}
+            className={styles.ctaButton}
+          >
+            <span className={styles.buttonText}>Browse Cars</span>
+            <FaArrowRight className="w-4 h-4" />
+          </button>
+          <span className="absolute -inset-1 rounded-2xl pointer-events-none ring-1 ring-white/[0.06]" />
+        </div>
       </div>
     </div>
   );

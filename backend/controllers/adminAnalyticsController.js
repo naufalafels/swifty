@@ -10,7 +10,11 @@ export const getAnalytics = async (req, res) => {
     const rawCompanyId = req.user.companyId;
     if (!rawCompanyId) return res.status(400).json({ success: false, message: 'No company associated with user' });
 
-    // FIX: Cast to ObjectId. Mongoose .find() auto-casts strings, but .aggregate() does NOT.
+    // FIX: Cast to ObjectId ONCE and use everywhere.
+    // Mongoose .find()/.countDocuments() auto-casts strings, but .aggregate() does NOT.
+    // Previously, aggregate() used the cast ObjectId while distinct()/countDocuments() used
+    // the raw string — this inconsistency could cause silent mismatches if the raw value
+    // was already an ObjectId object vs a string.
     const companyId = new mongoose.Types.ObjectId(String(rawCompanyId));
 
     const { period = '12' } = req.query;
@@ -18,10 +22,8 @@ export const getAnalytics = async (req, res) => {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
 
-    // FIX: Get unique user IDs from bookings (actual customers of THIS company).
-    // Regular users/renters do NOT have companyId on their User document —
-    // only company_admin users do. So User.countDocuments({ companyId }) was returning ~1.
-    const uniqueUserIds = await Booking.distinct('userId', { companyId: rawCompanyId });
+    // FIX: Use cast companyId (ObjectId) for distinct() too — was using rawCompanyId (string)
+    const uniqueUserIds = await Booking.distinct('userId', { companyId });
 
     const [
       revenueAgg,
@@ -47,8 +49,10 @@ export const getAnalytics = async (req, res) => {
         },
         { $sort: { _id: 1 } },
       ]),
-      Booking.countDocuments({ companyId: rawCompanyId }),
-      Car.countDocuments({ companyId: rawCompanyId }),
+
+      // FIX: Use cast companyId for countDocuments too (was rawCompanyId)
+      Booking.countDocuments({ companyId }),
+      Car.countDocuments({ companyId }),
 
       // Booking status breakdown
       Booking.aggregate([
@@ -98,7 +102,6 @@ export const getAnalytics = async (req, res) => {
       ]),
 
       // FIX: New customers per month — derived from BOOKINGS, not User.companyId.
-      // Groups by userId → takes their earliest booking date → groups by month.
       Booking.aggregate([
         { $match: { companyId, bookingDate: { $gte: startDate } } },
         { $sort: { bookingDate: 1 } },
@@ -129,9 +132,9 @@ export const getAnalytics = async (req, res) => {
         },
       ]),
 
-      // "Active visits" proxy — count admin logins in last 30 days
+      // FIX: Use cast companyId for AuditLog.countDocuments too (was rawCompanyId)
       AuditLog.countDocuments({
-        companyId: rawCompanyId,
+        companyId,
         category: 'auth',
         createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
       }),

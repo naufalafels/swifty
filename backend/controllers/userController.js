@@ -77,12 +77,15 @@ function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, { path: '/' });
 }
 
-// NEW: Set admin token cookie for admin users
+// FIX: Changed sameSite from 'strict' to 'lax'.
+// 'strict' blocks the cookie on ALL cross-origin requests, which means the admin SPA
+// (running on a different port/domain) can never read or send it. 'lax' allows it for
+// same-site top-level navigations and same-origin XHR/fetch.
 function setAdminTokenCookie(res, token) {
   const cookieOptions = {
     httpOnly: false,  // Allow SPA to read for Authorization headers
-    secure: process.env.NODE_ENV === 'production',  // HTTPS only
-    sameSite: 'strict',  // CSRF protection
+    secure: process.env.NODE_ENV === 'production',  // HTTPS only in production
+    sameSite: 'lax',  // FIX: Was 'strict' — blocked cross-origin entirely
     maxAge: 15 * 60 * 1000,  // 15 minutes (match access token)
     path: '/',
   };
@@ -242,6 +245,13 @@ export async function login(req, res) {
   }
 }
 
+// FIX: refresh() now includes role/companyId/roles in the new access token.
+// Previously it called createAccessToken(userId) with NO extras, so the refreshed JWT
+// had only { id }. The auth middleware fast-path (line 30 of auth.js) checks for
+// payload.role || payload.companyId || payload.roles — without these, it falls through
+// to a DB lookup, which works but means companyId could be null if the user doc doesn't
+// have it in the expected format. More critically, the adminToken cookie was set with
+// sameSite:'strict' so it was invisible cross-origin, making all subsequent API calls fail.
 export async function refresh(req, res) {
   try {
     const token = req.cookies?.[REFRESH_TOKEN_COOKIE_NAME];
@@ -274,10 +284,21 @@ export async function refresh(req, res) {
       { revoked: true, replacedByToken: hashToken(newToken), revokedByIp: req.ip || '' }
     ).exec();
 
-    const accessToken = createAccessToken(saved.userId.toString());
+    // FIX: Fetch user BEFORE creating access token so we can include role/companyId/roles
+    const user = await User.findById(saved.userId).lean();
+
+    // FIX: Include role, companyId, roles in the refreshed access token.
+    // Previously: createAccessToken(saved.userId.toString()) — JWT had only { id }.
+    // Now: includes all fields so auth middleware fast-path works and admin controllers
+    // get req.user.companyId from the token without needing an extra DB lookup.
+    const accessToken = createAccessToken(saved.userId.toString(), {
+      role: user?.role || 'user',
+      companyId: user?.companyId ? user.companyId.toString() : null,
+      roles: Array.isArray(user?.roles) && user.roles.length ? user.roles : ['renter'],
+    });
+
     setRefreshCookie(res, newToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
 
-    const user = await User.findById(saved.userId).lean();
     // NEW: Set admin token cookie if user is admin
     if (user && user.role === 'company_admin') {
       setAdminTokenCookie(res, accessToken);

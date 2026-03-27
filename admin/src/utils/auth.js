@@ -1,4 +1,4 @@
-// Admin auth helper - cookie-based token storage + scheduled refresh
+// Admin auth helper - cookie-based token storage + in-memory fallback + scheduled refresh
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:7889";
@@ -6,6 +6,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:7889";
 let currentUser = null;
 let refreshing = null;
 let refreshTimerId = null;
+let inMemoryToken = null;  // FIX: Fallback when cookie is blocked cross-origin
 
 /* Helpers */
 function parseJwt(token) {
@@ -58,10 +59,12 @@ function scheduleRefreshFromToken(token) {
         if (!(r && r.ok)) {
           // failed refresh -> clear session
           currentUser = null;
+          inMemoryToken = null;  // FIX: Clear in-memory token too
           if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
         }
       } catch {
         currentUser = null;
+        inMemoryToken = null;  // FIX: Clear in-memory token too
         if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
       }
     }, timeout);
@@ -71,20 +74,24 @@ function scheduleRefreshFromToken(token) {
 }
 
 export const saveAdminSession = (token, user) => {
-  // Token is in cookies; just store user and schedule refresh
+  // Store user and token (in-memory fallback)
   currentUser = user || null;
+  inMemoryToken = token || null;  // FIX: Store in memory as fallback
   if (token) scheduleRefreshFromToken(token);
 };
 
 export const clearAdminSession = () => {
   currentUser = null;
+  inMemoryToken = null;  // FIX: Clear in-memory token
   if (refreshTimerId) {
     clearTimeout(refreshTimerId);
     refreshTimerId = null;
   }
 };
 
-export const getAdminToken = () => getCookie('adminToken');  // Read from cookies
+// FIX: Try cookie first, fall back to in-memory token.
+// The cookie may be blocked if admin SPA runs on a different origin than the API.
+export const getAdminToken = () => getCookie('adminToken') || inMemoryToken;
 export const getAdminUser = () => currentUser;
 
 /* Auth API calls */
@@ -94,8 +101,9 @@ export const adminLogin = async (credentials) => {
     headers: { "Content-Type": "application/json" },
   });
   const data = res.data || {};
-  // Token is now in cookie; read it for client-side scheduling
-  const token = getCookie('adminToken') || data?.token;
+  // FIX: Read token from cookie OR response body (accessToken), store in memory as fallback
+  const token = getCookie('adminToken') || data?.accessToken || data?.token;
+  inMemoryToken = token || null;  // FIX: Always store in memory
   currentUser = data?.user || currentUser;
   if (token) scheduleRefreshFromToken(token);
   return data;
@@ -108,6 +116,9 @@ export const adminRegister = async (payload) => {
     headers: payload instanceof FormData ? {} : { "Content-Type": "application/json" },
   });
   const data = res.data || {};
+  // FIX: Store token in memory from signup response
+  const token = getCookie('adminToken') || data?.accessToken || data?.token;
+  if (token) inMemoryToken = token;
   return data;
 };
 
@@ -117,12 +128,15 @@ export const adminRefresh = async () => {
     try {
       const res = await axios.post(`${API_BASE}/api/auth/refresh`, {}, { withCredentials: true });
       const data = res.data || {};
-      const token = getCookie('adminToken') || data?.token;
+      // FIX: Read token from cookie OR response body, store in memory
+      const token = getCookie('adminToken') || data?.accessToken || data?.token;
+      inMemoryToken = token || null;  // FIX: Update in-memory token
       if (data?.user) currentUser = data.user;
       if (token) scheduleRefreshFromToken(token);
       return { ok: true, data };
     } catch (err) {
       currentUser = null;
+      inMemoryToken = null;  // FIX: Clear in-memory token
       if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
       return { ok: false, err };
     } finally {
@@ -133,6 +147,7 @@ export const adminRefresh = async () => {
 };
 
 export const ensureAuth = async () => {
+  // FIX: getAdminToken() now checks cookie + in-memory fallback
   if (getAdminToken()) return true;
   const r = await adminRefresh();
   return !!(r && r.ok && getAdminToken());
@@ -145,6 +160,10 @@ export const adminLogout = async () => {
     // ignore
   } finally {
     currentUser = null;
-    if (refreshTimerId) { clearTimeout(refreshTimerId); refreshTimerId = null; }
+    inMemoryToken = null;  // FIX: Clear in-memory token
+    if (refreshTimerId) {
+      clearTimeout(refreshTimerId);
+      refreshTimerId = null;
+    }
   }
 };

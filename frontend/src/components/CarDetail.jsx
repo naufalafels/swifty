@@ -1366,9 +1366,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                     <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
                   )}
                   <div className={carDetailStyles.priceRow}><span>Insurance ({selectedPlan.label})</span><span>MYR&nbsp;{insuranceCost}</span></div>
-                  <div className={carDetailStyles.priceRow}><span>Deposit (pay at counter)</span><span className="text-gray-400">MYR&nbsp;{deposit}</span></div>
+                  <div className={carDetailStyles.priceRow}><span>Deposit (pay at counter)</span><span className="text-slate-400">MYR&nbsp;{deposit}</span></div>
                   <div className={carDetailStyles.totalRow}><span>Total (to pay now)</span><span>MYR&nbsp;{calculateTotal()}</span></div>
-                  <p className="text-xs text-gray-400 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
+                  <p className="text-xs text-slate-500 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
                 </div>
 
                                 <div className="flex flex-col justify-end h-full gap-3">
@@ -1404,20 +1404,20 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
             </button>
 
             {isChatOpen && (
-              <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
-                <div className="flex items-center justify-between p-3 border-b border-gray-700">
-                  <h3 className="text-sm font-semibold text-white">Message Host</h3>
+              <div className="mt-2 w-80 h-96 bg-white border border-orange-200 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
+                <div className="flex items-center justify-between p-3 border-b border-orange-100">
+                  <h3 className="text-sm font-semibold text-slate-800">Message Host</h3>
                   <button
                     onClick={() => setIsChatOpen(false)}
-                    className="text-gray-400 hover:text-white"
+                    className="text-slate-400 hover:text-slate-700"
                     aria-label="Close chat"
                   >
                     <FaTimes className="text-lg" />
                   </button>
                 </div>
 
-                <div className="flex-1 p-3 overflow-y-auto bg-gray-800">
-                  {messages.length === 0 && <div className="text-xs text-gray-500">No messages yet.</div>}
+                <div className="flex-1 p-3 overflow-y-auto bg-orange-50/30">
+                  {messages.length === 0 && <div className="text-xs text-slate-400">No messages yet.</div>}
                   {messages.map((msg, idx) => (
                     <div
                       key={idx}
@@ -1425,14 +1425,18 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         msg.fromUserId === currentUserId ? "text-right" : "text-left"
                       }`}
                     >
-                      <span className="bg-gray-700 p-2 rounded inline-block max-w-xs break-words">
+                      <span className={`p-2 rounded inline-block max-w-xs break-words ${
+                        msg.fromUserId === currentUserId
+                          ? "bg-orange-100 text-slate-800"
+                          : "bg-white border border-orange-100 text-slate-700"
+                      }`}>
                         {msg.message}
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-3 border-t border-gray-700 bg-gray-900">
+                <div className="p-3 border-t border-orange-100 bg-white">
                   {messagingError && <div className="text-red-400 text-xs mb-2">{messagingError}</div>}
                   <div className="flex gap-2">
                     <input
@@ -1440,7 +1444,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Type your message..."
-                      className="flex-1 p-2 bg-gray-800 border border-gray-600 rounded text-sm"
+                      className="flex-1 p-2 bg-orange-50/50 border border-orange-200 rounded text-sm text-slate-800 placeholder:text-slate-400"
                     />
                     <button
                       onClick={sendMessage}
@@ -1459,21 +1463,21 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
             TERMS MODAL (unchanged)
             ═══════════════════════════════════════════════════════════════ */}
         {termsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-                <div className="flex items-center gap-2 text-white font-semibold">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white border border-orange-200 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-orange-100">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
                   <FaFileContract className="text-orange-400" /> Terms & Conditions
                 </div>
                 <button
                   onClick={closeTerms}
-                  className="text-gray-400 hover:text-white"
+                  className="text-slate-400 hover:text-slate-700"
                   aria-label="Close terms"
                 >
                   <FaTimes />
                 </button>
               </div>
-              <div className="p-5 overflow-y-auto max-h-[65vh] text-gray-200 leading-relaxed whitespace-pre-wrap">
+              <div className="p-5 overflow-y-auto max-h-[65vh] text-slate-700 leading-relaxed whitespace-pre-wrap">
                 {termsLoading ? "Loading..." : termsError ? termsError : termsText || "No terms available."}
               </div>
               <div className="px-5 py-4 border-t border-gray-800 flex justify-end">

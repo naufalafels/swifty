@@ -42,7 +42,7 @@ const ProfilePrivacyPage = () => {
     }
   };
 
-  if (loading) return <div className="max-w-3xl mx-auto px-4 py-10 text-slate-200">Loading privacy...</div>;
+  if (loading) return <div className="max-w-3xl mx-auto px-4 py-10 text-slate-600">Loading privacy...</div>;
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-4">
@@ -53,14 +53,14 @@ const ProfilePrivacyPage = () => {
         <FaArrowLeft /> Back to Profile
       </button>
 
-      <h1 className="text-2xl font-bold text-gray-500 flex items-center gap-2">
+      <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
         <FaShieldAlt className="text-emerald-400" /> Privacy
       </h1>
-      <p className="text-sm text-slate-400">Control what parts of your profile others can see.</p>
+      <p className="text-sm text-slate-500">Control what parts of your profile others can see.</p>
 
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className="bg-white border border-orange-100 rounded-xl p-5 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-200">Show my home city and country</div>
+          <div className="text-sm text-slate-700">Show my home city and country</div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -68,13 +68,13 @@ const ProfilePrivacyPage = () => {
               checked={form.showCity}
               onChange={(e) => setForm({ ...form, showCity: e.target.checked })}
             />
-            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition"></div>
+            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition"></div>
             <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transform transition peer-checked:translate-x-5" />
           </label>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-200">Hide my profile picture</div>
+          <div className="text-sm text-slate-700">Hide my profile picture</div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -82,7 +82,7 @@ const ProfilePrivacyPage = () => {
               checked={form.hideProfilePicture}
               onChange={(e) => setForm({ ...form, hideProfilePicture: e.target.checked })}
             />
-            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition"></div>
+            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition"></div>
             <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transform transition peer-checked:translate-x-5" />
           </label>
         </div>

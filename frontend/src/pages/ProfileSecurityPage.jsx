@@ -36,29 +36,29 @@ const ProfileSecurityPage = () => {
         <FaArrowLeft /> Back to Profile
       </button>
 
-      <h1 className="text-2xl font-bold text-gray-500 flex items-center gap-2">
+      <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
         <FaLock className="text-emerald-400" /> Login & Security
       </h1>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-slate-500">
         Update your password and keep your account secure. Deactivation should be confirmed by the user and is irreversible.
       </p>
 
-      <form onSubmit={submit} className="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3">
-        <label className="block text-sm text-slate-200">New password
+      <form onSubmit={submit} className="bg-white border border-orange-100 rounded-xl p-5 space-y-3 shadow-sm">
+        <label className="block text-sm text-slate-700">New password
           <input
             type="password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="w-full mt-1 p-3 rounded-lg bg-slate-800 border border-slate-700 text-white"
+            className="w-full mt-1 p-3 rounded-lg bg-orange-50/50 border border-orange-200 text-slate-800"
             required
           />
         </label>
-        <label className="block text-sm text-slate-200">Confirm password
+        <label className="block text-sm text-slate-700">Confirm password
           <input
             type="password"
             value={form.confirm}
             onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-            className="w-full mt-1 p-3 rounded-lg bg-slate-800 border border-slate-700 text-white"
+            className="w-full mt-1 p-3 rounded-lg bg-orange-50/50 border border-orange-200 text-slate-800"
             required
           />
         </label>
@@ -73,15 +73,15 @@ const ProfileSecurityPage = () => {
           <button
             type="button"
             onClick={() => toast.warn('Account deactivation flow should call /api/auth/deactivate')}
-            className="px-4 py-3 rounded-lg border border-rose-500 text-rose-200 hover:bg-rose-900/30"
+            className="px-4 py-3 rounded-lg border border-rose-400 text-rose-600 hover:bg-rose-50"
           >
             Deactivate account
           </button>
         </div>
       </form>
 
-      <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 flex items-center gap-3 text-slate-200">
-        <FaShieldAlt className="text-blue-300" />
+      <div className="bg-white border border-orange-100 rounded-xl p-4 flex items-center gap-3 text-slate-600 shadow-sm">
+        <FaShieldAlt className="text-blue-500" />
         <div className="text-sm">
           Consider adding MFA/2FA in the future for stronger security. This page is scoped for password-only flows today.
         </div>

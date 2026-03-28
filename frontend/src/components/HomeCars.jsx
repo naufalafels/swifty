@@ -254,7 +254,7 @@ const HomeCars = () => {
               <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
                 Booked — available on {formatDate(meta.availableIso)}
               </span>
-              <small className="text-xs text-gray-400 mt-1">
+              <small className="text-xs text-slate-400 mt-1">
                 until {formatDate(effective.until)}
               </small>
             </div>
@@ -266,7 +266,7 @@ const HomeCars = () => {
               Booked
             </span>
             {effective.until && (
-              <small className="text-xs text-gray-400 mt-1">
+              <small className="text-xs text-slate-400 mt-1">
                 until {formatDate(effective.until)}
               </small>
             )}
@@ -291,7 +291,7 @@ const HomeCars = () => {
               Available
             </span>
             {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">
+              <small className="text-xs text-slate-400 mt-1">
                 from {formatDate(effective.nextBookingStarts)}
               </small>
             )}

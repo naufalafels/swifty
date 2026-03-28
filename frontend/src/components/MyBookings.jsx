@@ -924,27 +924,27 @@ const MyBookings = () => {
         </div>
 
         {/* Guest lookup */}
-        <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 md:p-6 mb-8">
-          <div className="flex items-center gap-2 text-orange-300 font-semibold mb-3">
+        <div className="bg-white border border-orange-200 rounded-2xl p-4 md:p-6 mb-8 shadow-sm">
+          <div className="flex items-center gap-2 text-orange-600 font-semibold mb-3">
             <FaSearch /> <span>Find your booking</span>
           </div>
           <form className="grid md:grid-cols-3 gap-3" onSubmit={handleGuestLookup}>
             <div>
-              <label className="text-xs text-gray-400">Email used during booking</label>
+              <label className="text-xs text-slate-500">Email used during booking</label>
               <input
                 type="email"
                 value={guestEmail}
                 onChange={(e) => setGuestEmail(e.target.value)}
-                className="w-full mt-1 p-2 rounded bg-gray-800 text-white border border-gray-700"
+                className="w-full mt-1 p-2 rounded bg-orange-50/50 text-slate-800 border border-orange-200 placeholder:text-slate-400"
                 placeholder="you@example.com"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-400">Booking ID (optional)</label>
+              <label className="text-xs text-slate-500">Booking ID (optional)</label>
               <input
                 value={guestBookingId}
                 onChange={(e) => setGuestBookingId(e.target.value)}
-                className="w-full mt-1 p-2 rounded bg-gray-800 text-white border border-gray-700"
+                className="w-full mt-1 p-2 rounded bg-orange-50/50 text-slate-800 border border-orange-200 placeholder:text-slate-400"
                 placeholder="Paste Booking ID"
               />
             </div>
@@ -959,17 +959,17 @@ const MyBookings = () => {
               <button
                 type="button"
                 onClick={handleClearLookup}
-                className="px-3 py-2 rounded-lg border border-gray-700 text-gray-200 bg-gray-800 hover:bg-gray-750"
+                className="px-3 py-2 rounded-lg border border-orange-200 text-slate-600 bg-white hover:bg-orange-50"
               >
                 Clear
               </button>
             </div>
           </form>
           {guestError ? (
-            <p className="text-red-400 text-sm mt-2">{guestError}</p>
+            <p className="text-red-500 text-sm mt-2">{guestError}</p>
           ) : null}
-          <p className="text-gray-500 text-xs mt-2">
-            Enter your booking email, and optionally the Booking ID from your confirmation. We’ll fetch matching bookings.
+          <p className="text-slate-400 text-xs mt-2">
+            Enter your booking email, and optionally the Booking ID from your confirmation. We'll fetch matching bookings.
           </p>
         </div>
 

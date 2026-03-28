@@ -885,8 +885,8 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
               </div>
             )}
 
-            {/* ── Calendar ── */}
-            <div className="bg-gray-900/50 rounded-xl p-3 border border-gray-700/40">
+            {/* ── Calendar — clean, professional Airbnb-style ── */}
+            <div className="swifty-calendar-wrapper rounded-xl overflow-hidden border border-slate-700/40">
               <DateRange
                 ranges={range}
                 onChange={onRangeChange}
@@ -894,35 +894,29 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                 rangeColors={["#f97316"]}
                 direction="horizontal"
                 months={2}
+                showMonthAndYearPickers={false}
                 showDateDisplay={false}
                 disabledDates={disabledDates}
                 className="swifty-calendar"
-                dayContentRenderer={(date) => (
-                  <div style={{ position: "relative" }}>
-                    <span>{date.getDate()}</span>
-                  </div>
-                )}
+                monthDisplayFormat="MMMM yyyy"
               />
             </div>
 
-            {/* ── Price breakdown ── */}
-            <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/40 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-300">
+            {/* ── Price breakdown (no insurance — that's chosen during checkout) ── */}
+            <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/40 space-y-2.5 text-sm">
+              <div className="flex justify-between text-slate-300">
                 <span>MYR {formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price} × {days} {days === 1 ? "night" : "nights"}</span>
-                <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? computeTotalRent() : price}</span>
+                <span className="font-medium">MYR&nbsp;{formData.pickupDate && formData.returnDate ? computeTotalRent() : price}</span>
               </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Insurance ({selectedPlan.label})</span>
-                <span>MYR&nbsp;{insuranceCost}</span>
-              </div>
-              <div className="flex justify-between text-gray-400 text-xs">
+              <div className="flex justify-between text-slate-400 text-xs">
                 <span>Deposit (pay at counter)</span>
                 <span>MYR&nbsp;{deposit}</span>
               </div>
-              <div className="border-t border-gray-600 pt-2 flex justify-between font-bold text-white text-base">
-                <span>Total</span>
-                <span>MYR&nbsp;{calculateTotal()}</span>
+              <div className="border-t border-slate-600 pt-2 flex justify-between font-bold text-white text-base">
+                <span>Subtotal</span>
+                <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? computeTotalRent() : price}</span>
               </div>
+              <p className="text-slate-500 text-xs pt-1">Insurance will be selected during checkout</p>
             </div>
 
             {/* ── CTA ── */}

@@ -1,123 +1,217 @@
 /* ═══════════════════════════════════════════════════
-   Airbnb-style calendar overrides for react-date-range
+   Swifty — Clean, professional date range calendar
+   Inspired by Airbnb / trip.com / Trivago
    ═══════════════════════════════════════════════════ */
 
+/* ── Wrapper ── */
+.swifty-calendar-wrapper {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 16px;
+}
+
+/* ── Base calendar ── */
 .swifty-calendar .rdrCalendarWrapper {
   background: transparent !important;
   color: #e2e8f0;
-  font-size: 13px;
+  font-size: 14px;
+  width: 100%;
 }
 
+.swifty-calendar .rdrDateRangeWrapper {
+  width: 100%;
+}
+
+/* ── Month & year header ── */
 .swifty-calendar .rdrMonthAndYearWrapper {
-  padding-top: 4px;
+  padding: 0 8px 12px;
+  height: auto;
 }
 
-.swifty-calendar .rdrMonthAndYearPickers select {
-  color: #f8fafc;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-weight: 600;
-  font-size: 13px;
+.swifty-calendar .rdrMonthAndYearPickers {
+  display: none; /* hide ugly selects — nav arrows only */
 }
 
 .swifty-calendar .rdrMonthName {
-  color: #f8fafc;
+  color: #f1f5f9;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
   text-align: center;
+  padding: 0 0 8px;
+  letter-spacing: 0.02em;
 }
 
+/* ── Navigation arrows ── */
+.swifty-calendar .rdrNextPrevButton {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 1px solid #475569;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  margin: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.swifty-calendar .rdrNextPrevButton:hover {
+  background: rgba(51, 65, 85, 0.9) !important;
+  border-color: #f97316;
+  transform: scale(1.05);
+}
+
+.swifty-calendar .rdrPprevButton i {
+  border-color: transparent #cbd5e1 transparent transparent !important;
+}
+
+.swifty-calendar .rdrNextButton i {
+  border-color: transparent transparent transparent #cbd5e1 !important;
+}
+
+/* ── Weekday headers ── */
 .swifty-calendar .rdrWeekDay {
-  color: #94a3b8;
-  font-weight: 600;
+  color: #64748b;
+  font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-bottom: 8px;
 }
 
+/* ── Day cells ── */
 .swifty-calendar .rdrDay {
   color: #e2e8f0;
+  height: 40px;
+}
+
+.swifty-calendar .rdrDayNumber {
+  font-weight: 500;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .swifty-calendar .rdrDayNumber span {
   color: #e2e8f0 !important;
   font-weight: 500;
+  font-size: 13.5px;
+  z-index: 2;
 }
 
+/* ── Passive (out-of-month) days ── */
 .swifty-calendar .rdrDayPassive .rdrDayNumber span {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
+/* ── Disabled days ── */
 .swifty-calendar .rdrDayDisabled {
   background-color: transparent !important;
 }
 
 .swifty-calendar .rdrDayDisabled .rdrDayNumber span {
-  color: #475569 !important;
+  color: #334155 !important;
   text-decoration: line-through;
+  opacity: 0.5;
 }
 
-/* Selected range start/end — round pill */
+/* ── Selected: start & end edges — crisp circle ── */
 .swifty-calendar .rdrStartEdge,
 .swifty-calendar .rdrEndEdge {
   background: #f97316 !important;
   border-radius: 50% !important;
+  top: 3px;
+  bottom: 3px;
 }
 
-/* In-between range days */
+/* ── In-range days — subtle highlight band ── */
 .swifty-calendar .rdrInRange {
-  background: rgba(249, 115, 22, 0.15) !important;
+  background: rgba(249, 115, 22, 0.12) !important;
+  border-radius: 0 !important;
+  top: 3px;
+  bottom: 3px;
 }
 
+/* ── Day start of range + in range = half-round left ── */
+.swifty-calendar .rdrDayStartOfMonth .rdrInRange,
+.swifty-calendar .rdrDayStartOfWeek .rdrInRange {
+  border-top-left-radius: 50% !important;
+  border-bottom-left-radius: 50% !important;
+}
+
+.swifty-calendar .rdrDayEndOfMonth .rdrInRange,
+.swifty-calendar .rdrDayEndOfWeek .rdrInRange {
+  border-top-right-radius: 50% !important;
+  border-bottom-right-radius: 50% !important;
+}
+
+/* ── Preview (hover) range ── */
 .swifty-calendar .rdrDayStartPreview,
 .swifty-calendar .rdrDayEndPreview,
 .swifty-calendar .rdrDayInPreview {
-  border-color: rgba(249, 115, 22, 0.4) !important;
+  border-color: rgba(249, 115, 22, 0.35) !important;
+  border-width: 1px !important;
 }
 
-/* Hover */
+/* ── Hover state ── */
 .swifty-calendar .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span {
-  background: rgba(249, 115, 22, 0.2);
+  background: rgba(249, 115, 22, 0.15);
   border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
 }
 
-/* Today indicator */
+/* ── Today indicator — small dot ── */
 .swifty-calendar .rdrDayToday .rdrDayNumber span::after {
   background: #f97316 !important;
-  bottom: 2px;
-  width: 16px;
-  height: 2px;
-  border-radius: 1px;
+  width: 4px !important;
+  height: 4px !important;
+  border-radius: 50% !important;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-/* Navigation arrows */
-.swifty-calendar .rdrNextPrevButton {
-  background: #1e293b !important;
-  border: 1px solid #334155;
-  border-radius: 8px;
-}
-
-.swifty-calendar .rdrNextPrevButton:hover {
-  background: #334155 !important;
-}
-
-.swifty-calendar .rdrPprevButton i {
-  border-color: transparent #94a3b8 transparent transparent !important;
-}
-
-.swifty-calendar .rdrNextButton i {
-  border-color: transparent transparent transparent #94a3b8 !important;
-}
-
-/* Two-month responsive: stack on mobile */
+/* ── Month container spacing ── */
 .swifty-calendar .rdrMonths {
   flex-wrap: wrap;
   justify-content: center;
+  gap: 8px;
 }
 
+.swifty-calendar .rdrMonth {
+  padding: 0 8px;
+}
+
+/* ── Responsive: stack to 1 month on mobile ── */
 @media (max-width: 640px) {
   .swifty-calendar .rdrMonth {
     width: 100% !important;
+    padding: 0 4px;
   }
+
+  .swifty-calendar-wrapper {
+    padding: 12px 8px;
+  }
+}
+
+/* ── Remove default background stripes ── */
+.swifty-calendar .rdrDayHovered .rdrDayNumber::after {
+  display: none !important;
+}
+
+/* ── Selected edge text stays white ── */
+.swifty-calendar .rdrStartEdge ~ .rdrDayNumber span,
+.swifty-calendar .rdrEndEdge ~ .rdrDayNumber span {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+/* ── Clean separator between months ── */
+.swifty-calendar .rdrMonths.rdrMonthsHorizontal > .rdrMonth:not(:last-child) {
+  border-right: 1px solid rgba(71, 85, 105, 0.3);
 }

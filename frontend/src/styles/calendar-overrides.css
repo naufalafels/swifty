@@ -1,34 +1,37 @@
 /* ═══════════════════════════════════════════════════
    Swifty — Clean, professional date range calendar
-   Inspired by Airbnb / trip.com / Trivago
+   Two-month grid: Month 1 | Month 2
+   Mobile: single month only (second hidden)
    ═══════════════════════════════════════════════════ */
 
-/* ── Wrapper ── */
+/* ── Wrapper — match the parent card's slate-900 dark theme ── */
 .swifty-calendar-wrapper {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 12px;
   padding: 16px;
 }
 
-/* ── Base calendar ── */
+/* ── Base calendar — kill ALL white backgrounds from the library theme ── */
 .swifty-calendar .rdrCalendarWrapper {
   background: transparent !important;
-  color: #e2e8f0;
+  color: #f1f5f9;
   font-size: 14px;
   width: 100%;
 }
 
 .swifty-calendar .rdrDateRangeWrapper {
+  background: transparent !important;
   width: 100%;
 }
 
-/* ── Month & year header ── */
 .swifty-calendar .rdrMonthAndYearWrapper {
+  background: transparent !important;
   padding: 0 8px 12px;
   height: auto;
 }
 
 .swifty-calendar .rdrMonthAndYearPickers {
-  display: none; /* hide ugly selects — nav arrows only */
+  display: none;
 }
 
 .swifty-calendar .rdrMonthName {
@@ -70,7 +73,7 @@
 
 /* ── Weekday headers ── */
 .swifty-calendar .rdrWeekDay {
-  color: #64748b;
+  color: #94a3b8;
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
@@ -78,9 +81,13 @@
   padding-bottom: 8px;
 }
 
-/* ── Day cells ── */
+/* ══════════════════════════════════════════════════
+   COLOUR HIERARCHY (darkest = clickable)
+   ══════════════════════════════════════════════════ */
+
+/* ── Available/clickable day cells — DARKEST (white = highest contrast) ── */
 .swifty-calendar .rdrDay {
-  color: #e2e8f0;
+  color: #ffffff;
   height: 40px;
 }
 
@@ -93,18 +100,19 @@
 }
 
 .swifty-calendar .rdrDayNumber span {
-  color: #e2e8f0 !important;
-  font-weight: 500;
+  color: #ffffff !important;
+  font-weight: 600;
   font-size: 13.5px;
   z-index: 2;
 }
 
-/* ── Passive (out-of-month) days ── */
+/* ── Passive (out-of-month) days — LIGHTER (clearly secondary) ── */
 .swifty-calendar .rdrDayPassive .rdrDayNumber span {
-  color: #334155 !important;
+  color: #475569 !important;
+  font-weight: 400;
 }
 
-/* ── Disabled days ── */
+/* ── Disabled/booked days — LIGHTEST (ghost-like, clearly unavailable) ── */
 .swifty-calendar .rdrDayDisabled {
   background-color: transparent !important;
 }
@@ -112,10 +120,15 @@
 .swifty-calendar .rdrDayDisabled .rdrDayNumber span {
   color: #334155 !important;
   text-decoration: line-through;
+  font-weight: 400;
   opacity: 0.5;
 }
 
-/* ── Selected: start & end edges — crisp circle ── */
+/* ══════════════════════════════════════════════════
+   SELECTION STYLES
+   ══════════════════════════════════════════════════ */
+
+/* ── Selected: start & end edges — crisp orange circle ── */
 .swifty-calendar .rdrStartEdge,
 .swifty-calendar .rdrEndEdge {
   background: #f97316 !important;
@@ -132,7 +145,6 @@
   bottom: 3px;
 }
 
-/* ── Day start of range + in range = half-round left ── */
 .swifty-calendar .rdrDayStartOfMonth .rdrInRange,
 .swifty-calendar .rdrDayStartOfWeek .rdrInRange {
   border-top-left-radius: 50% !important;
@@ -176,34 +188,6 @@
   transform: translateX(-50%);
 }
 
-/* ── Month container spacing ── */
-.swifty-calendar .rdrMonths {
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-
-.swifty-calendar .rdrMonth {
-  padding: 0 8px;
-}
-
-/* ── Responsive: stack to 1 month on mobile ── */
-@media (max-width: 640px) {
-  .swifty-calendar .rdrMonth {
-    width: 100% !important;
-    padding: 0 4px;
-  }
-
-  .swifty-calendar-wrapper {
-    padding: 12px 8px;
-  }
-}
-
-/* ── Remove default background stripes ── */
-.swifty-calendar .rdrDayHovered .rdrDayNumber::after {
-  display: none !important;
-}
-
 /* ── Selected edge text stays white ── */
 .swifty-calendar .rdrStartEdge ~ .rdrDayNumber span,
 .swifty-calendar .rdrEndEdge ~ .rdrDayNumber span {
@@ -211,7 +195,58 @@
   font-weight: 700;
 }
 
-/* ── Clean separator between months ── */
-.swifty-calendar .rdrMonths.rdrMonthsHorizontal > .rdrMonth:not(:last-child) {
+/* ── Remove default background stripes ── */
+.swifty-calendar .rdrDayHovered .rdrDayNumber::after {
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════
+   TWO-MONTH GRID LAYOUT
+   Desktop: [Month 1] | [Month 2]  side by side
+   Mobile:  [Month 1] only (second month hidden)
+   ══════════════════════════════════════════════════ */
+
+.swifty-calendar .rdrMonths {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.swifty-calendar .rdrMonth {
+  background: transparent !important;
+  padding: 0 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ── Clean separator between months (vertical divider) ── */
+.swifty-calendar .rdrMonths > .rdrMonth:first-child {
   border-right: 1px solid rgba(71, 85, 105, 0.3);
+  padding-right: 16px;
+}
+
+.swifty-calendar .rdrMonths > .rdrMonth:last-child {
+  padding-left: 8px;
+}
+
+/* ── Responsive: ≤640px → single column, hide second month ── */
+@media (max-width: 640px) {
+  .swifty-calendar .rdrMonths {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  /* Hide the second month entirely on mobile */
+  .swifty-calendar .rdrMonths > .rdrMonth:nth-child(n+2) {
+    display: none;
+  }
+
+  .swifty-calendar .rdrMonths > .rdrMonth:first-child {
+    border-right: none;
+    padding-right: 8px;
+  }
+
+  .swifty-calendar-wrapper {
+    padding: 12px 8px;
+  }
 }

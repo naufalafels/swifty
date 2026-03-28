@@ -661,14 +661,14 @@ const Cars = () => {
               <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">
                 Booked — available on {formatDate(meta.availableIso)}
               </span>
-              <small className="text-xs text-gray-400 mt-1">until {formatDate(effective.until)}</small>
+              <small className="text-xs text-slate-400 mt-1">until {formatDate(effective.until)}</small>
             </div>
           );
         }
         return (
           <div className="flex flex-col items-end">
             <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">Booked</span>
-            <small className="text-xs text-gray-400 mt-1">until {formatDate(effective.until)}</small>
+            <small className="text-xs text-slate-400 mt-1">until {formatDate(effective.until)}</small>
           </div>
         );
       }
@@ -686,7 +686,7 @@ const Cars = () => {
           <div className="flex flex-col items-end">
             <span className="px-2 py-1 text-xs rounded-md bg-amber-50 text-amber-800 font-semibold">Available</span>
             {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
+              <small className="text-xs text-slate-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
             )}
           </div>
         );
@@ -696,7 +696,7 @@ const Cars = () => {
           <div className="flex flex-col items-end">
             <span className="px-2 py-1 text-xs rounded-md bg-red-50 text-red-700 font-semibold">Booked — starts today</span>
             {effective.nextBookingStarts && (
-              <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
+              <small className="text-xs text-slate-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
             )}
           </div>
         );
@@ -707,7 +707,7 @@ const Cars = () => {
             Available — reserved in {plural(days, "day")}
           </span>
           {effective.nextBookingStarts && (
-            <small className="text-xs text-gray-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
+            <small className="text-xs text-slate-400 mt-1">from {formatDate(effective.nextBookingStarts)}</small>
           )}
         </div>
       );
@@ -792,9 +792,9 @@ const Cars = () => {
         {/* Filters */}
         <div className="w-full max-w-7xl mx-auto mb-6">
           {/* Main grid: Location + Dates */}
-          <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div className="bg-white border border-orange-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end shadow-sm">
             <div className="flex-1 min-w-[240px]">
-              <label className="text-sm text-gray-300 block mb-2">Location (city, state, landmark)</label>
+              <label className="text-sm text-slate-600 block mb-2">Location (city, state, landmark)</label>
               <div className="relative">
                 {apiKey ? (
                   <LoadScript googleMapsApiKey={apiKey} libraries={["places"]}>
@@ -803,7 +803,7 @@ const Cars = () => {
                         value={locationQuery}
                         onChange={(e) => setLocationQuery(e.target.value)}
                         placeholder="Start typing to search..."
-                        className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+                        className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orange-200 focus:border-orange-500 focus:outline-none placeholder:text-slate-400"
                       />
                     </StandaloneSearchBox>
                   </LoadScript>
@@ -812,38 +812,38 @@ const Cars = () => {
                     value={locationQuery}
                     onChange={(e) => setLocationQuery(e.target.value)}
                     placeholder="Start typing to search..."
-                    className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+                    className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orange-200 focus:border-orange-500 focus:outline-none placeholder:text-slate-400"
                   />
                 )}
               </div>
             </div>
 
             <div className="flex-1 min-w-[200px]">
-              <label className="text-sm text-gray-300 block mb-2">Pickup Date</label>
+              <label className="text-sm text-slate-600 block mb-2">Pickup Date</label>
               <input
                 type="date"
                 value={pickupDate}
                 onChange={(e) => setPickupDate(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
-                className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orange-200 focus:border-orange-500 focus:outline-none"
               />
             </div>
 
             <div className="flex-1 min-w-[200px]">
-              <label className="text-sm text-gray-300 block mb-2">Return Date</label>
+              <label className="text-sm text-slate-600 block mb-2">Return Date</label>
               <input
                 type="date"
                 value={returnDate}
                 onChange={(e) => setReturnDate(e.target.value)}
                 min={pickupDate || new Date().toISOString().split("T")[0]}
-                className="w-full p-3 rounded bg-gray-800 text-white border border-gray-700 focus:border-orange-500 focus:outline-none"
+className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orange-200 focus:border-orange-500 focus:outline-none"
               />
             </div>
 
             <div className="flex justify-end items-center gap-2">
               <button
                 onClick={resetFilters}
-                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-200 hover:border-orange-500 hover:text-orange-400 transition-colors"
+                className="px-4 py-2 rounded-lg border border-orange-200 text-slate-600 hover:border-orange-500 hover:text-orange-500 transition-colors"
               >
                 Reset
               </button>
@@ -857,12 +857,12 @@ const Cars = () => {
           </div>
 
           {/* Locate */}
-          <div className="mt-4 bg-blue-900/50 border border-blue-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div className="flex items-center gap-3">
-              <FaMapMarkerAlt className="text-blue-400" />
+              <FaMapMarkerAlt className="text-blue-500" />
               <div>
-                <p className="text-white font-semibold">Auto-fill Location</p>
-                <p className="text-sm text-gray-300">
+                <p className="text-slate-800 font-semibold">Auto-fill Location</p>
+                <p className="text-sm text-slate-500">
                   Allow location access to automatically fill your state and city for easier car discovery.
                 </p>
               </div>
@@ -877,40 +877,47 @@ const Cars = () => {
           </div>
 
           {geoError && (
-            <div className="mt-4 bg-red-900/50 border border-red-800 rounded-xl p-4">
-              <p className="text-red-400 text-sm">{geoError}</p>
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-red-600 text-sm">{geoError}</p>
             </div>
           )}
 
-          <div className="mt-4 bg-gray-900/50 border border-gray-800 rounded-xl p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="text-lg font-semibold text-white mb-3">Car Types</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="mt-4 bg-white border border-orange-200 rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Car Types */}
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-slate-800 mb-3">Car Types</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                   {DEFAULT_TYPES.map((t) => (
                     <label
                       key={t}
-                      className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
+                      className="flex items-center gap-2 text-sm bg-orange-50/50 border border-orange-100 p-3 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer min-w-0"
                     >
                       <input
                         type="checkbox"
                         checked={!!selectedTypes[t]}
                         onChange={() => toggleType(t)}
-                        className="w-4 h-4 accent-orange-500"
+                        className="w-4 h-4 accent-orange-500 flex-shrink-0"
                       />
-                      <span className="text-gray-200">{t}</span>
+                      <span className="text-slate-700 truncate">{t}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-lg font-semibold text-white mb-3">Seat Numbers</h4>
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Vertical divider */}
+              <div className="hidden md:block w-px bg-orange-200 self-stretch" />
+              {/* Horizontal divider (mobile) */}
+              <hr className="md:hidden border-orange-200" />
+
+              {/* Seat Numbers */}
+              <div className="flex-1">
+                <h4 className="text-lg font-semibold text-slate-800 mb-3">Seat Numbers</h4>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {DEFAULT_SEATS.map((s) => (
                     <label
                       key={s}
-                      className="flex items-center gap-2 text-sm bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
+                      className="flex items-center gap-2 text-sm bg-orange-50/50 border border-orange-100 p-3 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -918,7 +925,7 @@ const Cars = () => {
                         onChange={() => toggleSeat(s)}
                         className="w-4 h-4 accent-orange-500"
                       />
-                      <span className="text-gray-200">{s} Seats</span>
+                      <span className="text-slate-700">{s} Seats</span>
                     </label>
                   ))}
                 </div>
@@ -986,12 +993,12 @@ const Cars = () => {
               </GoogleMap>
             </LoadScript>
           ) : (
-            <div className="text-center text-red-400 p-4 bg-gray-800 rounded">
+            <div className="text-center text-red-600 p-4 bg-red-50 border border-red-200 rounded">
               Google Maps API key is missing. Please set VITE_GOOGLE_MAPS_API_KEY in your .env file and ensure it's enabled in Google Cloud Console.
             </div>
           )}
           {mapError && (
-            <div className="text-center text-red-400 p-4 bg-gray-800 rounded mt-2">
+            <div className="text-center text-red-600 p-4 bg-red-50 border border-red-200 rounded mt-2">
               {mapError} Refer to Google Maps documentation for setup.
             </div>
           )}
@@ -1070,32 +1077,32 @@ const Cars = () => {
                         <h3 className={carPageStyles.carName}>{carName}</h3>
                         <p className={carPageStyles.carType}>{car.category ?? car.type ?? "Sedan"}</p>
 
-                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-300">
-                          <FaBuilding className="text-gray-400" />
+                        <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                          <FaBuilding className="text-slate-700" />
                           <span className="truncate">
                             {companyName}
                             {companyCity ? ` - ${companyCity}` : companyState ? ` - ${companyState}` : ""}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right text-sm text-gray-300">
-                        {car.distance ? <div className="text-xs text-gray-400">{car.distance}</div> : null}
+                      <div className="text-right text-sm text-slate-500">
+                        {car.distance ? <div className="text-xs text-slate-400">{car.distance}</div> : null}
                       </div>
                     </div>
 
                     {/* Flexible pricing summary when dates are selected */}
                     {hasDateRange && (
-                      <div className="mt-2 p-2 bg-gray-800/60 border border-gray-700 rounded-lg text-xs text-gray-300 space-y-1">
+                      <div className="mt-2 p-2 bg-orange-50/60 border border-orange-200 rounded-lg text-xs text-slate-600 space-y-1">
                         <div className="flex justify-between">
                           <span>Total rent ({days} {days === 1 ? "day" : "days"})</span>
-                          <span className="text-white font-medium">MYR {totalRent}</span>
+                          <span className="text-slate-800 font-medium">MYR {totalRent}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Deposit (at counter)</span>
-                          <span className="text-gray-400">MYR {displayDeposit}</span>
+                          <span className="text-slate-400">MYR {displayDeposit}</span>
                         </div>
                         {isFlex && (
-                          <div className="flex items-center gap-1 text-orange-300/70 pt-1">
+                          <div className="flex items-center gap-1 text-orange-500/80 pt-1">
                             <FaInfoCircle className="text-[10px]" />
                             <span>Flexible pricing — rates may vary for weekends/peak.</span>
                           </div>

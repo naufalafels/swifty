@@ -763,6 +763,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
         companyName: car.company?.name || car.companyName || "",
       }));
 
+      // Marketing consent — ALWAYS send regardless of KYC status
+      form.append("marketingConsent", marketingConsent ? "true" : "false");
+
       if (userKycApproved) {
         form.append("kycFromProfile", "true");
       } else {
@@ -771,9 +774,6 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
         form.append("kyc[idCountry]", countryCode);
         form.append("kycFront", frontFile);
         form.append("kycBack", backFile);
-
-        // Marketing consent — send to backend for storage
-        form.append("marketingConsent", marketingConsent ? "true" : "false");
       }
 
       const res = await createXenditInvoice(form);

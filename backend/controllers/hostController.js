@@ -356,6 +356,7 @@ export const getBookingCustomerDetail = async (req, res) => {
         bookingId: booking._id,
         amount: booking.amount || 0,
         paymentStatus: booking.paymentStatus || "pending",
+        marketingConsent: booking.marketingConsent === true,
       },
     });
   } catch (err) {

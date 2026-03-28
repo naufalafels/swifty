@@ -333,6 +333,24 @@ const CustomerDetailModal = ({ detail, loading, onClose, enlargedImage, setEnlar
               )}
             </div>
 
+            {/* Marketing Subscription */}
+            <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
+              <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Marketing Subscription</div>
+              <div className="flex items-center gap-2">
+                {detail.marketingConsent ? (
+                  <>
+                    <FaCheck className="text-emerald-400 w-4" />
+                    <span className="text-emerald-300 font-medium">Subscribed to marketing communications</span>
+                  </>
+                ) : (
+                  <>
+                    <FaBan className="text-rose-400 w-4" />
+                    <span className="text-rose-300 font-medium">Not subscribed — do not send marketing</span>
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Identification */}
             <div className="space-y-2 text-sm border-t border-slate-800 pt-3">
               <div className="text-xs uppercase text-slate-500 tracking-wide font-semibold">Identification</div>

@@ -187,6 +187,7 @@ const CarDetail = () => {
 
   const [locationQuery, setLocationQuery] = useState("");
   const searchBoxRef = useRef(null);
+  const bookingFormRef = useRef(null);
 
   const [range, setRange] = useState([
     {
@@ -793,6 +794,10 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
     return parts.filter(Boolean).join(", ");
   })();
 
+  const scrollToBookingForm = () => {
+    bookingFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className={carDetailStyles.pageContainer}>
       <div className={carDetailStyles.contentContainer}>
@@ -801,7 +806,11 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
           <FaArrowLeft className={carDetailStyles.backButtonIcon} />
         </button>
 
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 1: Car Details (left) + Sticky Date Picker (right)
+            ═══════════════════════════════════════════════════════════════ */}
         <div className={carDetailStyles.mainLayout}>
+          {/* ── LEFT COLUMN: car info (unchanged) ── */}
           <div className={carDetailStyles.leftColumn}>
             <div className={carDetailStyles.imageCarousel}>
               <img
@@ -879,39 +888,80 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
             </div>
           </div>
 
+          {/* ── RIGHT COLUMN: ONLY date picker + price summary + CTA (sticky) ── */}
           <div className={carDetailStyles.rightColumn}>
             <div className={carDetailStyles.bookingCard}>
               <h2 className={carDetailStyles.bookingTitle}>
                 Reserve <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">Your Drive</span>
               </h2>
-              <p className={carDetailStyles.bookingSubtitle}>Fast · Secure · Easy</p>
+              <p className={carDetailStyles.bookingSubtitle}>Pick your dates to get started</p>
 
-              <form onSubmit={handleSubmit} className={carDetailStyles.form}>
-                {/* Airbnb-esque date picker */}
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
-                    <FaCalendarAlt /> <span>Select dates</span>
-                  </div>
-                  <DateRange
-                    ranges={range}
-                    onChange={onRangeChange}
-                    minDate={new Date()}
-                    rangeColors={["#f97316"]}
-                    direction="horizontal"
-                    months={1}
-                    showDateDisplay={false}
-                    disabledDates={disabledDates}
-                    dayContentRenderer={(date) => {
-                      return (
-                        <div style={{ position: "relative" }}>
-                          <span>{date.getDate()}</span>
-                        </div>
-                      );
-                    }}
-                  />
+              {/* Date picker */}
+              <div>
+                <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
+                  <FaCalendarAlt /> <span>Select dates</span>
                 </div>
+                <DateRange
+                  ranges={range}
+                  onChange={onRangeChange}
+                  minDate={new Date()}
+                  rangeColors={["#f97316"]}
+                  direction="horizontal"
+                  months={1}
+                  showDateDisplay={false}
+                  disabledDates={disabledDates}
+                  dayContentRenderer={(date) => {
+                    return (
+                      <div style={{ position: "relative" }}>
+                        <span>{date.getDate()}</span>
+                      </div>
+                    );
+                  }}
+                />
+              </div>
 
-                <div className="flex flex-col mt-3">
+              {/* Compact price summary */}
+              <div className={carDetailStyles.priceBreakdown}>
+                <div className={carDetailStyles.priceRow}>
+                  <span>Rate/day {(Number(fp.weekendMultiplier) > 1 || (fp.peakMultipliers && fp.peakMultipliers.length > 0)) ? "(avg)" : ""}</span>
+                  <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price}</span>
+                </div>
+                {formData.pickupDate && formData.returnDate && (
+                  <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
+                )}
+                <div className={carDetailStyles.priceRow}><span>Insurance ({selectedPlan.label})</span><span>MYR&nbsp;{insuranceCost}</span></div>
+                <div className={carDetailStyles.priceRow}><span>Deposit (at counter)</span><span className="text-gray-300">MYR&nbsp;{deposit}</span></div>
+                <div className={carDetailStyles.totalRow}><span>Total (to pay now)</span><span>MYR&nbsp;{calculateTotal()}</span></div>
+              </div>
+
+              {/* Continue to booking form button */}
+              <button
+                type="button"
+                onClick={scrollToBookingForm}
+                className={carDetailStyles.continueButton}
+              >
+                <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
+                <span>Continue to Book</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            SECTION 2: Full-Width Booking Form
+            ═══════════════════════════════════════════════════════════════ */}
+        <div className={carDetailStyles.sectionDivider} />
+        <div ref={bookingFormRef} className={carDetailStyles.bookingSection}>
+          <div className={carDetailStyles.bookingFormCard}>
+            <h2 className={carDetailStyles.bookingTitle}>
+              Complete <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">Your Booking</span>
+            </h2>
+            <p className={carDetailStyles.bookingSubtitle}>Fast · Secure · Easy</p>
+
+            <form onSubmit={handleSubmit} className={carDetailStyles.form}>
+              {/* ── Personal info row ── */}
+              <div className={carDetailStyles.bookingFormGrid}>
+                <div className="flex flex-col">
                   <label className={carDetailStyles.formLabel}>Full Name</label>
                   <div className={carDetailStyles.inputContainer(activeField === "name")}>
                     <div className={carDetailStyles.inputIcon}><FaUser /></div>
@@ -929,313 +979,318 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                  <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>Email Address</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "email")}>
-                      <div className={carDetailStyles.inputIcon}><FaEnvelope /></div>
-                      <input
-                        type="email"
-                        name="email"
-                        placeholder="Your email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("email")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField + (emailReadOnly ? " opacity-80 bg-gray-800" : "")}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>Phone Number</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "phone")}>
-                      <div className={carDetailStyles.inputIcon}><FaPhone /></div>
-                      <input
-                        type="tel"
-                        name="phone"
-                        placeholder="Your phone number"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("phone")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField}
-                      />
-                    </div>
+                <div className="flex flex-col">
+                  <label className={carDetailStyles.formLabel}>Email Address</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "email")}>
+                    <div className={carDetailStyles.inputIcon}><FaEnvelope /></div>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="Your email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      onFocus={() => setActiveField("email")}
+                      onBlur={() => setActiveField(null)}
+                      required
+                      className={carDetailStyles.textInputField + (emailReadOnly ? " opacity-80 bg-gray-800" : "")}
+                    />
                   </div>
                 </div>
 
-                {/* Unified location search with Places autocomplete */}
-                <div className="flex flex-col mt-3">
-                  <label className={carDetailStyles.formLabel}>Location (city, state, landmark)</label>
-                  <div className={carDetailStyles.inputContainer(activeField === "locationSearch")}>
-                    <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
-                    {GOOGLE_MAPS_KEY ? (
-                      <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY} libraries={["places"]}>
-                        <StandaloneSearchBox
-                          onLoad={(ref) => (searchBoxRef.current = ref)}
-                          onPlacesChanged={handlePlaceChanged}
-                        >
-                          <input
-                            type="text"
-                            placeholder="Start typing to search..."
-                            value={locationQuery}
-                            onChange={(e) => setLocationQuery(e.target.value)}
-                            onFocus={() => setActiveField("locationSearch")}
-                            onBlur={() => setActiveField(null)}
-                            className={carDetailStyles.textInputField}
-                          />
-                        </StandaloneSearchBox>
-                      </LoadScript>
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="Start typing to search..."
-                        value={locationQuery}
-                        onChange={(e) => setLocationQuery(e.target.value)}
-                        onFocus={() => setActiveField("locationSearch")}
-                        onBlur={() => setActiveField(null)}
-                        className={carDetailStyles.textInputField}
-                      />
-                    )}
+                <div className="flex flex-col">
+                  <label className={carDetailStyles.formLabel}>Phone Number</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "phone")}>
+                    <div className={carDetailStyles.inputIcon}><FaPhone /></div>
+                    <input
+                      type="tel"
+                      name="phone"
+                      placeholder="Your phone number"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      onFocus={() => setActiveField("phone")}
+                      onBlur={() => setActiveField(null)}
+                      required
+                      className={carDetailStyles.textInputField}
+                    />
                   </div>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-                  <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>City</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "city")}>
-                      <div className={carDetailStyles.inputIcon}><FaCity /></div>
-                      <input
-                        type="text"
-                        name="city"
-                        placeholder="Your city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("city")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>State</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "state")}>
-                      <div className={carDetailStyles.inputIcon}><FaGlobeAsia /></div>
-                      <input
-                        type="text"
-                        name="state"
-                        placeholder="Your state"
-                        value={formData.state}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("state")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className={carDetailStyles.formLabel}>ZIP Code</label>
-                    <div className={carDetailStyles.inputContainer(activeField === "zipCode")}>
-                      <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
-                      <input
-                        type="text"
-                        name="zipCode"
-                        placeholder="ZIP/Postal code"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
-                        onFocus={() => setActiveField("zipCode")}
-                        onBlur={() => setActiveField(null)}
-                        required
-                        className={carDetailStyles.textInputField}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {!kycCheckDone && currentUserId ? (
-                  <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
-                    <div className="flex items-center gap-2">
-                      <FaShieldAlt className="text-gray-400 animate-pulse" />
-                      <span className="text-sm text-gray-400">Checking verification status...</span>
-                    </div>
-                  </div>
-                ) : userKycApproved ? (
-                  <div className="mt-4 p-3 rounded-xl border border-emerald-700/50 bg-emerald-900/20">
-                    <div className="flex items-center gap-2">
-                      <FaCheckCircle className="text-emerald-400" />
-                      <span className="text-sm text-emerald-300 font-semibold">Identity Verified</span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Your KYC has been approved. No additional verification needed.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FaPassport className="text-orange-400" />
-                      <h3 className="text-sm font-semibold text-gray-100">KYC (Passport / NRIC)</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className={carDetailStyles.formLabel}>ID Type</label>
-                        <select
-                          name="idType"
-                          value={formData.idType}
-                          onChange={handleInputChange}
-                          onFocus={() => setActiveField("idType")}
-                          onBlur={() => setActiveField(null)}
-                          className={carDetailStyles.textInputField + " bg-gray-800"}
-                        >
-                          <option value="passport">Passport</option>
-                          <option value="nric">Malaysian NRIC</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className={carDetailStyles.formLabel}>ID Number (optional)</label>
+              {/* ── Location search ── */}
+              <div className="flex flex-col">
+                <label className={carDetailStyles.formLabel}>Location (city, state, landmark)</label>
+                <div className={carDetailStyles.inputContainer(activeField === "locationSearch")}>
+                  <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
+                  {GOOGLE_MAPS_KEY ? (
+                    <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY} libraries={["places"]}>
+                      <StandaloneSearchBox
+                        onLoad={(ref) => (searchBoxRef.current = ref)}
+                        onPlacesChanged={handlePlaceChanged}
+                      >
                         <input
                           type="text"
-                          name="idNumber"
-                          placeholder="e.g. A1234567"
-                          value={formData.idNumber}
-                          onChange={handleInputChange}
-                          onFocus={() => setActiveField("idNumber")}
+                          placeholder="Start typing to search..."
+                          value={locationQuery}
+                          onChange={(e) => setLocationQuery(e.target.value)}
+                          onFocus={() => setActiveField("locationSearch")}
+                          onBlur={() => setActiveField(null)}
+                          className={carDetailStyles.textInputField}
+                        />
+                      </StandaloneSearchBox>
+                    </LoadScript>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Start typing to search..."
+                      value={locationQuery}
+                      onChange={(e) => setLocationQuery(e.target.value)}
+                      onFocus={() => setActiveField("locationSearch")}
+                      onBlur={() => setActiveField(null)}
+                      className={carDetailStyles.textInputField}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* ── City / State / ZIP row ── */}
+              <div className={carDetailStyles.bookingFormGrid}>
+                <div className="flex flex-col">
+                  <label className={carDetailStyles.formLabel}>City</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "city")}>
+                    <div className={carDetailStyles.inputIcon}><FaCity /></div>
+                    <input
+                      type="text"
+                      name="city"
+                      placeholder="Your city"
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      onFocus={() => setActiveField("city")}
+                      onBlur={() => setActiveField(null)}
+                      required
+                      className={carDetailStyles.textInputField}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <label className={carDetailStyles.formLabel}>State</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "state")}>
+                    <div className={carDetailStyles.inputIcon}><FaGlobeAsia /></div>
+                    <input
+                      type="text"
+                      name="state"
+                      placeholder="Your state"
+                      value={formData.state}
+                      onChange={handleInputChange}
+                      onFocus={() => setActiveField("state")}
+                      onBlur={() => setActiveField(null)}
+                      required
+                      className={carDetailStyles.textInputField}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <label className={carDetailStyles.formLabel}>ZIP Code</label>
+                  <div className={carDetailStyles.inputContainer(activeField === "zipCode")}>
+                    <div className={carDetailStyles.inputIcon}><FaMapPin /></div>
+                    <input
+                      type="text"
+                      name="zipCode"
+                      placeholder="ZIP/Postal code"
+                      value={formData.zipCode}
+                      onChange={handleInputChange}
+                      onFocus={() => setActiveField("zipCode")}
+                      onBlur={() => setActiveField(null)}
+                      required
+                      className={carDetailStyles.textInputField}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── KYC section ── */}
+              {!kycCheckDone && currentUserId ? (
+                <div className="p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                  <div className="flex items-center gap-2">
+                    <FaShieldAlt className="text-gray-400 animate-pulse" />
+                    <span className="text-sm text-gray-400">Checking verification status...</span>
+                  </div>
+                </div>
+              ) : userKycApproved ? (
+                <div className="p-3 rounded-xl border border-emerald-700/50 bg-emerald-900/20">
+                  <div className="flex items-center gap-2">
+                    <FaCheckCircle className="text-emerald-400" />
+                    <span className="text-sm text-emerald-300 font-semibold">Identity Verified</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Your KYC has been approved. No additional verification needed.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FaPassport className="text-orange-400" />
+                    <h3 className="text-sm font-semibold text-gray-100">KYC (Passport / NRIC)</h3>
+                  </div>
+                  <div className={carDetailStyles.bookingFormGrid}>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>ID Type</label>
+                      <select
+                        name="idType"
+                        value={formData.idType}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idType")}
+                        onBlur={() => setActiveField(null)}
+                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                      >
+                        <option value="passport">Passport</option>
+                        <option value="nric">Malaysian NRIC</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>ID Number (optional)</label>
+                      <input
+                        type="text"
+                        name="idNumber"
+                        placeholder="e.g. A1234567"
+                        value={formData.idNumber}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idNumber")}
+                        onBlur={() => setActiveField(null)}
+                        className={carDetailStyles.textInputField}
+                      />
+                    </div>
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Issuing Country</label>
+                      <select
+                        name="idCountry"
+                        value={formData.idCountry}
+                        onChange={handleInputChange}
+                        onFocus={() => setActiveField("idCountry")}
+                        onBlur={() => setActiveField(null)}
+                        required
+                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                      >
+                        {countryOptions.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
+                      <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
+                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          name="frontImage"
+                          onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
+                          onFocus={() => setActiveField("frontImage")}
                           onBlur={() => setActiveField(null)}
                           className={carDetailStyles.textInputField}
                         />
                       </div>
-                      <div>
-                        <label className={carDetailStyles.formLabel}>Issuing Country</label>
-                        <select
-                          name="idCountry"
-                          value={formData.idCountry}
-                          onChange={handleInputChange}
-                          onFocus={() => setActiveField("idCountry")}
-                          onBlur={() => setActiveField(null)}
-                          required
-                          className={carDetailStyles.textInputField + " bg-gray-800"}
-                        >
-                          {countryOptions.map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                          ))}
-                        </select>
-                      </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <label className={carDetailStyles.formLabel}>Front Image (upload)</label>
-                        <div className={carDetailStyles.inputContainer(activeField === "frontImage")}>
-                          <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            name="frontImage"
-                            onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
-                            onFocus={() => setActiveField("frontImage")}
-                            onBlur={() => setActiveField(null)}
-                            className={carDetailStyles.textInputField}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
-                        <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
-                          <div className={carDetailStyles.inputIcon}><FaImage /></div>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            name="backImage"
-                            onChange={(e) => setBackFile(e.target.files?.[0] || null)}
-                            onFocus={() => setActiveField("backImage")}
-                            onBlur={() => setActiveField(null)}
-                            className={carDetailStyles.textInputField}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
-                      <FaShieldAlt className="mt-0.5" />
-                      <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-4 p-3 rounded-xl border border-gray-700 bg-gray-800/70">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FaShieldAlt className="text-orange-400" />
-                    <h3 className="text-sm font-semibold text-gray-100">Insurance / Excess</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {insuranceOptions.map((opt) => (
-                      <label
-                        key={opt.value}
-                        className="flex items-start gap-3 cursor-pointer rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 hover:border-orange-500 transition"
-                      >
+                    <div>
+                      <label className={carDetailStyles.formLabel}>Back Image (upload)</label>
+                      <div className={carDetailStyles.inputContainer(activeField === "backImage")}>
+                        <div className={carDetailStyles.inputIcon}><FaImage /></div>
                         <input
-                          type="radio"
-                          name="insurancePlan"
-                          value={opt.value}
-                          checked={formData.insurancePlan === opt.value}
-                          onChange={handleInputChange}
-                          className="mt-1 accent-orange-500"
+                          type="file"
+                          accept="image/*"
+                          name="backImage"
+                          onChange={(e) => setBackFile(e.target.files?.[0] || null)}
+                          onFocus={() => setActiveField("backImage")}
+                          onBlur={() => setActiveField(null)}
+                          className={carDetailStyles.textInputField}
                         />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-gray-100">
-                            {opt.label}
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-orange-300">
-                              {opt.feePerDay ? `MYR ${opt.feePerDay}/day` : "No daily fee"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-0.5">{opt.info}</p>
-                        </div>
-                      </label>
-                    ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
+                    <FaShieldAlt className="mt-0.5" />
+                    <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
                   </div>
                 </div>
+              )}
 
-                                <div className="mb-4 bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-white font-semibold">
-                    <FaFileContract className="text-orange-400" /> Terms & Conditions
-                  </div>
-                  <p className="text-sm text-gray-300">
-                    By booking, you agree to our{" "}
-                    <button
-                      type="button"
-                      onClick={openTerms}
-                      className="text-orange-400 underline hover:text-orange-300"
+              {/* ── Insurance options (now full width — much more breathing room) ── */}
+              <div className="p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+                <div className="flex items-center gap-2 mb-2">
+                  <FaShieldAlt className="text-orange-400" />
+                  <h3 className="text-sm font-semibold text-gray-100">Insurance / Excess</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {insuranceOptions.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex items-start gap-3 cursor-pointer rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 hover:border-orange-500 transition"
                     >
-                      Terms & Conditions
-                    </button>.
-                  </p>
-                  <label className="flex items-start gap-2 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={acceptTerms}
-                      onChange={(e) => setAcceptTerms(e.target.checked)}
-                      className="mt-1 accent-orange-500"
-                    />
-                    <span>I have read and accept the Terms & Conditions.</span>
-                  </label>
-                  {/* Marketing consent opt-in */}
-                  <label className="flex items-start gap-2 text-sm text-gray-200 mt-2">
-                    <input
-                      type="checkbox"
-                      checked={marketingConsent}
-                      onChange={(e) => setMarketingConsent(e.target.checked)}
-                      className="mt-1 accent-emerald-500"
-                    />
-                    <span>
-                      I agree to receive marketing communications and promotional offers from the car host via email. You can unsubscribe anytime.
-                    </span>
-                  </label>
-                  {termsError && <p className="text-xs text-red-400">{termsError}</p>}
+                      <input
+                        type="radio"
+                        name="insurancePlan"
+                        value={opt.value}
+                        checked={formData.insurancePlan === opt.value}
+                        onChange={handleInputChange}
+                        className="mt-1 accent-orange-500"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-100">
+                          {opt.label}
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-orange-300">
+                            {opt.feePerDay ? `MYR ${opt.feePerDay}/day` : "No daily fee"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">{opt.info}</p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
+              </div>
 
-                <div className={carDetailStyles.priceBreakdown + " mt-4"}>
+              {/* ── Terms & Conditions ── */}
+              <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-white font-semibold">
+                  <FaFileContract className="text-orange-400" /> Terms & Conditions
+                </div>
+                <p className="text-sm text-gray-300">
+                  By booking, you agree to our{" "}
+                  <button
+                    type="button"
+                    onClick={openTerms}
+                    className="text-orange-400 underline hover:text-orange-300"
+                  >
+                    Terms & Conditions
+                  </button>.
+                </p>
+                <label className="flex items-start gap-2 text-sm text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-1 accent-orange-500"
+                  />
+                  <span>I have read and accept the Terms & Conditions.</span>
+                </label>
+                <label className="flex items-start gap-2 text-sm text-gray-200 mt-2">
+                  <input
+                    type="checkbox"
+                    checked={marketingConsent}
+                    onChange={(e) => setMarketingConsent(e.target.checked)}
+                    className="mt-1 accent-emerald-500"
+                  />
+                  <span>
+                    I agree to receive marketing communications and promotional offers from the car host via email. You can unsubscribe anytime.
+                  </span>
+                </label>
+                {termsError && <p className="text-xs text-red-400">{termsError}</p>}
+              </div>
+
+              {/* ── Final price breakdown + submit ── */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                <div className={carDetailStyles.priceBreakdown}>
                   <div className={carDetailStyles.priceRow}>
                     <span>Rate/day {(Number(fp.weekendMultiplier) > 1 || (fp.peakMultipliers && fp.peakMultipliers.length > 0)) ? "(avg)" : ""}</span>
                     <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price}</span>
@@ -1249,15 +1304,20 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   <p className="text-xs text-gray-400 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
                 </div>
 
-                <button type="submit" disabled={submitting} className={carDetailStyles.submitButton}>
-                  <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
-                  <span>{submitting ? "Redirecting to payment..." : "Pay & Confirm Booking"}</span>
-                </button>
-              </form>
-            </div>
+                <div className="flex flex-col justify-end h-full">
+                  <button type="submit" disabled={submitting} className={carDetailStyles.submitButton}>
+                    <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
+                    <span>{submitting ? "Redirecting to payment..." : "Pay & Confirm Booking"}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
 
+        {/* ═══════════════════════════════════════════════════════════════
+            CHAT WIDGET (unchanged)
+            ═══════════════════════════════════════════════════════════════ */}
         {currentUser && (
           <div className="fixed bottom-4 left-4 z-50">
             <button
@@ -1270,7 +1330,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
 
             {isChatOpen && (
               <div className="mt-2 w-80 h-96 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col md:w-96 md:h-[28rem]">
-                <div className="flex itemscenter justify-between p-3 border-b border-gray-700">
+                <div className="flex items-center justify-between p-3 border-b border-gray-700">
                   <h3 className="text-sm font-semibold text-white">Message Host</h3>
                   <button
                     onClick={() => setIsChatOpen(false)}
@@ -1320,6 +1380,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
           </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════════
+            TERMS MODAL (unchanged)
+            ═══════════════════════════════════════════════════════════════ */}
         {termsOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">

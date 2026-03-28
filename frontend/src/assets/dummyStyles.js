@@ -218,11 +218,24 @@ export const carDetailStyles = {
   aboutSection: "bg-gray-800/60 backdrop-blur-sm p-4 sm:p-6 rounded-xl border border-gray-700 space-y-3",
   aboutTitle: "text-xl sm:text-2xl font-semibold text-white",
   aboutText: "text-gray-300 text-sm sm:text-base",
-  rightColumn: "lg:w-1/3",
+
+  // ── RIGHT COLUMN: now sticky, only holds date picker + mini summary ──
+  rightColumn: "lg:w-1/3 lg:sticky lg:top-24 lg:self-start",
   bookingCard: "bg-gray-800/70 backdrop-blur-sm p-4 sm:p-6 rounded-2xl border border-gray-700 shadow-xl space-y-4",
   bookingTitle: "text-2xl sm:text-2xl font-bold text-white",
   bookingSubtitle: "text-gray-400 text-sm",
-  form: "space-y-4",
+
+  // ── "Continue to Book" CTA in the sticky sidebar ──
+  continueButton: "w-full flex items-center justify-center py-3 rounded-xl bg-gradient-to-r from-orange-400 to-orange-500 cursor-pointer text-white font-bold hover:from-orange-500 hover:to-orange-600 transition-all group text-base shadow-lg hover:shadow-orange-500/25",
+
+  // ── SECTION 2: full-width booking form below the car details grid ──
+  sectionDivider: "my-10 border-t border-gray-800",
+  bookingSection: "max-w-5xl mx-auto",
+  bookingFormCard: "bg-gray-800/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl border border-gray-700 shadow-xl space-y-6",
+  bookingFormGrid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5",
+
+  // ── shared form styles (unchanged) ──
+  form: "space-y-5",
   grid2: "grid grid-cols-2 gap-3",
   formLabel: "text-xs sm:text-sm text-gray-300 mb-1",
   inputContainer: (active) => `relative rounded-lg border transition-all ${active ? 'border-orange-500' : 'border-gray-600'}`,
@@ -232,7 +245,7 @@ export const carDetailStyles = {
   priceBreakdown: "bg-gray-700/40 p-3 rounded-lg text-sm space-y-1 border border-gray-600",
   priceRow: "flex justify-between text-gray-300",
   totalRow: "border-t border-gray-600 pt-1 flex justify-between font-semibold text-white",
-  submitButton: "w-full flex items-center justify-center py-2.5 rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 cursor-pointer text-white font-bold hover:from-orange-400 hover:to-orange-500 transition-all group"
+  submitButton: "w-full flex items-center justify-center py-2.5 rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 cursor-pointer text-white font-bold hover:from-orange-400 hover:to-orange-500 transition-all group",
 };
 
 // src/assets/dummyStyles.js

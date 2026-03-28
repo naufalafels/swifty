@@ -124,7 +124,26 @@ const Cars = () => {
   const [locationRequested, setLocationRequested] = useState(false);
 
   const [locationQuery, setLocationQuery] = useState("");
+  const [showTypesDropdown, setShowTypesDropdown] = useState(false);
+  const [showSeatsDropdown, setShowSeatsDropdown] = useState(false);
   const searchBoxRef = useRef(null);
+
+  const typesDropdownRef = useRef(null);
+  const seatsDropdownRef = useRef(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (typesDropdownRef.current && !typesDropdownRef.current.contains(e.target)) {
+        setShowTypesDropdown(false);
+      }
+      if (seatsDropdownRef.current && !seatsDropdownRef.current.contains(e.target)) {
+        setShowSeatsDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const abortControllerRef = useRef(null);
   const base = import.meta.env.VITE_API_URL || "http://localhost:7889";
@@ -883,52 +902,106 @@ className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orang
           )}
 
           <div className="mt-4 bg-white border border-orange-200 rounded-xl p-4 shadow-sm">
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Car Types */}
-              <div className="flex-1">
-                <h4 className="text-lg font-semibold text-slate-800 mb-3">Car Types</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                  {DEFAULT_TYPES.map((t) => (
-                    <label
-                      key={t}
-                      className="flex items-center gap-2 text-sm bg-orange-50/50 border border-orange-100 p-3 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer min-w-0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!!selectedTypes[t]}
-                        onChange={() => toggleType(t)}
-                        className="w-4 h-4 accent-orange-500 flex-shrink-0"
-                      />
-                      <span className="text-slate-700 truncate">{t}</span>
-                    </label>
-                  ))}
-                </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Car Types Dropdown */}
+              <div className="relative flex-1" ref={typesDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTypesDropdown((prev) => !prev);
+                    setShowSeatsDropdown(false);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-orange-50/50 border border-orange-200 rounded-xl text-sm text-slate-700 hover:border-orange-400 transition-colors"
+                >
+                  <span className="font-semibold text-slate-800">
+                    Car Types
+                    {activeTypes.length > 0 && (
+                      <span className="ml-2 px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full">
+                        {activeTypes.length}
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-slate-400 transition-transform ${showTypesDropdown ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showTypesDropdown && (
+                  <div className="absolute z-30 top-full left-0 right-0 mt-2 bg-white border border-orange-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    <div className="p-2 space-y-1">
+                      {DEFAULT_TYPES.map((t) => (
+                        <label
+                          key={t}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 transition-colors cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!selectedTypes[t]}
+                            onChange={() => toggleType(t)}
+                            className="w-4 h-4 accent-orange-500 flex-shrink-0"
+                          />
+                          <span className="text-sm text-slate-700">{t}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Vertical divider */}
-              <div className="hidden md:block w-px bg-orange-200 self-stretch" />
+              <div className="hidden sm:block w-px bg-orange-200 self-stretch" />
               {/* Horizontal divider (mobile) */}
-              <hr className="md:hidden border-orange-200" />
+              <hr className="sm:hidden border-orange-200" />
 
-              {/* Seat Numbers */}
-              <div className="flex-1">
-                <h4 className="text-lg font-semibold text-slate-800 mb-3">Seat Numbers</h4>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  {DEFAULT_SEATS.map((s) => (
-                    <label
-                      key={s}
-                      className="flex items-center gap-2 text-sm bg-orange-50/50 border border-orange-100 p-3 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!!selectedSeats[s]}
-                        onChange={() => toggleSeat(s)}
-                        className="w-4 h-4 accent-orange-500"
-                      />
-                      <span className="text-slate-700">{s} Seats</span>
-                    </label>
-                  ))}
-                </div>
+              {/* Seat Numbers Dropdown */}
+              <div className="relative flex-1" ref={seatsDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSeatsDropdown((prev) => !prev);
+                    setShowTypesDropdown(false);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-orange-50/50 border border-orange-200 rounded-xl text-sm text-slate-700 hover:border-orange-400 transition-colors"
+                >
+                  <span className="font-semibold text-slate-800">
+                    Seat Numbers
+                    {activeSeats.length > 0 && (
+                      <span className="ml-2 px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full">
+                        {activeSeats.length}
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-slate-400 transition-transform ${showSeatsDropdown ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {showSeatsDropdown && (
+                  <div className="absolute z-30 top-full left-0 right-0 mt-2 bg-white border border-orange-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    <div className="p-2 space-y-1">
+                      {DEFAULT_SEATS.map((s) => (
+                        <label
+                          key={s}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-orange-50 transition-colors cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!selectedSeats[s]}
+                            onChange={() => toggleSeat(s)}
+                            className="w-4 h-4 accent-orange-500"
+                          />
+                          <span className="text-sm text-slate-700">{s} Seats</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

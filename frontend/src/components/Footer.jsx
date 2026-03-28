@@ -2,10 +2,15 @@ import React from 'react'
 import { footerStyles as styles } from '../assets/dummyStyles'
 import { Link } from 'react-router-dom'
 import logo from '../assets/swifty-logo.png'
-import { FaPhone, FaEnvelope, FaFacebookF, FaInstagram, FaLinkedinIn, FaMapMarkedAlt, FaTwitter, FaYoutube } from 'react-icons/fa'
+import { FaPhone, FaEnvelope, FaFacebookF, FaInstagram, FaLinkedinIn, FaMapMarkedAlt, FaTwitter, FaYoutube, FaCar } from 'react-icons/fa'
 import { GiCarKey } from 'react-icons/gi'
+import * as authService from '../utils/authService'
 
 const Footer = () => {
+  // Check if user is logged in and is a host
+  const user = authService.getCurrentUser?.();
+  const isHost = Array.isArray(user?.roles) && user.roles.includes('host');
+
   return (
     <footer className={styles.container}>
         <div className={styles.topElements}>
@@ -50,7 +55,7 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* QUICK LINKS — FIX: use <Link> instead of <a href> for SPA routing */}
+                {/* QUICK LINKS — expanded with more routes */}
                 <nav aria-label="Quick links">
                     <h3 className={styles.sectionTitle}>
                         Quick Links
@@ -61,6 +66,8 @@ const Footer = () => {
                             { label: 'Home', to: '/' },
                             { label: 'Cars', to: '/cars' },
                             { label: 'Contact Us', to: '/contact' },
+                            { label: 'My Bookings', to: '/bookings' },
+                            { label: 'My Profile', to: '/profile' },
                         ].map((link, i) => (
                             <li key={i}>
                                 <Link
@@ -83,7 +90,6 @@ const Footer = () => {
                     </h3>
 
                     <ul className={styles.contactList}>
-                        {/* FIX: was styles.contactList on <li>, should be styles.contactItem */}
                         <li className={styles.contactItem}>
                             <FaMapMarkedAlt className={styles.contactIcon} />
                             <span>Bayan Baru, 11950, Pulau Pinang, Malaysia </span>
@@ -110,7 +116,7 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* NEWSLETTER */}
+                {/* NEWSLETTER + BECOME A HOST / HOST CENTRE */}
                 <div>
                     <h3 className={styles.sectionTitle}>
                         Newsletter
@@ -133,6 +139,15 @@ const Footer = () => {
                             Subscribe Now
                         </button>
                     </form>
+
+                    {/* Dynamic: "Host Centre" (blue) if host, "Become a Host" (blue) if not */}
+                    <Link
+                        to={isHost ? "/host/dashboard" : "/host/onboard"}
+                        className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg transition-all duration-300 transform hover:-translate-y-1 text-sm sm:text-base border border-sky-500 hover:border-sky-600"
+                    >
+                        <FaCar className="text-lg" />
+                        {isHost ? "Host Centre" : "Become a Host"}
+                    </Link>
                 </div>
             </div>
 

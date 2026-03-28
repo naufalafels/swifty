@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft, FaCheckCircle, FaChevronDown, FaImage, FaList, FaRocket } from "react-icons/fa";
 import { createHostCar } from "../services/hostService";
+import { validateFile } from '../utils/fileValidation';
 import { toast } from "react-toastify";
 
 const HostAddCars = () => {
@@ -43,9 +44,16 @@ const HostAddCars = () => {
   const next = () => setStep(2);
   const prev = () => setStep(1);
 
-  const handleFile = (e) => {
+    const handleFile = (e) => {
     const file = e.target.files?.[0];
-    setCar((c) => ({ ...c, image: file || null }));
+    if (!file) return;
+    const check = validateFile(file, 'carImage');
+    if (!check.valid) {
+      toast.warn(check.message);
+      e.target.value = '';
+      return;
+    }
+    setCar((c) => ({ ...c, image: file }));
   };
 
   const publish = async () => {
@@ -247,7 +255,7 @@ const HostAddCars = () => {
                 <label className="text-sm text-slate-200">Vehicle image
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={handleFile}
                     className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
                     required

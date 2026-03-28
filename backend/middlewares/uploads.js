@@ -5,6 +5,12 @@ import fs from 'fs';
 const uploadDir = path.join(process.cwd(), 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
+const ALLOWED_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+];
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDir)
@@ -18,8 +24,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null,true);
-    else cb(new Error('Only images file are allowed'), false);
+    if (ALLOWED_MIMES.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error(`Invalid file type "${file.mimetype}". Allowed: JPEG, PNG, WEBP. Max size: 5MB.`), false);
+    }
 };
 
 export const uploads = multer({

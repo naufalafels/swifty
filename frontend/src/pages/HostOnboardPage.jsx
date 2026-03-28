@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { FaCheckCircle, FaChevronLeft, FaChevronRight, FaRocket, FaList, FaCarSide, FaMapMarkerAlt, FaGlobe, FaInfoCircle, FaImage } from 'react-icons/fa';
 import * as authService from '../utils/authService';
+import { validateFile } from '../utils/fileValidation';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { LoadScript, StandaloneSearchBox } from '@react-google-maps/api';
@@ -254,11 +255,16 @@ const HostOnboardPage = () => {
   };
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setVehicle({ ...vehicle, image: file });
-      setImagePreview(URL.createObjectURL(file));
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const check = validateFile(file, 'carImage');
+    if (!check.valid) {
+      toast.warn(check.message);
+      e.target.value = '';
+      return;
     }
+    setVehicle({ ...vehicle, image: file });
+    setImagePreview(URL.createObjectURL(file));
   };
 
   return (
@@ -555,7 +561,7 @@ const HostOnboardPage = () => {
               <label className="text-sm text-slate-200">Vehicle image
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   onChange={handleImageChange}
                   className="w-full mt-1 p-2 rounded bg-slate-800 border border-slate-700 text-white"
                   required

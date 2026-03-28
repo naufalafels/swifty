@@ -19,6 +19,8 @@ import {
 const router = express.Router();
 
 // Multer storage for host car images (reuse car-images folder)
+const CAR_IMAGE_ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
+
 const carStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(process.cwd(), "uploads", "car-images");
@@ -31,7 +33,17 @@ const carStorage = multer.diskStorage({
     cb(null, name);
   },
 });
-const uploadCarImage = multer({ storage: carStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadCarImage = multer({
+  storage: carStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (CAR_IMAGE_ALLOWED_MIMES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type "${file.mimetype}". Allowed: JPEG, PNG, WEBP. Max size: 5MB.`), false);
+    }
+  },
+});
 
 // All host routes require auth + host role
 router.use(authMiddleware, requireRoles(["host", "admin"]));

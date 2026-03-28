@@ -23,7 +23,8 @@ import {
   FaComments,
   FaPaperPlane,
   FaTimes,
-  FaFileContract
+  FaFileContract,
+  FaLock
 } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -1370,7 +1371,15 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   <p className="text-xs text-gray-400 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
                 </div>
 
-                <div className="flex flex-col justify-end h-full">
+                                <div className="flex flex-col justify-end h-full gap-3">
+                  {/* ── Secure payment trust badge ── */}
+                  <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <FaLock className="text-emerald-500 text-sm" />
+                    <span className="text-xs font-semibold text-emerald-700">
+                      Secured by Xendit
+                    </span>
+                  </div>
+
                   <button type="submit" disabled={submitting} className={carDetailStyles.submitButton}>
                     <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
                     <span>{submitting ? "Redirecting to payment..." : "Pay & Confirm Booking"}</span>

@@ -4,20 +4,14 @@ import { generateUploadUrl } from '../services/s3Service.js';  // NEW
 // NEW: Custom storage for S3 signed URLs
 const storage = multer.memoryStorage();  // Store in memory, then upload to S3
 
-const KYC_ALLOWED_MIMES = [
-  'image/jpeg',
-  'image/png',
-  'application/pdf',
-];
-
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },  // 5MB limit
   fileFilter: (req, file, cb) => {
-    if (KYC_ALLOWED_MIMES.includes(file.mimetype)) {
+    if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
-      cb(new Error(`Invalid file type "${file.mimetype}". Allowed: JPEG, PNG, PDF. Max size: 5MB.`), false);
+      cb(new Error('Only images allowed'), false);
     }
   },
 });

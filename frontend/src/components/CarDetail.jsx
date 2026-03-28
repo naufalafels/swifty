@@ -26,7 +26,6 @@ import {
   FaFileContract,
   FaLock
 } from "react-icons/fa";
-import { validateFile } from '../utils/fileValidation';
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import api from "../utils/api";
@@ -1250,19 +1249,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         <div className={carDetailStyles.inputIcon}><FaImage /></div>
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/webp"
+                          accept="image/*"
                           name="frontImage"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const check = validateFile(file, 'kyc');
-                            if (!check.valid) {
-                              toast.warn(check.message);
-                              e.target.value = '';
-                              return;
-                            }
-                            setFrontFile(file);
-                          }}
+                          onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
                           onFocus={() => setActiveField("frontImage")}
                           onBlur={() => setActiveField(null)}
                           className={carDetailStyles.textInputField}
@@ -1275,19 +1264,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         <div className={carDetailStyles.inputIcon}><FaImage /></div>
                         <input
                           type="file"
-                          accept="image/jpeg,image/png,image/webp"
+                          accept="image/*"
                           name="backImage"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const check = validateFile(file, 'kyc');
-                            if (!check.valid) {
-                              toast.warn(check.message);
-                              e.target.value = '';
-                              return;
-                            }
-                            setBackFile(file);
-                          }}
+                          onChange={(e) => setBackFile(e.target.files?.[0] || null)}
                           onFocus={() => setActiveField("backImage")}
                           onBlur={() => setActiveField(null)}
                           className={carDetailStyles.textInputField}

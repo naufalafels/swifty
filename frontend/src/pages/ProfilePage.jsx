@@ -26,7 +26,6 @@ import * as authService from '../utils/authService';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import Navbar from '../components/Navbar';
-import { validateFile } from '../utils/fileValidation';
 
 const Badge = ({ children, tone = 'slate' }) => {
   const tones = {
@@ -744,17 +743,7 @@ const ProfilePage = () => {
                         type="file"
                         accept=".jpeg,.jpg,.png,.pdf"
                         className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const check = validateFile(file, 'kyc');
-                          if (!check.valid) {
-                            toast.warn(check.message);
-                            e.target.value = '';
-                            return;
-                          }
-                          setKycForm({ ...kycForm, frontImage: file });
-                        }}
+                        onChange={(e) => setKycForm({ ...kycForm, frontImage: e.target.files?.[0] || null })}
                       />
                     </label>
                     <PreviewThumb file={kycForm.frontImage} />
@@ -770,17 +759,7 @@ const ProfilePage = () => {
                         type="file"
                         accept=".jpeg,.jpg,.png,.pdf"
                         className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const check = validateFile(file, 'kyc');
-                          if (!check.valid) {
-                            toast.warn(check.message);
-                            e.target.value = '';
-                            return;
-                          }
-                          setKycForm({ ...kycForm, backImage: file });
-                        }}
+                        onChange={(e) => setKycForm({ ...kycForm, backImage: e.target.files?.[0] || null })}
                       />
                     </label>
                     <PreviewThumb file={kycForm.backImage} />
@@ -837,17 +816,7 @@ const ProfilePage = () => {
                       type="file"
                       accept=".jpeg,.jpg,.png,.pdf"
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const check = validateFile(file, 'kyc');
-                        if (!check.valid) {
-                          toast.warn(check.message);
-                          e.target.value = '';
-                          return;
-                        }
-                        setKycForm({ ...kycForm, frontImage: file });
-                      }}
+                      onChange={(e) => setKycForm({ ...kycForm, frontImage: e.target.files?.[0] || null })}
                     />
                   </label>
                   <PreviewThumb file={kycForm.frontImage} />
@@ -863,17 +832,7 @@ const ProfilePage = () => {
                       type="file"
                       accept=".jpeg,.jpg,.png,.pdf"
                       className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const check = validateFile(file, 'kyc');
-                        if (!check.valid) {
-                          toast.warn(check.message);
-                          e.target.value = '';
-                          return;
-                        }
-                        setKycForm({ ...kycForm, backImage: file });
-                      }}
+                      onChange={(e) => setKycForm({ ...kycForm, backImage: e.target.files?.[0] || null })}
                     />
                   </label>
                   <PreviewThumb file={kycForm.backImage} />
@@ -1092,22 +1051,7 @@ const ProfilePage = () => {
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
                     <FaImage /> Choose image
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const check = validateFile(file, 'profilePic');
-                        if (!check.valid) {
-                          toast.warn(check.message);
-                          e.target.value = '';
-                          return;
-                        }
-                        setEditExtras({ ...editExtras, profilePic: file });
-                      }}
-                    />
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setEditExtras({ ...editExtras, profilePic: e.target.files?.[0] || null })} />
                   </label>
                   {editExtras.profilePic ? (
                     <PreviewThumb file={editExtras.profilePic} />

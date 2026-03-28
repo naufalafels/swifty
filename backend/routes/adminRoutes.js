@@ -27,25 +27,14 @@ import {
   reviewKyc
 } from '../controllers/adminVerificationController.js';
 import { getTerms, updateTerms, getPublicTerms } from '../controllers/adminLegalController.js';
-import { getEligibleRefunds, processRefund } from '../controllers/adminRefundController.js';
-import { listInvoices, getInvoiceDetail } from '../controllers/adminInvoiceController.js';
-import { getAdminProfile, updateAdminProfile, changeAdminPassword } from '../controllers/adminProfileController.js';
+import { getEligibleRefunds, processRefund } from '../controllers/adminRefundController.js'; // FIX: Added getEligibleRefunds import
+import { listInvoices, getInvoiceDetail } from '../controllers/adminInvoiceController.js'; // NEW: Invoices
+import { getAdminProfile, updateAdminProfile, changeAdminPassword } from '../controllers/adminProfileController.js'; // NEW: Admin Profile
 import { downloadReport } from '../controllers/adminReportsController.js';
 import authMiddleware from '../middlewares/auth.js';
 import requireCompanyAdmin from '../middlewares/requireCompanyAdmin.js';
 
 const router = express.Router();
-
-// Shared file filter for image uploads
-const IMAGE_ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'];
-
-const imageFileFilter = (req, file, cb) => {
-  if (IMAGE_ALLOWED_MIMES.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error(`Invalid file type "${file.mimetype}". Allowed: JPEG, PNG, WEBP.`), false);
-  }
-};
 
 // Multer storage for company logos
 const logoStorage = multer.diskStorage({
@@ -60,7 +49,7 @@ const logoStorage = multer.diskStorage({
     cb(null, name);
   }
 });
-const uploadLogo = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter: imageFileFilter });
+const uploadLogo = multer({ storage: logoStorage, limits: { fileSize: 2 * 1024 * 1024 } });
 
 // Multer storage for car images
 const carStorage = multer.diskStorage({
@@ -75,9 +64,9 @@ const carStorage = multer.diskStorage({
     cb(null, name);
   }
 });
-const uploadCarImage = multer({ storage: carStorage, limits: { fileSize: 5 * 1024 * 1024 }, fileFilter: imageFileFilter });
+const uploadCarImage = multer({ storage: carStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Multer storage for admin avatars
+// Multer storage for admin avatars (NEW)
 const avatarStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = path.join(process.cwd(), 'uploads', 'admin-avatars');
@@ -90,7 +79,7 @@ const avatarStorage = multer.diskStorage({
     cb(null, name);
   }
 });
-const uploadAvatar = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 }, fileFilter: imageFileFilter });
+const uploadAvatar = multer({ storage: avatarStorage, limits: { fileSize: 2 * 1024 * 1024 } });
 
 // Public signup (accepts logo file)
 router.post('/signup', uploadLogo.single('logo'), signupCompany);
@@ -150,11 +139,11 @@ router.get('/kyc', getKycList);
 router.post('/kyc/:id/approve', approveKyc);
 router.post('/kyc/:id/reject', rejectKyc);
 
-// Refunds
-router.get('/refunds/eligible', getEligibleRefunds);
+// Refunds — FIX: Added the missing GET route
+router.get('/refunds/eligible', getEligibleRefunds);  // THIS WAS MISSING — caused "Failed to load refund data"
 router.post('/refunds', processRefund);
 
-// Invoices
+// Invoices (NEW)
 router.get('/invoices', listInvoices);
 router.get('/invoices/:invoiceId', getInvoiceDetail);
 

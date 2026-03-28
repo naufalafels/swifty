@@ -1,0 +1,123 @@
+/* ═══════════════════════════════════════════════════
+   Airbnb-style calendar overrides for react-date-range
+   ═══════════════════════════════════════════════════ */
+
+.swifty-calendar .rdrCalendarWrapper {
+  background: transparent !important;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.swifty-calendar .rdrMonthAndYearWrapper {
+  padding-top: 4px;
+}
+
+.swifty-calendar .rdrMonthAndYearPickers select {
+  color: #f8fafc;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.swifty-calendar .rdrMonthName {
+  color: #f8fafc;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+}
+
+.swifty-calendar .rdrWeekDay {
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.swifty-calendar .rdrDay {
+  color: #e2e8f0;
+}
+
+.swifty-calendar .rdrDayNumber span {
+  color: #e2e8f0 !important;
+  font-weight: 500;
+}
+
+.swifty-calendar .rdrDayPassive .rdrDayNumber span {
+  color: #475569 !important;
+}
+
+.swifty-calendar .rdrDayDisabled {
+  background-color: transparent !important;
+}
+
+.swifty-calendar .rdrDayDisabled .rdrDayNumber span {
+  color: #475569 !important;
+  text-decoration: line-through;
+}
+
+/* Selected range start/end — round pill */
+.swifty-calendar .rdrStartEdge,
+.swifty-calendar .rdrEndEdge {
+  background: #f97316 !important;
+  border-radius: 50% !important;
+}
+
+/* In-between range days */
+.swifty-calendar .rdrInRange {
+  background: rgba(249, 115, 22, 0.15) !important;
+}
+
+.swifty-calendar .rdrDayStartPreview,
+.swifty-calendar .rdrDayEndPreview,
+.swifty-calendar .rdrDayInPreview {
+  border-color: rgba(249, 115, 22, 0.4) !important;
+}
+
+/* Hover */
+.swifty-calendar .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span {
+  background: rgba(249, 115, 22, 0.2);
+  border-radius: 50%;
+}
+
+/* Today indicator */
+.swifty-calendar .rdrDayToday .rdrDayNumber span::after {
+  background: #f97316 !important;
+  bottom: 2px;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+/* Navigation arrows */
+.swifty-calendar .rdrNextPrevButton {
+  background: #1e293b !important;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+
+.swifty-calendar .rdrNextPrevButton:hover {
+  background: #334155 !important;
+}
+
+.swifty-calendar .rdrPprevButton i {
+  border-color: transparent #94a3b8 transparent transparent !important;
+}
+
+.swifty-calendar .rdrNextButton i {
+  border-color: transparent transparent transparent #94a3b8 !important;
+}
+
+/* Two-month responsive: stack on mobile */
+.swifty-calendar .rdrMonths {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .swifty-calendar .rdrMonth {
+    width: 100% !important;
+  }
+}

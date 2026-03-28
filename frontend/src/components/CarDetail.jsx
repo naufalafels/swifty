@@ -38,6 +38,7 @@ import { DateRange } from "react-date-range";
 import { addDays, eachDayOfInterval, format } from "date-fns";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
+import "../styles/calendar-overrides.css";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:7889";
 const SOCKET_URL =
@@ -806,143 +807,183 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
           <FaArrowLeft className={carDetailStyles.backButtonIcon} />
         </button>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            SECTION 1: Car Details (left) + Sticky Date Picker (right)
+                {/* ═══════════════════════════════════════════════════════════════
+            SECTION 1: Single column — no more suffocating 2-col layout
             ═══════════════════════════════════════════════════════════════ */}
-        <div className={carDetailStyles.mainLayout}>
-          {/* ── LEFT COLUMN: car info (unchanged) ── */}
-          <div className={carDetailStyles.leftColumn}>
-            <div className={carDetailStyles.imageCarousel}>
-              <img
-                src={buildImageSrc(carImages[currentImage] ?? car.image)}
-                alt={car.name}
-                className={carDetailStyles.carImage}
-                onError={(e) => handleImageError(e)}
-              />
-              {(carImages.length > 0 || (car.image && car.image !== "")) && (
-                <div className={carDetailStyles.carouselIndicators}>
-                  {(carImages.length > 0 ? carImages : [car.image]).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentImage(idx)}
-                      aria-label={`Show image ${idx + 1}`}
-                      className={carDetailStyles.carouselIndicator(idx === currentImage)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <h1 className={carDetailStyles.carName}>{car.make}</h1>
-            <p className={carDetailStyles.carPrice}>
-              MYR&nbsp;{price} <span className={carDetailStyles.pricePerDay}>/ day</span>
-            </p>
-
-            {companyName ? (
-              <div className="mt-3 mb-3 p-3 bg-gray-800 rounded-md border border-gray-700">
-                <div className="flex items-start gap-3">
-                  <FaBuilding className="text-orange-400 mt-1" />
-                  <div>
-                    <div className="text-sm font-semibold text-gray-100">{companyName}</div>
-                    {companyAddress ? (
-                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                        <FaMapMarkerAlt className="text-gray-500" />
-                        <span>{companyAddress}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+        <div className="pt-12 max-w-4xl mx-auto space-y-6">
+          {/* ── Image carousel ── */}
+          <div className={carDetailStyles.imageCarousel}>
+            <img
+              src={buildImageSrc(carImages[currentImage] ?? car.image)}
+              alt={car.name}
+              className={carDetailStyles.carImage}
+              onError={(e) => handleImageError(e)}
+            />
+            {(carImages.length > 0 || (car.image && car.image !== "")) && (
+              <div className={carDetailStyles.carouselIndicators}>
+                {(carImages.length > 0 ? carImages : [car.image]).map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImage(idx)}
+                    aria-label={`Show image ${idx + 1}`}
+                    className={carDetailStyles.carouselIndicator(idx === currentImage)}
+                  />
+                ))}
               </div>
-            ) : null}
-
-            <div className={carDetailStyles.specsGrid}>
-              {[
-                { Icon: FaUserFriends, label: "Seats", value: car.seats ?? "—", color: "text-orange-400" },
-                { Icon: FaGasPump, label: "Fuel", value: car.fuel ?? car.fuelType ?? "—", color: "text-green-400" },
-                { Icon: FaTachometerAlt, label: "Mileage", value: car.mileage ? `${car.mileage}\u00A0kmpl` : "—", color: "text-yellow-400" },
-                { Icon: FaCheckCircle, label: "Transmission", value: transmissionLabel, color: "text-purple-400" },
-              ].map((spec, i) => (
-                <div key={i} className={carDetailStyles.specCard}>
-                  <spec.Icon className={`${spec.color} ${carDetailStyles.specIcon}`} />
-                  <p className={carDetailStyles.aboutText + " " + carDetailStyles.specLabel}>{spec.label}</p>
-                  <p className={carDetailStyles.specValue}>{spec.value}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className={carDetailStyles.aboutSection}>
-              <h2 className={carDetailStyles.aboutTitle}>About this car</h2>
-              <p className={carDetailStyles.aboutText}>
-                Experience luxury in the {car.name}. With its {transmissionLabel} transmission and seating for {car.seats ?? "—"}, every journey is exceptional.
-              </p>
-              <p className={carDetailStyles.aboutText}>
-                {car.description ?? "This car combines performance and comfort for an unforgettable drive."}
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Free cancellation</span></div>
-                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
-                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
-                <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* ── RIGHT COLUMN: ONLY date picker + price summary + CTA (sticky) ── */}
-          <div className={carDetailStyles.rightColumn}>
-            <div className={carDetailStyles.bookingCard}>
-              <h2 className={carDetailStyles.bookingTitle}>
-                Reserve <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500">Your Drive</span>
+          {/* ── Car Name ── */}
+          <h1 className={carDetailStyles.carName}>{car.make}</h1>
+
+          {/* ── Price ── */}
+          <p className={carDetailStyles.carPrice}>
+            MYR&nbsp;{price} <span className={carDetailStyles.pricePerDay}>/ day</span>
+          </p>
+
+          {/* ══════════════════════════════════════════════════════════
+              "Reserve Your Drive" — NOW here, after Name + Price,
+              BEFORE company info. Airbnb-style date picker.
+              ══════════════════════════════════════════════════════════ */}
+          <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/90 backdrop-blur-sm p-5 sm:p-7 rounded-2xl border border-gray-700/60 shadow-2xl space-y-5">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">
+                Reserve <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400">Your Drive</span>
               </h2>
-              <p className={carDetailStyles.bookingSubtitle}>Pick your dates to get started</p>
+              <p className="text-gray-400 text-sm mt-1">Pick your dates to get started</p>
+            </div>
 
-              {/* Date picker */}
-              <div>
-                <div className="flex items-center gap-2 mb-1 text-sm text-gray-200">
-                  <FaCalendarAlt /> <span>Select dates</span>
-                </div>
-                <DateRange
-                  ranges={range}
-                  onChange={onRangeChange}
-                  minDate={new Date()}
-                  rangeColors={["#f97316"]}
-                  direction="horizontal"
-                  months={1}
-                  showDateDisplay={false}
-                  disabledDates={disabledDates}
-                  dayContentRenderer={(date) => {
-                    return (
-                      <div style={{ position: "relative" }}>
-                        <span>{date.getDate()}</span>
-                      </div>
-                    );
-                  }}
-                />
+            {/* ── Airbnb-style check-in / check-out display ── */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-900/60 border border-gray-600 rounded-xl px-4 py-3 hover:border-orange-400 transition-colors">
+                <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5">Check-in</p>
+                <p className="text-white font-medium text-sm">
+                  {formData.pickupDate
+                    ? format(new Date(formData.pickupDate), "EEE, MMM d")
+                    : <span className="text-gray-500">Select date</span>
+                  }
+                </p>
               </div>
+              <div className="bg-gray-900/60 border border-gray-600 rounded-xl px-4 py-3 hover:border-orange-400 transition-colors">
+                <p className="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-0.5">Check-out</p>
+                <p className="text-white font-medium text-sm">
+                  {formData.returnDate
+                    ? format(new Date(formData.returnDate), "EEE, MMM d")
+                    : <span className="text-gray-500">Select date</span>
+                  }
+                </p>
+              </div>
+            </div>
 
-              {/* Compact price summary */}
-              <div className={carDetailStyles.priceBreakdown}>
-                <div className={carDetailStyles.priceRow}>
-                  <span>Rate/day {(Number(fp.weekendMultiplier) > 1 || (fp.peakMultipliers && fp.peakMultipliers.length > 0)) ? "(avg)" : ""}</span>
-                  <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price}</span>
-                </div>
-                {formData.pickupDate && formData.returnDate && (
-                  <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
+            {/* ── Duration pill ── */}
+            {formData.pickupDate && formData.returnDate && (
+              <div className="flex items-center justify-center">
+                <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300 text-sm font-medium">
+                  <FaCalendarAlt className="text-xs" />
+                  {days} {days === 1 ? "day" : "days"}
+                </span>
+              </div>
+            )}
+
+            {/* ── Calendar ── */}
+            <div className="bg-gray-900/50 rounded-xl p-3 border border-gray-700/40">
+              <DateRange
+                ranges={range}
+                onChange={onRangeChange}
+                minDate={new Date()}
+                rangeColors={["#f97316"]}
+                direction="horizontal"
+                months={2}
+                showDateDisplay={false}
+                disabledDates={disabledDates}
+                className="swifty-calendar"
+                dayContentRenderer={(date) => (
+                  <div style={{ position: "relative" }}>
+                    <span>{date.getDate()}</span>
+                  </div>
                 )}
-                <div className={carDetailStyles.priceRow}><span>Insurance ({selectedPlan.label})</span><span>MYR&nbsp;{insuranceCost}</span></div>
-                <div className={carDetailStyles.priceRow}><span>Deposit (at counter)</span><span className="text-gray-300">MYR&nbsp;{deposit}</span></div>
-                <div className={carDetailStyles.totalRow}><span>Total (to pay now)</span><span>MYR&nbsp;{calculateTotal()}</span></div>
-              </div>
+              />
+            </div>
 
-              {/* Continue to booking form button */}
-              <button
-                type="button"
-                onClick={scrollToBookingForm}
-                className={carDetailStyles.continueButton}
-              >
-                <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
-                <span>Continue to Book</span>
-              </button>
+            {/* ── Price breakdown ── */}
+            <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700/40 space-y-2 text-sm">
+              <div className="flex justify-between text-gray-300">
+                <span>MYR {formData.pickupDate && formData.returnDate ? Math.round(computeTotalRent() / days) : price} × {days} {days === 1 ? "night" : "nights"}</span>
+                <span>MYR&nbsp;{formData.pickupDate && formData.returnDate ? computeTotalRent() : price}</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span>Insurance ({selectedPlan.label})</span>
+                <span>MYR&nbsp;{insuranceCost}</span>
+              </div>
+              <div className="flex justify-between text-gray-400 text-xs">
+                <span>Deposit (pay at counter)</span>
+                <span>MYR&nbsp;{deposit}</span>
+              </div>
+              <div className="border-t border-gray-600 pt-2 flex justify-between font-bold text-white text-base">
+                <span>Total</span>
+                <span>MYR&nbsp;{calculateTotal()}</span>
+              </div>
+            </div>
+
+            {/* ── CTA ── */}
+            <button
+              type="button"
+              onClick={scrollToBookingForm}
+              className="w-full flex items-center justify-center py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 cursor-pointer text-white font-bold hover:from-amber-500 hover:to-orange-600 transition-all group text-base shadow-lg hover:shadow-orange-500/30 active:scale-[0.98]"
+            >
+              <FaCreditCard className="mr-2 group-hover:scale-110 transition-transform" />
+              <span>Continue to Book</span>
+            </button>
+          </div>
+
+          {/* ── Host's Company Name — NOW AFTER "Reserve Your Drive" ── */}
+          {companyName ? (
+            <div className="p-4 bg-gray-800/60 rounded-xl border border-gray-700/50">
+              <div className="flex items-start gap-3">
+                <FaBuilding className="text-orange-400 mt-1" />
+                <div>
+                  <div className="text-sm font-semibold text-gray-100">{companyName}</div>
+                  {companyAddress ? (
+                    <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                      <FaMapMarkerAlt className="text-gray-500" />
+                      <span>{companyAddress}</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── Specs grid ── */}
+          <div className={carDetailStyles.specsGrid}>
+            {[
+              { Icon: FaUserFriends, label: "Seats", value: car.seats ?? "—", color: "text-orange-400" },
+              { Icon: FaGasPump, label: "Fuel", value: car.fuel ?? car.fuelType ?? "—", color: "text-green-400" },
+              { Icon: FaTachometerAlt, label: "Mileage", value: car.mileage ? `${car.mileage}\u00A0kmpl` : "—", color: "text-yellow-400" },
+              { Icon: FaCheckCircle, label: "Transmission", value: transmissionLabel, color: "text-purple-400" },
+            ].map((spec, i) => (
+              <div key={i} className={carDetailStyles.specCard}>
+                <spec.Icon className={`${spec.color} ${carDetailStyles.specIcon}`} />
+                <p className={carDetailStyles.aboutText + " " + carDetailStyles.specLabel}>{spec.label}</p>
+                <p className={carDetailStyles.specValue}>{spec.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── About this car ── */}
+          <div className={carDetailStyles.aboutSection}>
+            <h2 className={carDetailStyles.aboutTitle}>About this car</h2>
+            <p className={carDetailStyles.aboutText}>
+              Experience luxury in the {car.name}. With its {transmissionLabel} transmission and seating for {car.seats ?? "—"}, every journey is exceptional.
+            </p>
+            <p className={carDetailStyles.aboutText}>
+              {car.description ?? "This car combines performance and comfort for an unforgettable drive."}
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Free cancellation</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
             </div>
           </div>
         </div>

@@ -197,55 +197,66 @@ export const homeCarsStyles = {
 
 // assets/dummyStyles.js
 export const carDetailStyles = {
-  pageContainer: "relative min-h-screen overflow-hidden py-6 px-4 sm:px-6 lg:px-8 bg-black",
+  // ── Page: warm dark instead of pure black ──
+  pageContainer: "relative min-h-screen overflow-hidden py-6 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950",
   contentContainer: "relative z-10 max-w-7xl mx-auto",
-  backButton: "absolute top-1 cursor-pointer left-4 p-2 bg-gray-800 rounded-full shadow hover:shadow-lg z-20 border border-gray-700 hover:bg-gray-700 transition-all",
-  backButtonIcon: "text-orange-400 text-lg",
-  mainLayout: "pt-12 flex flex-col lg:flex-row gap-8",
-  leftColumn: "lg:w-2/3 space-y-6",
-  imageCarousel: "relative rounded-2xl overflow-hidden shadow-lg border border-gray-700",
+  backButton: "absolute top-1 cursor-pointer left-4 p-2 bg-slate-800/80 rounded-full shadow hover:shadow-lg z-20 border border-slate-700 hover:bg-slate-700 transition-all",
+  backButtonIcon: "text-amber-400 text-lg",
+
+  // ── No more 2-col layout — single column is handled in JSX ──
+  // (mainLayout, leftColumn, rightColumn are no longer used)
+
+  imageCarousel: "relative rounded-2xl overflow-hidden shadow-lg border border-slate-700/50",
   carImage: "w-full h-64 sm:h-80 md:h-96 object-cover",
   carouselIndicators: "absolute bottom-4 right-4 flex space-x-2",
-  carouselIndicator: (active) => `w-3 h-3 rounded-full ${active ? 'bg-orange-500' : 'bg-gray-500'}`,
-  carName: "text-2xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-500",
-  carPrice: "text-xl sm:text-2xl md:text-3xl font-bold text-green-400",
-  pricePerDay: "text-base sm:text-lg font-normal text-gray-400",
+  carouselIndicator: (active) => `w-3 h-3 rounded-full transition-all ${active ? 'bg-amber-400 scale-110' : 'bg-slate-500'}`,
+
+  // ── Car name: warm amber gradient ──
+  carName: "text-2xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400",
+
+  // ── Price: a softer green ──
+  carPrice: "text-xl sm:text-2xl md:text-3xl font-bold text-emerald-400",
+  pricePerDay: "text-base sm:text-lg font-normal text-slate-400",
+
+  // ── Specs: lighter cards ──
   specsGrid: "grid grid-cols-2 sm:grid-cols-4 gap-4",
-  specCard: "flex flex-col items-center bg-gray-800/60 backdrop-blur-sm p-3 sm:p-4 rounded-xl border border-gray-700 hover:border-orange-500 transition-all",
+  specCard: "flex flex-col items-center bg-slate-800/40 backdrop-blur-sm p-3 sm:p-4 rounded-xl border border-slate-700/40 hover:border-amber-400/50 hover:bg-slate-800/60 transition-all",
   specIcon: "text-xl sm:text-2xl mb-2",
-  specLabel: "text-xs sm:text-sm text-gray-400",
+  specLabel: "text-xs sm:text-sm text-slate-400",
   specValue: "font-semibold text-base sm:text-lg text-white",
-  aboutSection: "bg-gray-800/60 backdrop-blur-sm p-4 sm:p-6 rounded-xl border border-gray-700 space-y-3",
+
+  // ── About section ──
+  aboutSection: "bg-slate-800/40 backdrop-blur-sm p-4 sm:p-6 rounded-xl border border-slate-700/40 space-y-3",
   aboutTitle: "text-xl sm:text-2xl font-semibold text-white",
-  aboutText: "text-gray-300 text-sm sm:text-base",
+  aboutText: "text-slate-300 text-sm sm:text-base",
 
-  // ── RIGHT COLUMN: now sticky, only holds date picker + mini summary ──
-  rightColumn: "lg:w-1/3 lg:sticky lg:top-24 lg:self-start",
-  bookingCard: "bg-gray-800/70 backdrop-blur-sm p-4 sm:p-6 rounded-2xl border border-gray-700 shadow-xl space-y-4",
-  bookingTitle: "text-2xl sm:text-2xl font-bold text-white",
-  bookingSubtitle: "text-gray-400 text-sm",
+  // ── Booking form card: lighter, warmer ──
+  bookingTitle: "text-xl sm:text-2xl font-bold text-white",
+  bookingSubtitle: "text-slate-400 text-sm",
 
-  // ── "Continue to Book" CTA in the sticky sidebar ──
-  continueButton: "w-full flex items-center justify-center py-3 rounded-xl bg-gradient-to-r from-orange-400 to-orange-500 cursor-pointer text-white font-bold hover:from-orange-500 hover:to-orange-600 transition-all group text-base shadow-lg hover:shadow-orange-500/25",
+  continueButton: "w-full flex items-center justify-center py-3.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 cursor-pointer text-white font-bold hover:from-amber-500 hover:to-orange-600 transition-all group text-base shadow-lg hover:shadow-orange-500/30",
 
-  // ── SECTION 2: full-width booking form below the car details grid ──
-  sectionDivider: "my-10 border-t border-gray-800",
+  sectionDivider: "my-10 border-t border-slate-800/50",
   bookingSection: "max-w-5xl mx-auto",
-  bookingFormCard: "bg-gray-800/70 backdrop-blur-sm p-6 sm:p-8 rounded-2xl border border-gray-700 shadow-xl space-y-6",
+  bookingFormCard: "bg-slate-800/50 backdrop-blur-sm p-6 sm:p-8 rounded-2xl border border-slate-700/40 shadow-xl space-y-6",
   bookingFormGrid: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5",
 
-  // ── shared form styles (unchanged) ──
+  // ── Form fields ──
   form: "space-y-5",
   grid2: "grid grid-cols-2 gap-3",
-  formLabel: "text-xs sm:text-sm text-gray-300 mb-1",
-  inputContainer: (active) => `relative rounded-lg border transition-all ${active ? 'border-orange-500' : 'border-gray-600'}`,
-  inputIcon: "absolute left-3 top-2.5 text-orange-400",
-  inputField: "w-full pl-10 pr-2 py-1.5 sm:py-2 bg-transparent text-gray-200 text-sm sm:text-base outline-none",
-  textInputField: "w-full pl-10 pr-3 py-1.5 sm:py-2 bg-transparent text-gray-200 text-sm sm:text-base outline-none",
-  priceBreakdown: "bg-gray-700/40 p-3 rounded-lg text-sm space-y-1 border border-gray-600",
-  priceRow: "flex justify-between text-gray-300",
-  totalRow: "border-t border-gray-600 pt-1 flex justify-between font-semibold text-white",
-  submitButton: "w-full flex items-center justify-center py-2.5 rounded-lg bg-gradient-to-r from-orange-400 to-orange-500 cursor-pointer text-white font-bold hover:from-orange-400 hover:to-orange-500 transition-all group",
+  formLabel: "text-xs sm:text-sm text-slate-300 mb-1",
+  inputContainer: (active) => `relative rounded-xl border transition-all ${active ? 'border-amber-400 ring-1 ring-amber-400/30' : 'border-slate-600'}`,
+  inputIcon: "absolute left-3 top-2.5 text-amber-400",
+  inputField: "w-full pl-10 pr-2 py-1.5 sm:py-2 bg-transparent text-slate-200 text-sm sm:text-base outline-none",
+  textInputField: "w-full pl-10 pr-3 py-1.5 sm:py-2 bg-transparent text-slate-200 text-sm sm:text-base outline-none",
+
+  // ── Price breakdown ──
+  priceBreakdown: "bg-slate-800/40 p-3 rounded-xl text-sm space-y-1 border border-slate-700/40",
+  priceRow: "flex justify-between text-slate-300",
+  totalRow: "border-t border-slate-600 pt-1 flex justify-between font-semibold text-white",
+
+  // ── Submit button ──
+  submitButton: "w-full flex items-center justify-center py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 cursor-pointer text-white font-bold hover:from-amber-500 hover:to-orange-600 transition-all group shadow-lg hover:shadow-orange-500/25",
 };
 
 // src/assets/dummyStyles.js

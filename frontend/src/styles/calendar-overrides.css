@@ -8,7 +8,7 @@
 .swifty-calendar-wrapper {
   background: rgba(15, 23, 42, 0.95);
   border-radius: 12px;
-  padding: 16px;
+  padding: 24px 16px;
 }
 
 /* ── Base calendar — kill ALL white backgrounds from the library theme ── */
@@ -24,10 +24,12 @@
   width: 100%;
 }
 
+/* ── Month & year header — relative container so arrows can float ── */
 .swifty-calendar .rdrMonthAndYearWrapper {
   background: transparent !important;
-  padding: 0 8px 12px;
+  padding: 8px 8px 16px;
   height: auto;
+  position: relative;
 }
 
 .swifty-calendar .rdrMonthAndYearPickers {
@@ -43,24 +45,47 @@
   letter-spacing: 0.02em;
 }
 
-/* ── Navigation arrows ── */
+/* ══════════════════════════════════════════════════
+   FLOATING NAVIGATION ARROWS
+   Positioned outside the calendar grid edges so they
+   hover beside the months instead of sitting on top.
+   ══════════════════════════════════════════════════ */
+
 .swifty-calendar .rdrNextPrevButton {
-  background: rgba(30, 41, 59, 0.8) !important;
+  background: rgba(30, 41, 59, 0.85) !important;
   border: 1px solid #475569;
   border-radius: 50%;
   width: 32px;
   height: 32px;
-  margin: 0 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  z-index: 10;
+
+  /* Float the arrows: pull them out of normal flow */
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
+/* ── Left arrow — flush against the left edge ── */
+.swifty-calendar .rdrPprevButton {
+  left: -4px;
+}
+
+/* ── Right arrow — flush against the right edge ── */
+.swifty-calendar .rdrNextButton {
+  right: -4px;
+}
+
+/* ── Hover: glow + lift ── */
 .swifty-calendar .rdrNextPrevButton:hover {
-  background: rgba(51, 65, 85, 0.9) !important;
+  background: rgba(51, 65, 85, 0.95) !important;
   border-color: #f97316;
-  transform: scale(1.05);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.3);
 }
 
 .swifty-calendar .rdrPprevButton i {
@@ -214,7 +239,7 @@
 
 .swifty-calendar .rdrMonth {
   background: transparent !important;
-  padding: 0 8px;
+  padding: 0 8px 8px;
   width: 100%;
   min-width: 0;
 }
@@ -247,6 +272,6 @@
   }
 
   .swifty-calendar-wrapper {
-    padding: 12px 8px;
+    padding: 20px 8px;
   }
 }

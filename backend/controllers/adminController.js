@@ -4,6 +4,7 @@ import User from '../models/userModel.js';
 import Company from '../models/companyModel.js';
 import Car from '../models/carModel.js';
 import Booking from '../models/bookingModel.js';
+import { sendHostApprovalEmail, sendHostRejectionEmail } from '../services/emailService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config();
@@ -598,6 +599,12 @@ export const approveHost = async (req, res) => {
       console.error('Invalid initialCar data for user:', user._id);
     }
     await user.save();
+
+    // Send approval email
+    sendHostApprovalEmail(user.email, user.name).catch(err =>
+      console.error('Host approval email failed:', err)
+    );
+
     res.json({ message: 'Host approved' });
   } catch (err) {
     console.error('approveHost error', err);
@@ -618,6 +625,12 @@ export const rejectHost = async (req, res) => {
     if (!user.notifications) user.notifications = [];
     user.notifications.unshift({ message: `Host Application is Rejected: ${reason || 'Rejected by admin'}`, read: false, createdAt: new Date() });
     await user.save();
+
+    // Send rejection email
+    sendHostRejectionEmail(user.email, user.name, reason).catch(err =>
+      console.error('Host rejection email failed:', err)
+    );
+
     res.json({ message: 'Host rejected' });
   } catch (err) {
     console.error('rejectHost error', err);

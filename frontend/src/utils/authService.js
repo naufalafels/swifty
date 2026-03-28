@@ -104,6 +104,20 @@ export const login = async (credentials) => {
   return data;
 };
 
+export const googleSignIn = async (credential) => {
+  const url = `${API_BASE}/api/auth/google`;
+  const res = await axios.post(url, { credential }, {
+    withCredentials: true,
+    headers: { "Content-Type": "application/json" },
+  });
+  const data = res.data || {};
+  const token = data.accessToken || data.token || null;
+  const user = data.user || null;
+  setAccessToken(token);
+  setCurrentUser(user);
+  return data;
+};
+
 export const register = async (payload) => {
   const url = `${API_BASE}/api/auth/register`;
   const res = await axios.post(url, payload, {

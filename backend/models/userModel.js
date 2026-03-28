@@ -89,7 +89,24 @@ const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
+    // Password is only required for local (email/password) signups
+    password: {
+      type: String,
+      required: function () { return this.authProvider === 'local'; },
+    },
+
+    // Social auth fields
+    authProvider: {
+      type: String,
+      enum: ['local', 'google'],
+      default: 'local',
+    },
+    googleId: { type: String, default: null, sparse: true, unique: true },
+
+    // Email verification
+    emailVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String, default: null },
+    emailVerificationExpires: { type: Date, default: null },
 
     role: {
       type: String,

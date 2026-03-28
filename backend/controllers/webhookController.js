@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import Booking from '../models/bookingModel.js';
 import Car from '../models/carModel.js';
 import { BLOCKING_STATUSES, computePostPaymentStatus, updateCarStatusBasedOnBookings } from './paymentController.js';
+import { sendBookingConfirmation } from '../services/emailService.js';
 
 dotenv.config();
 
@@ -141,6 +142,13 @@ export const xenditWebhookHandler = async (req, res) => {
       existingBooking.xenditPaymentChannel = paymentChannel || '';
       existingBooking.processedWebhookEvents.push(eventKey);
       await existingBooking.save();
+
+      // Send booking confirmation email with invoice
+      if (existingBooking.email) {
+        sendBookingConfirmation(existingBooking.email, existingBooking).catch(err =>
+          console.error('Booking confirmation email failed:', err)
+        );
+      }
 
       // Push to car's bookings array and update car status
       const carId = existingBooking.car?.id;

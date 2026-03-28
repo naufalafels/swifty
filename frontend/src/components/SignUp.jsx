@@ -4,8 +4,9 @@ import { FaArrowLeft, FaCheck, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaUser } f
 import { useNavigate } from 'react-router-dom'
 import logo from "../assets/swifty-logo.png"
 import { ToastContainer, toast } from "react-toastify"
-import api from '../utils/api'; // central axios instance
+import api from '../utils/api';
 import * as authService from '../utils/authService';
+import { GoogleLogin } from '@react-oauth/google'
 
 const SignUp = () => {
 
@@ -42,18 +43,16 @@ const SignUp = () => {
         setLoading(true);
 
         try {
-            // Respect cookie consent: if user declined, send without credentials (backend must honor this and return token in body)
             const consent = typeof window !== 'undefined' ? localStorage.getItem('cookie_consent') : null;
-            const allowCookies = consent !== 'declined'; // default allow unless explicitly declined
+            const allowCookies = consent !== 'declined';
 
             const res = await api.post('/api/auth/register', formData, {
                 headers: { 'Content-Type': 'application/json' },
-                withCredentials: allowCookies, // per-request override
+                withCredentials: allowCookies,
             });
 
             if (res.status >= 200 && res.status < 300) {
                 const data = res.data || {};
-                // if server returns an access token, set it in memory
                 const token = data?.accessToken || data?.token || null;
                 const user = data?.user || null;
                 if (token) authService.setAccessToken(token);
@@ -78,11 +77,9 @@ const SignUp = () => {
             })
         }
         catch (err) {
-            // Detailed axios error handling
             console.error("Signup error (frontend):", err);
 
             if (err.response) {
-                // Server responded with a status outside 2xx
                 console.log(
                     "Server response (debug):",
                     err.response.status,
@@ -94,7 +91,6 @@ const SignUp = () => {
                     `Server error: ${err.response.status}`;
                 toast.error(serverMessage, { theme: "dark" });
             } else if (err.request) {
-                // Request made but no response
                 console.log("No response received (debug):", err.request);
                 toast.error(
                     "No response from server — ensure backend is running and CORS is configured.",
@@ -103,7 +99,6 @@ const SignUp = () => {
                     }
                 );
             } else {
-                // Something else happened
                 toast.error(err.message || "Registration failed", { theme: "dark" });
             }
         }
@@ -115,6 +110,24 @@ const SignUp = () => {
 
     const togglePasswordVisibility = () => {
         setShowPassword(!showPassword);
+    };
+
+    // Google Sign-Up handler
+    const handleGoogleSuccess = async (credentialResponse) => {
+        setLoading(true);
+        try {
+            const data = await authService.googleSignIn(credentialResponse.credential);
+            toast.success(data?.message || 'Account created with Google!', {
+                theme: 'dark',
+                autoClose: 1200,
+                onClose: () => navigate('/', { replace: true }),
+            });
+        } catch (err) {
+            const msg = err?.response?.data?.message || 'Google sign-up failed';
+            toast.error(msg, { theme: 'dark' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -293,6 +306,42 @@ const SignUp = () => {
                             <div className={signupStyles.form.buttonHover} />
                         </button>
                     </form>
+
+                    {/* ── Google Sign-Up (inline styles — no Tailwind conflict) ── */}
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        marginTop: '14px',
+                        marginBottom: '6px',
+                        gap: '10px',
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            width: '100%',
+                            padding: '0 8px',
+                        }}>
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(251,146,60,0.25)' }} />
+                            <span style={{
+                                fontSize: '11px',
+                                color: '#94a3b8',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
+                            }}>or</span>
+                            <div style={{ flex: 1, height: '1px', background: 'rgba(251,146,60,0.25)' }} />
+                        </div>
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => toast.error('Google sign-up was cancelled', { theme: 'dark' })}
+                            theme="outline"
+                            shape="pill"
+                            size="large"
+                            text="signup_with"
+                            width="280"
+                        />
+                    </div>
 
                     <div
                         style={{

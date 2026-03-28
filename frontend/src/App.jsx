@@ -21,6 +21,7 @@ import * as authService from './utils/authService';
 import CookieConsent from './components/CookieConsent';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 // Branded loading spinner for auth checks — cheerful light theme
 const AuthLoadingScreen = () => (
@@ -187,6 +188,8 @@ const App = () => {
         />
 
         <Route path='/verify-payment' element={<VerifyPaymentPage />} />
+
+        <Route path='/verify-email' element={<VerifyEmailPage />} />
 
         {/* Payment result pages */}
         <Route path='/success' element={<PaymentResultPage />} />

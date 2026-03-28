@@ -9,6 +9,10 @@ import { encrypt } from '../services/cryptoService.js';  // NEW: Crypto service
 import Car from '../models/carModel.js';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+
+import { OAuth2Client } from 'google-auth-library';
+import { sendWelcomeEmail, sendVerificationEmail } from '../services/emailService.js';
+
 dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here';
@@ -16,6 +20,9 @@ const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m';
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 1);
 const REFRESH_TOKEN_COOKIE_NAME = process.env.REFRESH_TOKEN_COOKIE_NAME || 'refreshToken';
 const SERVER_URL = (process.env.SERVER_URL || 'http://localhost:7889').replace(/\/$/, '');
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const buildCarImageUrl = (file) => {
   if (!file) return '';
@@ -143,6 +150,8 @@ async function userResponse(user) {
     decade: user.decade || '',
     languages: user.languages || '',
     live: user.live || '',
+    authProvider: user.authProvider || 'local',
+    emailVerified: user.emailVerified || false
   };
 }
 
@@ -180,6 +189,18 @@ export async function register(req, res) {
     });
     await user.save();
 
+     // NEW: Generate email verification token
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    user.emailVerificationToken = verifyToken;
+    user.emailVerificationExpires = verifyExpires;
+    await user.save();
+
+    // NEW: Send welcome + verification emails (fire-and-forget, don't block registration)
+    const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    sendWelcomeEmail(user.email, user.name).catch(err => console.error('Welcome email failed:', err));
+    sendVerificationEmail(user.email, user.name, `${FRONTEND_URL}/verify-email?token=${verifyToken}`).catch(err => console.error('Verification email failed:', err));
+
     const accessToken = createAccessToken(newId.toString());
     const refreshToken = generateRefreshToken();
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
@@ -214,6 +235,14 @@ export async function login(req, res) {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email!' });
+
+    // Block password login for social-auth-only accounts
+    if (user.authProvider === 'google' && !user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'This account uses Google Sign-In. Please use the Google button to log in.',
+      });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ success: false, message: 'Invalid password!' });
@@ -315,6 +344,155 @@ export async function logout(req, res) {
     console.error('Logout error', err);
     clearRefreshCookie(res);
     clearAdminTokenCookie(res);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// NEW: Google Sign-In / Sign-Up handler
+export async function googleSignIn(req, res) {
+  try {
+    const { credential } = req.body; // Google ID token from frontend
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential required' });
+    }
+
+    // Verify the Google ID token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: GOOGLE_CLIENT_ID,
+      });
+    } catch (err) {
+      console.error('Google token verification failed:', err);
+      return res.status(401).json({ success: false, message: 'Invalid Google token' });
+    }
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email: rawEmail, name, picture, email_verified } = payload;
+
+    if (!rawEmail) {
+      return res.status(400).json({ success: false, message: 'Google account has no email' });
+    }
+
+    const email = validator.normalizeEmail(rawEmail) || rawEmail.toLowerCase();
+
+    // Check if user already exists
+    let user = await User.findOne({ $or: [{ googleId }, { email }] });
+
+    if (user) {
+      // Existing user — link Google if not already linked
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authProvider = user.authProvider === 'local' ? 'local' : 'google';
+        // If they signed up with email, keep authProvider as 'local' but add googleId
+      }
+      // Update profile picture if not set
+      if (!user.profilePicture && picture) {
+        user.profilePicture = picture;
+      }
+      // Google-verified emails are trusted
+      if (email_verified && !user.emailVerified) {
+        user.emailVerified = true;
+      }
+      await user.save();
+    } else {
+      // New user — create account
+      const newId = new mongoose.Types.ObjectId();
+      user = new User({
+        _id: newId,
+        name: name || 'Google User',
+        email,
+        authProvider: 'google',
+        googleId,
+        emailVerified: !!email_verified,
+        profilePicture: picture || '',
+        roles: ['renter'],
+      });
+      await user.save();
+
+      // Send welcome email (fire-and-forget)
+      sendWelcomeEmail(user.email, user.name).catch(err =>
+        console.error('Welcome email failed:', err)
+      );
+    }
+
+    // Issue tokens
+    const accessToken = createAccessToken(user._id.toString(), {
+      role: user.role,
+      companyId: user.companyId || null,
+      roles: user.roles || ['renter'],
+    });
+    const refreshToken = generateRefreshToken();
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+    await saveRefreshToken({ token: refreshToken, userId: user._id, expiresAt, createdByIp: req.ip || '' });
+    setRefreshCookie(res, refreshToken, REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60);
+
+    if (user.role === 'company_admin' || user.role === 'superadmin') {
+      setAdminTokenCookie(res, accessToken);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: user.createdAt && (Date.now() - new Date(user.createdAt).getTime() < 5000)
+        ? 'Account created with Google! Welcome to Swifty!'
+        : 'Signed in with Google successfully!',
+      accessToken,
+      user: await userResponse(user),
+    });
+  } catch (err) {
+    console.error('Google Sign-In error:', err);
+    return res.status(500).json({ success: false, message: 'Server error during Google sign-in' });
+  }
+}
+
+// NEW: Email verification handler
+export async function verifyEmail(req, res) {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ success: false, message: 'Verification token required' });
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired verification link' });
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    return res.json({ success: true, message: 'Email verified successfully!' });
+  } catch (err) {
+    console.error('verifyEmail error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// NEW: Resend verification email
+export async function resendVerification(req, res) {
+  try {
+    if (!req.user?.id) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.emailVerified) return res.json({ success: true, message: 'Email already verified' });
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = verifyToken;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    await sendVerificationEmail(user.email, user.name, `${FRONTEND_URL}/verify-email?token=${verifyToken}`);
+
+    return res.json({ success: true, message: 'Verification email sent' });
+  } catch (err) {
+    console.error('resendVerification error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 }

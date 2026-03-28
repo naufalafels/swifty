@@ -13,10 +13,13 @@ import {
   updateProfile,
   verifyPassword,
   getKycUploadUrls,
-  approveHost,  // NEW
-  rejectHost,   // NEW
-  approveKyc,   // Keep for KYC
-  rejectKyc,    // Keep for KYC
+  approveHost,
+  rejectHost,
+  approveKyc,
+  rejectKyc,
+  googleSignIn,
+  verifyEmail,
+  resendVerification,
 } from '../controllers/userController.js';
 import authMiddleware from '../middlewares/auth.js';
 import { loginLimiter } from '../middlewares/rateLimit.js';
@@ -26,13 +29,15 @@ const userRouter = express.Router();
 
 // Multer for vehicle image
 const vehicleUpload = multer({
-  dest: 'uploads/car-images/',  // Match buildCarImageUrl
+  dest: 'uploads/car-images/',
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 // Public
 userRouter.post('/login', loginLimiter, login);
 userRouter.post('/register', register);
+userRouter.post('/google', googleSignIn);            // Google Sign-In
+userRouter.get('/verify-email', verifyEmail);         // Email verification
 
 // Refresh and logout
 userRouter.post('/refresh', refresh);
@@ -42,6 +47,7 @@ userRouter.post('/logout', logout);
 userRouter.get('/me', authMiddleware, me);
 userRouter.post('/verify-password', authMiddleware, verifyPassword);
 userRouter.put('/update-profile', authMiddleware, updateProfile);
+userRouter.post('/resend-verification', authMiddleware, resendVerification);
 
 // Protected: renter KYC
 userRouter.get('/kyc/upload-urls', authMiddleware, getKycUploadUrls);
@@ -55,11 +61,11 @@ userRouter.post('/host/onboard', authMiddleware, vehicleUpload.single('vehicleIm
 // Protected: host fetch renter KYC by userId
 userRouter.get('/host/kyc/:userId', authMiddleware, hostGetRenterKyc);
 
-// NEW: Admin host approval/rejection (separate from KYC)
+// Admin host approval/rejection
 userRouter.post('/host/:id/approve', authMiddleware, approveHost);
 userRouter.post('/host/:id/reject', authMiddleware, rejectHost);
 
-// Keep KYC approve/reject for users
+// KYC approve/reject
 userRouter.post('/kyc/:id/approve', authMiddleware, approveKyc);
 userRouter.post('/kyc/:id/reject', authMiddleware, rejectKyc);
 

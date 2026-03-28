@@ -5,6 +5,7 @@ import { FaArrowLeft, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa'
 import logo from '../assets/swifty-logo.png'
 import { toast, ToastContainer } from 'react-toastify'
 import * as authService from '../utils/authService'
+import { GoogleLogin } from '@react-oauth/google'
 
 const Login = () => {
 
@@ -31,9 +32,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Use authService which keeps token in memory and attempts to use cookie-based refresh if backend sets refresh cookie
       const data = await authService.login(credentials);
-      // login returns server payload; authService already stored access token (in memory) and user
       const msg = data?.message || 'Login Successful! Welcome back';
       toast.success(msg, {
         position: 'top-right',
@@ -53,9 +52,7 @@ const Login = () => {
     catch (err) {
       console.error("Login error (frontend):", err);
 
-      // Handle rate limit (429) with improved UX
       if (err?.response?.status === 429) {
-        // Try to extract Retry-After header (seconds) to show more actionable message
         const retryAfterHeader = err.response?.headers?.['retry-after'];
         let waitInfo = '';
         if (retryAfterHeader) {
@@ -67,7 +64,6 @@ const Login = () => {
         const serverMessage =
           err.response.data?.message ||
           `Too many login attempts. Please try again later.${waitInfo}`;
-        // Persistent, prominent toast for rate-limits
         toast.error(serverMessage, { theme: "colored", autoClose: 8000 });
       } else if (err.response) {
         const serverMessage =
@@ -89,6 +85,26 @@ const Login = () => {
   };
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
+
+  // Google Sign-In handler
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    try {
+      const data = await authService.googleSignIn(credentialResponse.credential);
+      const msg = data?.message || 'Signed in with Google!';
+      toast.success(msg, {
+        theme: 'colored',
+        autoClose: 1000,
+        onClose: () => navigate('/', { replace: true }),
+      });
+    } catch (err) {
+      console.error('Google sign-in error:', err);
+      const msg = err?.response?.data?.message || 'Google sign-in failed';
+      toast.error(msg, { theme: 'colored' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className={loginStyles.pageContainer}>
@@ -182,6 +198,42 @@ const Login = () => {
               <div className={loginStyles.form.buttonHover} />
             </button>
           </form>
+
+          {/* ── Google Sign-In (inline styles — no Tailwind conflict) ── */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginTop: '16px',
+            marginBottom: '8px',
+            gap: '12px',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              width: '100%',
+              padding: '0 8px',
+            }}>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(251,146,60,0.25)' }} />
+              <span style={{
+                fontSize: '11px',
+                color: '#94a3b8',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+              }}>or</span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(251,146,60,0.25)' }} />
+            </div>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => toast.error('Google sign-in was cancelled', { theme: 'colored' })}
+              theme="outline"
+              shape="pill"
+              size="large"
+              text="signin_with"
+              width="280"
+            />
+          </div>
 
           <div className={loginStyles.signupSection}>
             <p className={loginStyles.signupText}>Don't have an account?</p>

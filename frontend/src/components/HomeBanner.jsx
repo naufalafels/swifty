@@ -125,20 +125,20 @@ export default function HeroSleek() {
             <button
               onClick={prev}
               aria-label="Previous slide"
-              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-50 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
+              className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
             >
               <FaChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={next}
               aria-label="Next slide"
-              className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-50 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
+              className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 bg-white/70 hover:bg-white/90 backdrop-blur-sm text-slate-800 p-3 sm:p-3.5 rounded-full transition-all shadow-md"
             >
               <FaChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
 
             {/* Dot indicators */}
-            <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 flex gap-2.5">
+            <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2.5">
               {slides.map((_, i) => (
                 <button
                   key={i}

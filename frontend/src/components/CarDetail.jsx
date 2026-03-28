@@ -996,9 +996,9 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-slate-600 text-sm">Free cancellation</span></div>
-              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">24/7 Roadside assistance</span></div>
-              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Unlimited mileage</span></div>
-              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-gray-300 text-sm">Collision damage waiver</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-slate-600 text-sm">24/7 Roadside assistance</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-slate-600 text-sm">Unlimited mileage</span></div>
+              <div className="flex items-center"><FaCheckCircle className="text-green-400 mr-2 text-sm" /><span className="text-slate-600 text-sm">Collision damage waiver</span></div>
             </div>
           </div>
         </div>
@@ -1204,7 +1204,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         onChange={handleInputChange}
                         onFocus={() => setActiveField("idType")}
                         onBlur={() => setActiveField(null)}
-                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                        className={carDetailStyles.textInputField + " bg-orange-50"}
                       >
                         <option value="passport">Passport</option>
                         <option value="nric">Malaysian NRIC</option>
@@ -1233,7 +1233,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         onFocus={() => setActiveField("idCountry")}
                         onBlur={() => setActiveField(null)}
                         required
-                        className={carDetailStyles.textInputField + " bg-gray-800"}
+                        className={carDetailStyles.textInputField + " bg-orange-50"}
                       >
                         {countryOptions.map((c) => (
                           <option key={c} value={c}>{c}</option>
@@ -1273,15 +1273,15 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-start gap-2 text-xs text-orange-300">
+                  <div className="mt-3 flex items-start gap-2 text-xs text-orange-600">
                     <FaShieldAlt className="mt-0.5" />
                     <span>Reminder: Please bring your valid driving license (domestic or international per Malaysian law). Host will verify ID in person.</span>
                   </div>
                 </div>
               )}
 
-              {/* ── Insurance options (now full width — much more breathing room) ── */}
-              <div className="p-3 rounded-xl border border-gray-700 bg-gray-800/70">
+              {/* ── Insurance / Excess ── */}
+              <div className="p-3 rounded-xl border border-orange-200 bg-orange-50/30">
                 <div className="flex items-center gap-2 mb-2">
                   <FaShieldAlt className="text-orange-400" />
                   <h3 className="text-sm font-semibold text-slate-800">Insurance / Excess</h3>
@@ -1290,7 +1290,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   {insuranceOptions.map((opt) => (
                     <label
                       key={opt.value}
-                      className="flex items-start gap-3 cursor-pointer rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-2 hover:border-orange-500 transition"
+                      className="flex items-start gap-3 cursor-pointer rounded-lg border border-orange-200 bg-white px-3 py-2 hover:border-orange-500 transition"
                     >
                       <input
                         type="radio"
@@ -1301,13 +1301,13 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                         className="mt-1 accent-orange-500"
                       />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-100">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                           {opt.label}
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-orange-300">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">
                             {opt.feePerDay ? `MYR ${opt.feePerDay}/day` : "No daily fee"}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">{opt.info}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{opt.info}</p>
                       </div>
                     </label>
                   ))}
@@ -1315,21 +1315,21 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
               </div>
 
               {/* ── Terms & Conditions ── */}
-              <div className="bg-gray-900/60 border border-gray-800 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-white font-semibold">
+              <div className="bg-orange-50/30 border border-orange-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-slate-800 font-semibold">
                   <FaFileContract className="text-orange-400" /> Terms & Conditions
                 </div>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-slate-600">
                   By booking, you agree to our{" "}
                   <button
                     type="button"
                     onClick={openTerms}
-                    className="text-orange-400 underline hover:text-orange-300"
+                    className="text-orange-500 underline hover:text-orange-600"
                   >
                     Terms & Conditions
                   </button>.
                 </p>
-                <label className="flex items-start gap-2 text-sm text-gray-200">
+                <label className="flex items-start gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
                     checked={acceptTerms}
@@ -1365,7 +1365,7 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                     <div className={carDetailStyles.priceRow}><span>Days</span><span>{days}</span></div>
                   )}
                   <div className={carDetailStyles.priceRow}><span>Insurance ({selectedPlan.label})</span><span>MYR&nbsp;{insuranceCost}</span></div>
-                  <div className={carDetailStyles.priceRow}><span>Deposit (pay at counter)</span><span className="text-gray-300">MYR&nbsp;{deposit}</span></div>
+                  <div className={carDetailStyles.priceRow}><span>Deposit (pay at counter)</span><span className="text-gray-400">MYR&nbsp;{deposit}</span></div>
                   <div className={carDetailStyles.totalRow}><span>Total (to pay now)</span><span>MYR&nbsp;{calculateTotal()}</span></div>
                   <p className="text-xs text-gray-400 mt-2">No hidden costs. Deposit is collected at the rental desk and will not be charged online.</p>
                 </div>

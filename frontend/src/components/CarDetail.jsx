@@ -231,6 +231,28 @@ const CarDetail = () => {
   const [termsText, setTermsText] = useState("");
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [alreadySubscribed, setAlreadySubscribed] = useState(false);
+
+  // Check if the user has already opted in to marketing on a previous booking
+  useEffect(() => {
+    if (!currentUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await authService.ensureAuth();
+        const res = await api.get("/api/bookings/mybooking");
+        const bookings = Array.isArray(res.data) ? res.data : [];
+        const hasSubscribed = bookings.some((b) => b.marketingConsent === true);
+        if (!cancelled && hasSubscribed) {
+          setAlreadySubscribed(true);
+          setMarketingConsent(true); // silently keep it true for future submissions
+        }
+      } catch {
+        // Silently ignore — guest or auth failure; just show the checkbox
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUserId]);
 
   useEffect(() => setToday(todayISO()), []);
 
@@ -1316,17 +1338,19 @@ const calculateTotal = () => computeTotalRent() + insuranceCost;
                   />
                   <span>I have read and accept the Terms & Conditions.</span>
                 </label>
-                <label className="flex items-start gap-2 text-sm text-gray-200 mt-2">
-                  <input
-                    type="checkbox"
-                    checked={marketingConsent}
-                    onChange={(e) => setMarketingConsent(e.target.checked)}
-                    className="mt-1 accent-emerald-500"
-                  />
-                  <span>
-                    I agree to receive marketing communications and promotional offers from the car host via email. You can unsubscribe anytime.
-                  </span>
-                </label>
+                {!alreadySubscribed && (
+                  <label className="flex items-start gap-2 text-sm text-slate-700 mt-2">
+                    <input
+                      type="checkbox"
+                      checked={marketingConsent}
+                      onChange={(e) => setMarketingConsent(e.target.checked)}
+                      className="mt-1 accent-emerald-500"
+                    />
+                    <span>
+                      I agree to receive marketing communications and promotional offers from the car host via email. You can unsubscribe anytime.
+                    </span>
+                  </label>
+                )}
                 {termsError && <p className="text-xs text-red-400">{termsError}</p>}
               </div>
 

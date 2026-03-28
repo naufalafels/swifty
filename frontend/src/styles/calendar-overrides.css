@@ -35,7 +35,7 @@
 }
 
 .swifty-calendar .rdrMonthName {
-  color: #f1f5f9;
+  color: #000000;
   font-weight: 700;
   font-size: 15px;
   text-align: center;
@@ -100,7 +100,7 @@
 }
 
 .swifty-calendar .rdrDayNumber span {
-  color: #ffffff !important;
+  color: #3e3e3e !important;
   font-weight: 600;
   font-size: 13.5px;
   z-index: 2;
@@ -108,7 +108,7 @@
 
 /* ── Passive (out-of-month) days — LIGHTER (clearly secondary) ── */
 .swifty-calendar .rdrDayPassive .rdrDayNumber span {
-  color: #475569 !important;
+  color: #8892a0 !important;
   font-weight: 400;
 }
 
@@ -132,7 +132,7 @@
 .swifty-calendar .rdrStartEdge,
 .swifty-calendar .rdrEndEdge {
   background: #f97316 !important;
-  border-radius: 50% !important;
+  border-radius: 15% !important;
   top: 3px;
   bottom: 3px;
 }

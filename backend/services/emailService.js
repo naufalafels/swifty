@@ -6,8 +6,8 @@ const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@swifty.my';
-const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'Swifty Car Rentals';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@vroomoo.my';
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'Vroomoo Car Rentals';
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
 
 // Create reusable transporter
@@ -62,10 +62,10 @@ function wrapHtml(title, bodyContent) {
           <tr>
             <td style="background:#f1f5f9;padding:24px 40px;text-align:center;border-top:1px solid #e2e8f0;">
               <p style="margin:0;color:#94a3b8;font-size:12px;">
-                &copy; ${new Date().getFullYear()} Swifty Car Rentals. All rights reserved.
+                &copy; ${new Date().getFullYear()} Vroomoo Car Rentals. All rights reserved.
               </p>
               <p style="margin:8px 0 0;color:#94a3b8;font-size:11px;">
-                <a href="${FRONTEND_URL}" style="color:#fb923c;text-decoration:none;">Visit Swifty</a>
+                <a href="${FRONTEND_URL}" style="color:#fb923c;text-decoration:none;">Visit Vroomoo</a>
               </p>
             </td>
           </tr>
@@ -82,9 +82,9 @@ function wrapHtml(title, bodyContent) {
 // ──────────────────────────────────────────────
 export async function sendWelcomeEmail(toEmail, userName) {
   const body = `
-    <h2 style="color:#1e293b;margin:0 0 16px;">Welcome to Swifty, ${userName}! 🎉</h2>
+    <h2 style="color:#1e293b;margin:0 0 16px;">Welcome to Vroomoo, ${userName}! 🎉</h2>
     <p style="color:#475569;font-size:15px;line-height:1.7;">
-      We're thrilled to have you join the Swifty family. Your account is ready and you can start browsing our premium car fleet right away.
+      We're thrilled to have you join the Vroomoo family. Your account is ready and you can start browsing our premium car fleet right away.
     </p>
     <p style="color:#475569;font-size:15px;line-height:1.7;">Here's what you can do:</p>
     <ul style="color:#475569;font-size:14px;line-height:2;">
@@ -106,8 +106,8 @@ export async function sendWelcomeEmail(toEmail, userName) {
   await transporter.sendMail({
     from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
     to: toEmail,
-    subject: 'Welcome to Swifty! 🚗',
-    html: wrapHtml('Welcome to Swifty', body),
+    subject: 'Welcome to Vroomoo! 🚗',
+    html: wrapHtml('Welcome to Vroomoo', body),
   });
 }
 
@@ -118,7 +118,7 @@ export async function sendVerificationEmail(toEmail, userName, verifyUrl) {
   const body = `
     <h2 style="color:#1e293b;margin:0 0 16px;">Verify Your Email</h2>
     <p style="color:#475569;font-size:15px;line-height:1.7;">
-      Hi ${userName}, please verify your email address to secure your Swifty account and unlock all features.
+      Hi ${userName}, please verify your email address to secure your Vroomoo account and unlock all features.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${verifyUrl}" style="display:inline-block;background:#fb923c;color:#ffffff;padding:14px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px;">
@@ -136,7 +136,7 @@ export async function sendVerificationEmail(toEmail, userName, verifyUrl) {
   await transporter.sendMail({
     from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
     to: toEmail,
-    subject: 'Verify your Swifty email ✉️',
+    subject: 'Verify your Vroomoo email ✉️',
     html: wrapHtml('Verify Email', body),
   });
 }
@@ -233,7 +233,7 @@ export async function sendMarketingEmail(toEmail, subject, htmlContent) {
     ${htmlContent}
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
     <p style="color:#94a3b8;font-size:11px;text-align:center;">
-      You received this because you signed up at Swifty. 
+      You received this because you signed up at Vroomoo. 
       <a href="${FRONTEND_URL}/profile/privacy" style="color:#fb923c;">Manage preferences</a>
     </p>
   `;
@@ -253,7 +253,7 @@ export async function sendHostApprovalEmail(toEmail, userName) {
   const body = `
     <h2 style="color:#1e293b;margin:0 0 16px;">You're Approved as a Host! 🎊</h2>
     <p style="color:#475569;font-size:15px;line-height:1.7;">
-      Congratulations ${userName}! Your host application has been approved. You can now list your cars on Swifty and start earning.
+      Congratulations ${userName}! Your host application has been approved. You can now list your cars on Vroomoo and start earning.
     </p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${FRONTEND_URL}/host/dashboard" style="display:inline-block;background:#fb923c;color:#ffffff;padding:14px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px;">
@@ -293,7 +293,7 @@ export async function sendHostRejectionEmail(toEmail, userName, reason) {
   await transporter.sendMail({
     from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
     to: toEmail,
-    subject: 'Host Application Update — Swifty',
+    subject: 'Host Application Update — Vroomoo',
     html: wrapHtml('Host Application', body),
   });
 }

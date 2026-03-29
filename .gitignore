@@ -31,5 +31,6 @@ uploads/
 # Temporary files
 *.tmp
 # SSL Certificates (self-signed for dev)
+*.pem
 key.pem
 cert.pem

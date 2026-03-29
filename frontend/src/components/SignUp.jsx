@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { signupStyles } from '../assets/dummyStyles'
 import { FaArrowLeft, FaCheck, FaEnvelope, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa'
 import { useNavigate } from 'react-router-dom'
-import logo from "../assets/swifty-logo.png"
+import logo from "../assets/vroomoo.png"
 import { ToastContainer, toast } from "react-toastify"
 import api from '../utils/api';
 import * as authService from '../utils/authService';
@@ -184,9 +184,6 @@ const SignUp = () => {
                                         display: "block",
                                     }}
                                 />
-                                <span className=' font-bold tracking-wider text-white mt-1'>
-                                    swifty
-                                </span>
                             </div>
                         </div>
                         <h1 className={signupStyles.signupCard.title}>Join Us Today!</h1>

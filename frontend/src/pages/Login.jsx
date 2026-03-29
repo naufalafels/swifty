@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { loginStyles } from '../assets/dummyStyles'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FaArrowLeft, FaEye, FaEyeSlash, FaLock, FaUser } from 'react-icons/fa'
-import logo from '../assets/swifty-logo.png'
+import logo from '../assets/vroomoo.png'
 import { toast, ToastContainer } from 'react-toastify'
 import * as authService from '../utils/authService'
 import { GoogleLogin } from '@react-oauth/google'
@@ -142,7 +142,6 @@ const Login = () => {
                     objectFit: "contain",
                   }}
                 />
-                <span className=' font-bold tracking-wider'>swifty</span>
               </div>
             </div>
 

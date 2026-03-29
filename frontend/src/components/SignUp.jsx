@@ -346,17 +346,15 @@ const SignUp = () => {
                         }}
                         className={signupStyles.signinSection}
                     >
-                        <p className={signupStyles.signinText}>Already have an account?</p>
-                        <a
-                            href="/login"
-                            className={signupStyles.signinButton}
-                            style={{
-                                borderRadius: "16px",
-                                boxShadow: "0 2px 10px rgba(245, 124, 0, 0.08)",
-                            }}
-                        >
-                            LOGIN TO YOUR ACCOUNT
-                        </a>
+                        <p className="text-xs sm:text-sm text-slate-500">
+                            Already have an account?{" "}
+                            <a
+                                href="/login"
+                                className="font-semibold text-orange-500 hover:text-orange-600 hover:underline transition-colors duration-200"
+                            >
+                                Sign in
+                            </a>
+                        </p>
                     </div>
                 </div>
             </div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import logo from "../assets/logo.png";
+import logo from "../assets/v.png";
 import axios from "axios"; // FIX: Import axios (was missing — `api` was never defined)
 import { BarChart3, ShieldCheck, FileText, Receipt, FileSignature, FileBarChart, LogOut, User, ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -91,7 +91,7 @@ const Sidebar = () => {
       >
         <div className={`flex items-center justify-between mb-8 ${isCollapsed ? "justify-center" : ""}`}>
           <img src={logo} alt="Logo" className={`h-10 w-auto ${isCollapsed ? "" : "mr-3"}`} />
-          {!isCollapsed && <span className="text-xl font-bold">Swifty Admin</span>}
+          {!isCollapsed && <span className="text-xl font-bold">Administration</span>}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1 bg-gray-700 rounded hover:bg-gray-600 transition-colors"

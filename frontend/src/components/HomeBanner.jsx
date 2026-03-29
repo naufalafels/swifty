@@ -4,19 +4,18 @@ import { FaChevronLeft, FaChevronRight, FaArrowRight } from "react-icons/fa";
 import { heroStyles as styles } from "../assets/dummyStyles";
 
 // Import all your marketing / promo images
-import hc1 from "../assets/HC1.jpeg";
+// import hc1 from "../assets/HC1.jpeg";
 import hc2 from "../assets/HC2.png";
 import hc3 from "../assets/HC3.png";
 import hc4 from "../assets/HC4.png";
 
 // ── slide data (add / remove entries here and the carousel adapts) ──
 const slides = [
-  { src: hc1, alt: "Swifty Promotion — Premium car fleet showcase" },
-  { src: hc2, alt: "Swifty Promotion — Affordable rental deals" },
-  { src: hc3, alt: "Swifty Promotion — Easy online booking" },
-  { src: hc4, alt: "Swifty Promotion — Trusted car rental service" },
+  // { src: hc1, alt: "Vroomoo Promotion — Premium car fleet showcase" },
+  { src: hc3, alt: "Vroomoo Promotion — Affordable rental deals" },
+  { src: hc2, alt: "Vroomoo Promotion — Easy online booking" },
+  { src: hc4, alt: "Vroomoo Promotion — Trusted car rental service" },
 ];
-
 const AUTOPLAY_MS = 5000; // 5 seconds per slide
 
 export default function HeroSleek() {
@@ -161,7 +160,7 @@ export default function HeroSleek() {
         <div className="relative rounded-2xl p-5 sm:p-6 bg-white border border-orange-100 shadow-lg shadow-orange-100/50 flex flex-col md:flex-row items-center justify-between gap-4 max-w-xl w-full text-center md:text-left">
           <div>
             <p className="text-xs uppercase tracking-widest text-orange-500/80">
-              Swifty Car Rental
+              Vroomoo Car Rental
             </p>
             <h2 className="text-slate-800 text-lg sm:text-xl md:text-2xl font-semibold mt-1">
               Find Your Perfect Ride

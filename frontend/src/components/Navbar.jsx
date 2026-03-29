@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { FaBars, FaTimes, FaUser, FaSignOutAlt, FaBell } from "react-icons/fa";
-import logo from "../assets/swifty-logo.png";
+import logo from "../assets/vroomoo-logo.png";
 import { navbarStyles as styles } from "../assets/dummyStyles.js";
 import api from "../utils/api";
 import * as authService from "../utils/authService";
@@ -281,7 +281,7 @@ const Navbar = () => {
                 <div className={styles.logoContainer}>
                   <img
                     src={logo}
-                    alt="Swifty logo"
+                    alt="Vroomoo logo"                    
                     className="h-[1em] w-auto block"
                     style={{ display: "block", objectFit: "contain" }}
                   />

@@ -109,7 +109,7 @@ const AuthPage = () => {
             <ShieldCheck className="h-6 w-6 text-indigo-300" />
           </div>
           <div>
-            <p className="text-sm text-slate-400">Swifty Admin Console</p>
+            <p className="text-sm text-slate-400">Vroomoo Admin Console</p>
             <h1 className="text-xl font-semibold text-white">Admin Sign In</h1>
           </div>
         </div>
@@ -200,7 +200,7 @@ const AuthPage = () => {
           </button>
 
           <p className="text-xs text-slate-500 leading-relaxed">
-            Admin-only access. If you’re a Host or User, please sign in through the main Swifty app.
+            Admin-only access. If you’re a Host or User, please sign in through the main Vroomoo app.
           </p>
         </form>
       </div>

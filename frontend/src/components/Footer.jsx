@@ -1,7 +1,7 @@
 import React from 'react'
 import { footerStyles as styles } from '../assets/dummyStyles'
 import { Link } from 'react-router-dom'
-import logo from '../assets/swifty-logo.png'
+import logo from '../assets/vroomoo.png'
 import { FaPhone, FaEnvelope, FaFacebookF, FaInstagram, FaLinkedinIn, FaMapMarkedAlt, FaTwitter, FaYoutube, FaCar } from 'react-icons/fa'
 import { GiCarKey } from 'react-icons/gi'
 import * as authService from '../utils/authService'
@@ -26,14 +26,13 @@ const Footer = () => {
                         <div className={styles.logoContainer}>
                             <img 
                                 src={logo} 
-                                alt="Swifty Car Rental logo"
+                                alt="Vroomoo Car Rental logo"
                                 className='h-[1em] w-auto block'
                                 style={{
                                     display: "block",
                                     objectFit: "contain",
                                 }}
                             />
-                            <span className={styles.logoText}>swifty</span>
                         </div>
                     </Link>
                     <p className={styles.description}>
@@ -102,7 +101,7 @@ const Footer = () => {
 
                         <li className={styles.contactItem}>
                             <FaEnvelope className={styles.contactIcon} />
-                            <span>admin@swifty.com</span>
+                            <span>admin@vroomoo.com</span>
                         </li>
                     </ul>
                 
@@ -153,7 +152,7 @@ const Footer = () => {
 
             {/* BOTTOM COPYRIGHT */}
             <div className={styles.copyright}>
-                <p>&copy; {new Date().getFullYear()} Swifty. All Rights Reserved.</p>
+                <p>&copy; {new Date().getFullYear()} Vroomoo Inc. All Rights Reserved.</p>
                 <p className=' mt-3 md:mt-0'>
                     Designed by{" "}
                     <a 

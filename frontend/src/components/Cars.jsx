@@ -26,8 +26,8 @@ const startOfDay = (d) => {
 };
 const daysBetween = (from, to) => Math.ceil((startOfDay(to) - startOfDay(from)) / MS_PER_DAY);
 
-const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury"];
-const DEFAULT_SEATS = [2, 4, 5, 7];
+const DEFAULT_TYPES = ["Hatchback", "Sedan", "SUV", "MPV", "Luxury", "Van"];
+const DEFAULT_SEATS = [2, 4, 5, 6, 7, 8, 12];
 
 // ─── Flexible pricing helpers ───
 const getFlexPricing = (car) => car?.flexiblePricing || {
@@ -996,7 +996,7 @@ className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orang
                             onChange={() => toggleSeat(s)}
                             className="w-4 h-4 accent-orange-500"
                           />
-                          <span className="text-sm text-slate-700">{s} Seats</span>
+                          <span className="text-sm text-slate-700">{s} Seaters</span>
                         </label>
                       ))}
                     </div>
@@ -1188,7 +1188,7 @@ className="w-full p-3 rounded bg-orange-50/50 text-slate-800 border border-orang
                         <div className={carPageStyles.specIconContainer}>
                           <FaUserFriends className="text-sky-400" />
                         </div>
-                        <span>{car.seats ?? "4"} Seats</span>
+                        <span>{car.seats ?? "4"} Seaters</span>
                       </div>
 
                       <div className={carPageStyles.specItem}>

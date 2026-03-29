@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
 import { OAuth2Client } from 'google-auth-library';
-import { sendWelcomeEmail, sendVerificationEmail } from '../services/emailService.js';
+import { sendWelcomeEmail, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 dotenv.config();
 
@@ -1080,3 +1080,64 @@ export async function clearNotifications(req, res) {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
+
+// ──────────────────────────────────────────────
+// Password Reset: Forgot Password
+// ──────────────────────────────────────────────
+export async function forgotPassword(req, res) {
+  try {
+    const email = validator.normalizeEmail(String(req.body.email || '').trim());
+    if (!email || !validator.isEmail(email))
+      return res.status(400).json({ success: false, message: 'Valid email required' });
+
+    const user = await User.findOne({ email });
+    // Always return success to prevent email enumeration
+    if (!user) return res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
+
+    // Block reset for Google-only accounts with no password
+    if (user.authProvider === 'google' && !user.password) {
+      return res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    await sendPasswordResetEmail(user.email, user.name, `${FRONTEND_URL}/reset-password?token=${resetToken}`);
+
+    return res.json({ success: true, message: 'If that email exists, a reset link was sent.' });
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// ──────────────────────────────────────────────
+// Password Reset: Reset with Token
+// ──────────────────────────────────────────────
+export async function resetPassword(req, res) {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password || password.length < 8)
+      return res.status(400).json({ success: false, message: 'Token and password (8+ chars) required' });
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) return res.status(400).json({ success: false, message: 'Invalid or expired reset link' });
+
+    user.password = await bcrypt.hash(password, 10);
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+
+    return res.json({ success: true, message: 'Password reset successful!' });
+  } catch (err) {
+    console.error('resetPassword error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}

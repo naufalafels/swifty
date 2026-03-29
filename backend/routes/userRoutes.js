@@ -20,6 +20,8 @@ import {
   googleSignIn,
   verifyEmail,
   resendVerification,
+  forgotPassword,
+  resetPassword,
 } from '../controllers/userController.js';
 import authMiddleware from '../middlewares/auth.js';
 import { loginLimiter } from '../middlewares/rateLimit.js';
@@ -38,6 +40,8 @@ userRouter.post('/login', loginLimiter, login);
 userRouter.post('/register', register);
 userRouter.post('/google', googleSignIn);            // Google Sign-In
 userRouter.get('/verify-email', verifyEmail);         // Email verification
+userRouter.post('/forgot-password', forgotPassword);
+userRouter.post('/reset-password', resetPassword);
 
 // Refresh and logout
 userRouter.post('/refresh', refresh);

@@ -108,6 +108,16 @@ const userSchema = new mongoose.Schema(
     emailVerificationToken: { type: String, default: null },
     emailVerificationExpires: { type: Date, default: null },
 
+    // Password reset                                          
+    passwordResetToken: { type: String, default: null },      
+    passwordResetExpires: { type: Date, default: null },       
+
+    role: {
+      type: String,
+      enum: ["user", "customer", "company_admin", "superadmin", "guest", "host"],
+      default: "user",
+    },
+
     role: {
       type: String,
       enum: ["user", "customer", "company_admin", "superadmin", "guest", "host"],

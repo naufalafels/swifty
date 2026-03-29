@@ -298,4 +298,34 @@ export async function sendHostRejectionEmail(toEmail, userName, reason) {
   });
 }
 
+// ──────────────────────────────────────────────
+// 7. Password Reset Email
+// ──────────────────────────────────────────────
+export async function sendPasswordResetEmail(toEmail, userName, resetUrl) {
+  const body = `
+    <h2 style="color:#1e293b;margin:0 0 16px;">Reset Your Password</h2>
+    <p style="color:#475569;font-size:15px;line-height:1.7;">
+      Hi ${userName}, we received a request to reset your password. Click the button below to choose a new one.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${resetUrl}" style="display:inline-block;background:#fb923c;color:#ffffff;padding:14px 36px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px;">
+        Reset Password
+      </a>
+    </div>
+    <p style="color:#94a3b8;font-size:13px;">
+      This link expires in 1 hour. If you didn't request this, you can safely ignore this email — your password won't change.
+    </p>
+    <p style="color:#cbd5e1;font-size:11px;margin-top:24px;word-break:break-all;">
+      Or copy this link: ${resetUrl}
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: `"${EMAIL_FROM_NAME}" <${EMAIL_FROM}>`,
+    to: toEmail,
+    subject: 'Reset your Vroomoo password 🔑',
+    html: wrapHtml('Reset Password', body),
+  });
+}
+
 export default transporter;
